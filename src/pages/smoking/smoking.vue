@@ -148,6 +148,8 @@ export default {
       // 音效
       soundEnabled: true,
       audioCtx: null,
+      burnSoundSource: null,
+      burnSoundGain: null,
       // 烟圈
       ringActive: false,
       ringPressTimer: null,
@@ -269,6 +271,7 @@ export default {
       this.stopDomFilter()
       this.stopInhale()
       this.stopIdleSmoke()
+      this.stopBurnSound()
       this.setSmokeMode('off')
     },
 
@@ -757,6 +760,8 @@ export default {
         this.startSmokeProgress()
         this.showHint = false
         if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
+        // 开始燃烧音效
+        this.startBurnSound()
       }
     },
 
@@ -798,6 +803,8 @@ export default {
       }
 
       if (this.state === 'smoking') {
+        // 停止燃烧音效
+        this.stopBurnSound()
         // 计算本次吸入时长，越久吐烟越多
         const puffDuration = this.currentPuffStart ? Date.now() - this.currentPuffStart : 1000
         // 综合因素：进度越后烟越浓，吸入越久烟越多
@@ -982,6 +989,77 @@ export default {
         source.start()
       } catch (e) {
         console.warn('Exhale sound failed', e)
+      }
+    },
+
+    // 燃烧音效：持续燃烧声
+    startBurnSound() {
+      if (!this.soundEnabled) return
+      this.stopBurnSound()
+      const ctx = this.ensureAudio()
+      if (!ctx) return
+      try {
+        // 创建持续燃烧噪声
+        const bufferSize = ctx.sampleRate * 2  // 2秒循环缓冲
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+        const data = buffer.getChannelData(0)
+        
+        // 生成燃烧噪声（粉红噪声 + 爆裂声）
+        let b0 = 0, b1 = 0, b2 = 0
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1
+          // 粉红噪声滤波
+          b0 = 0.99765 * b0 + white * 0.0990460
+          b1 = 0.96370 * b1 + white * 0.2965164
+          b2 = 0.57000 * b2 + white * 1.0526913
+          const pink = (b0 + b1 + b2 + white * 0.1848) * 0.11
+          
+          // 随机爆裂声
+          let crackle = 0
+          if (Math.random() < 0.002) {
+            crackle = (Math.random() - 0.5) * 0.3
+          }
+          
+          data[i] = pink + crackle
+        }
+        
+        const source = ctx.createBufferSource()
+        source.buffer = buffer
+        source.loop = true
+        
+        // 带通滤波：模拟燃烧声
+        const filter = ctx.createBiquadFilter()
+        filter.type = 'bandpass'
+        filter.frequency.value = 400
+        filter.Q.value = 0.5
+        
+        // 音量控制
+        const gain = ctx.createGain()
+        gain.gain.value = 0.25
+        
+        source.connect(filter)
+        filter.connect(gain)
+        gain.connect(ctx.destination)
+        source.start()
+        
+        this.burnSoundSource = source
+        this.burnSoundGain = gain
+      } catch (e) {
+        console.warn('Burn sound failed', e)
+      }
+    },
+
+    stopBurnSound() {
+      if (this.burnSoundSource) {
+        try {
+          this.burnSoundSource.stop()
+          this.burnSoundSource.disconnect()
+        } catch (e) {}
+        this.burnSoundSource = null
+      }
+      if (this.burnSoundGain) {
+        try { this.burnSoundGain.disconnect() } catch (e) {}
+        this.burnSoundGain = null
       }
     },
 
