@@ -1,5 +1,8 @@
 <template>
   <view class="page-container">
+    <!-- 背景火光（由亮渐灭） -->
+    <view class="bg-ember-glow" :style="bgGlowStyle"></view>
+
     <!-- Canvas 烟雾层 -->
     <view class="canvas-wrapper" :style="{ pointerEvents: sceneReady ? 'auto' : 'none' }"
       @touchstart.prevent="onPointerDown" @touchmove.prevent="onPointerMove" @touchend.prevent="onPointerUp"
@@ -22,7 +25,7 @@
       </view>
 
       <!-- 2D 香烟 -->
-      <view class="cigarette-3d" :class="cigClass">
+      <view class="cigarette-3d" :class="cigClass" :style="cigBurnStyle">
         <view class="cig-flat-ash" :class="{ show: ashGrowth > 0, 'ash-falling': ashFalling }" :style="ashStyle"></view>
         <view class="cig-flat-charring" :class="{ show: ashGrowth > 0 }" :style="{ opacity: ashGrowth > 0 ? (0.4 + Math.min(1, ashGrowth / 80) * 0.6) : 0 }"></view>
         <view class="cig-flat-burn">
@@ -47,6 +50,12 @@
     <!-- 抽烟提示 -->
     <view class="smoke-hint" v-if="showHint">
       <text>{{ hintText }}</text>
+    </view>
+
+    <!-- 燃烧进度条 -->
+    <view class="burn-progress" v-if="state !== 'ready' && state !== 'burnout' && state !== 'cooldown'">
+      <view class="burn-progress-bar" :style="{ width: smokeProgress + '%' }"></view>
+      <text class="burn-progress-text">{{ Math.round(smokeProgress) }}%</text>
     </view>
 
     <!-- 功能按钮 -->
@@ -106,7 +115,7 @@
 <script>
 import Store from '@/utils/store.js'
 
-const SMOKING_DURATION = 18000
+const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
 
 export default {
@@ -167,7 +176,13 @@ export default {
       domFilterFrames: 1,
       domFilterRaf: null,
       domActivePuffs: 0,
-      inhaleTimer: null
+      inhaleTimer: null,
+      // 空闲冒烟
+      idleSmokeTimer: null,
+      // 本次吸入开始时间
+      currentPuffStart: 0,
+      // 烟灰自动断裂
+      ashBreakThreshold: 120
     }
   },
 
@@ -184,8 +199,34 @@ export default {
 
     ashStyle() {
       if (this.ashGrowth <= 0) return { height: '0px' }
-      const h = 38 * 0.9 * (this.ashGrowth / 100)
+      const h = 52 * 0.9 * (this.ashGrowth / 100)
       return { height: Math.max(3, h) + 'px' }
+    },
+
+    // 香烟燃烧变短：减少容器高度，烟头位置不变
+    cigBurnStyle() {
+      if (this.smokeProgress <= 0) return {}
+      const totalH = 560 // --cig-total-h
+      // 最多缩短 70%（保留滤嘴）
+      const deltaH = (this.smokeProgress / 100) * totalH * 0.7
+      const newH = totalH - deltaH
+      // 补偿 translateY：容器变短后要下移，保持烟头位置不变
+      const offsetY = deltaH / 2
+      return {
+        height: newH + 'px',
+        transform: `translate(-50%, calc(-50% + ${offsetY}px))`
+      }
+    },
+
+    // 背景火光：由亮渐灭，吸烟时更亮
+    bgGlowStyle() {
+      if (this.state === 'ready' || this.state === 'igniting') return { opacity: 0 }
+      // 基础亮度：随进度衰减
+      const baseBrightness = Math.max(0, 1 - this.smokeProgress / 100)
+      // 吸烟时额外增亮
+      const smokingBoost = this.state === 'smoking' ? 0.4 : 0
+      const litBoost = (this.state === 'lit' || this.state === 'exhaling') ? 0.1 : 0
+      return { opacity: Math.min(1, baseBrightness + smokingBoost + litBoost) }
     }
   },
 
@@ -227,6 +268,7 @@ export default {
       this.stopCanvasLoop()
       this.stopDomFilter()
       this.stopInhale()
+      this.stopIdleSmoke()
       this.setSmokeMode('off')
     },
 
@@ -310,9 +352,16 @@ export default {
       extras = extras || {}
       const p = { x, y, type, life: 0, maxLife: 0, vx: 0, vy: 0, size: 0, maxSize: 0, r: 0, g: 0, b: 0 }
       if (type === 'spark') {
-        p.vx = (Math.random() - 0.5) * 1.5; p.vy = -Math.random() * 2 - 1
-        p.size = Math.random() * 2 + 0.5; p.life = Math.random() * 30 + 20; p.maxLife = p.life
-        p.r = 255; p.g = Math.floor(Math.random() * 100 + 120); p.b = 0
+        // 火星：更自然的速度和生命周期
+        p.vx = (Math.random() - 0.5) * 2.5
+        p.vy = -Math.random() * 3 - 1.5
+        p.size = Math.random() * 2.5 + 0.8
+        p.life = Math.random() * 40 + 25
+        p.maxLife = p.life
+        // 火星颜色：橙红到金黄
+        p.r = 255
+        p.g = Math.floor(Math.random() * 120 + 100)
+        p.b = Math.random() < 0.3 ? Math.floor(Math.random() * 30) : 0
       } else if (type === 'ring') {
         const angle = Math.random() * Math.PI * 2, speed = 1.2 + Math.random() * 0.8, rs = this.ringCurrentStyle
         if (rs === 0) { p.vx = Math.cos(angle) * speed * 0.6; p.vy = -speed * 0.5 + Math.sin(angle) * 0.8 }
@@ -332,12 +381,24 @@ export default {
         const spread = extras.spread || 280, power = extras.power || 1
         p.x = extras.originX !== undefined ? extras.originX : this.emitterX + (Math.random() - 0.5) * spread
         p.y = extras.originY !== undefined ? extras.originY : this.canvasH + 10
-        p.vx = (Math.random() - 0.5) * 0.8; p.vy = -(Math.random() * 2.2 + 1.6) * power
+        // 先沉后升：初始 vy 可能为正（下沉），之后减速再反向上升
+        p.vx = (Math.random() - 0.5) * 0.8; p.vy = (Math.random() * 1.2 + 0.3) * power
         p.size = Math.random() * 10 + 6; p.maxSize = p.size + Math.random() * 70 + 50
         p.life = Math.random() * 180 + 160; p.maxLife = p.life
         const g = Math.floor(Math.random() * 30 + 200); p.r = g; p.g = g; p.b = g + Math.floor(Math.random() * 12)
         p.wobblePhase = Math.random() * Math.PI * 2; p.wobbleAmp = Math.random() * 1.5 + 0.6
         p.wobbleSpeed = 0.04 + Math.random() * 0.05; p.decel = 0.985 + Math.random() * 0.01
+        // 分层：前 30% 粒子更浓更大
+        p.layer = extras.layer || 1
+      } else if (type === 'idle-wisp') {
+        // 空闲时烟头自然冒出的细烟丝
+        p.vx = (Math.random() - 0.5) * 0.15
+        p.vy = -(Math.random() * 0.6 + 0.3)
+        p.size = Math.random() * 3 + 1.5; p.maxSize = p.size + Math.random() * 8 + 5
+        p.life = Math.random() * 60 + 40; p.maxLife = p.life
+        const g = Math.floor(Math.random() * 20 + 190); p.r = g; p.g = g; p.b = g + Math.floor(Math.random() * 8)
+        p.wobblePhase = Math.random() * Math.PI * 2; p.wobbleAmp = Math.random() * 0.4 + 0.1
+        p.wobbleSpeed = 0.03 + Math.random() * 0.03
       } else {
         const a2 = (Math.random() - 0.5) * Math.PI * 0.4, sp = Math.random() * 2 + 1
         p.vx = Math.sin(a2) * sp; p.vy = -Math.random() * 3 - 2
@@ -354,7 +415,21 @@ export default {
       if (p.type === 'spark') { p.x += p.vx; p.y += p.vy; p.vy -= 0.02; p.size *= 0.98 }
       else if (p.type === 'ring') { p.x += p.vx; p.y += p.vy; p.vx += Math.cos(this.ringTime * 0.1 + progress * 2) * 0.05; p.vx = Math.max(-2, Math.min(2, p.vx)); p.vy += (Math.random() - 0.5) * 0.1; p.size = p.size + (p.maxSize - p.size) * 0.015 }
       else if (p.type === 'exhale') { p.x += p.vx + (Math.random() - 0.5) * 0.8; p.y += p.vy; p.vy += 0.02; p.vx *= 0.99; p.size = p.size + (p.maxSize - p.size) * 0.025 }
-      else if (p.type === 'exhale-rise') { p.x += p.vx + Math.sin(p.wobblePhase) * p.wobbleAmp * 0.7; p.y += p.vy; p.wobblePhase += p.wobbleSpeed; p.wobbleAmp *= 0.998; p.vy *= p.decel; p.vx += (Math.random() - 0.5) * 0.05; p.vx *= 0.995; p.size = p.size + (p.maxSize - p.size) * 0.022 }
+      else if (p.type === 'exhale-rise') {
+        // 先沉后升：vy 先正（下沉）再减速到 0 再变负（上升）
+        p.vy -= 0.06 * (p.layer || 1)
+        p.x += p.vx + Math.sin(p.wobblePhase) * p.wobbleAmp * 0.7; p.y += p.vy
+        p.wobblePhase += p.wobbleSpeed; p.wobbleAmp *= 0.998
+        p.vx += (Math.random() - 0.5) * 0.05; p.vx *= 0.995
+        p.size = p.size + (p.maxSize - p.size) * 0.022
+      }
+      else if (p.type === 'idle-wisp') {
+        p.x += p.vx + Math.sin(p.wobblePhase) * p.wobbleAmp
+        p.y += p.vy
+        p.wobblePhase += p.wobbleSpeed
+        p.vy *= 0.995
+        p.size = p.size + (p.maxSize - p.size) * 0.015
+      }
       else { p.x += p.vx + (Math.random() - 0.5) * 0.5; p.y += p.vy; p.vy *= 0.99; p.vx += (Math.random() - 0.5) * 0.1; p.size = p.size + (p.maxSize - p.size) * 0.02 }
       return p.life > 0
     },
@@ -371,7 +446,8 @@ export default {
         let a = alpha * 0.15
         if (p.type === 'ring') a = alpha * 0.22
         else if (p.type === 'exhale') a = alpha * 0.18
-        else if (p.type === 'exhale-rise') a = alpha * 0.14
+        else if (p.type === 'exhale-rise') a = alpha * 0.14 * (p.layer || 1)
+        else if (p.type === 'idle-wisp') a = alpha * 0.08
         ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`; ctx.fill()
       }
     },
@@ -379,8 +455,24 @@ export default {
     emitParticles() {
       const m = this.smokeMode, ex = this.emitterX, ey = this.emitterY
       if (m === 'off') return
-      if (m === 'idle') { if (Math.random() < 0.3) this.particles.push(this.createParticle(ex, ey, 'spark')) }
-      else if (m === 'inhale') { if (Math.random() < 0.15) this.particles.push(this.createParticle(ex, ey, 'spark')) }
+      if (m === 'idle') {
+        if (Math.random() < 0.3) this.particles.push(this.createParticle(ex, ey, 'spark'))
+        // 空闲时烟头自然冒细烟丝
+        if (Math.random() < 0.25) this.particles.push(this.createParticle(ex + (Math.random() - 0.5) * 4, ey, 'idle-wisp'))
+      }
+      else if (m === 'inhale') {
+        // 吸烟时火星飘出：更频繁、更多样
+        if (Math.random() < 0.6) {
+          const sparkCount = Math.random() < 0.3 ? 2 : 1
+          for (let i = 0; i < sparkCount; i++) {
+            this.particles.push(this.createParticle(
+              ex + (Math.random() - 0.5) * 8,
+              ey + (Math.random() - 0.5) * 4,
+              'spark'
+            ))
+          }
+        }
+      }
       else if (m === 'burnout') { if (Math.random() < 0.2) this.particles.push(this.createParticle(ex, ey, 'smoke')) }
       else if (m === 'ring') { for (let i = 0; i < 6; i++) this.particles.push(this.createParticle(ex, ey, 'ring')) }
       else if (m === 'exhale') { for (let i = 0; i < 5; i++) this.particles.push(this.createParticle(ex, ey, 'exhale')) }
@@ -391,11 +483,13 @@ export default {
         const burstCount = phase < 0.3 ? 10 : (phase < 0.7 ? 6 : 3)
         const power = phase < 0.3 ? 1.2 : (phase < 0.7 ? 1.0 : 0.7)
         const spread = this.canvasW * (phase < 0.5 ? 0.25 : 0.5)
+        // 分层：前 30% 粒子更浓更大（先浓后淡）
+        const layer = phase < 0.3 ? 1.5 : (phase < 0.7 ? 1.0 : 0.6)
         for (let i = 0; i < burstCount; i++) {
           const r1 = Math.random() * 2 - 1, r2 = Math.random() * 2 - 1
           const offsetNorm = (r1 + r2) * 0.5
           const originX = Math.max(20, Math.min(this.canvasW - 20, ex + offsetNorm * spread * 0.5))
-          this.particles.push(this.createParticle(0, 0, 'exhale-rise', { originX, originY: this.canvasH + 10 + Math.random() * 15, spread, power }))
+          this.particles.push(this.createParticle(0, 0, 'exhale-rise', { originX, originY: this.canvasH + 10 + Math.random() * 15, spread, power, layer }))
         }
       }
     },
@@ -468,14 +562,119 @@ export default {
     },
     stopInhale() { if (this.inhaleTimer) { clearInterval(this.inhaleTimer); this.inhaleTimer = null } },
 
+    // ---- 空闲冒烟（lit 状态下烟头持续冒细烟） ----
+    startIdleSmoke() {
+      this.stopIdleSmoke()
+      const pos = this.getBurnPosSync()
+      this.idleSmokeTimer = setInterval(() => {
+        if (this.state !== 'lit') return
+        if (Math.random() < 0.4) {
+          this.spawnDomPuff(
+            pos.x + (Math.random() - 0.5) * 6,
+            pos.y - 5 - Math.random() * 8,
+            this.makeDomOpts({ sizeMin: 15, sizeMax: 30, lifeMin: 2500, lifeMax: 4000, opacityMin: 0.06, opacityMax: 0.12, scaleMin: 0.05, scaleMax: 0.08, driftBase: 8, driftVar: 12, riseMin: 15, riseMax: 30 })
+          )
+        }
+      }, 350)
+    },
+    stopIdleSmoke() {
+      if (this.idleSmokeTimer) { clearInterval(this.idleSmokeTimer); this.idleSmokeTimer = null }
+    },
+    getBurnPosSync() {
+      try {
+        const burnEl = this.$el ? this.$el.querySelector('.cig-flat-burn') : null
+        if (burnEl) {
+          const r = burnEl.getBoundingClientRect()
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+        }
+      } catch (e) {}
+      return { x: this.emitterX || 200, y: this.emitterY || 300 }
+    },
+
     exhaleBurst(cx, cy, count) {
       this.startDomFilter()
       const n = count || 22, spread = 100
       for (let i = 0; i < n; i++) {
         setTimeout(() => {
           const r1 = Math.random()*2-1, r2 = Math.random()*2-1, ox = (r1+r2)*0.5*spread
-          const opts = this.makeDomOpts(); opts.drift = ox + (Math.random()-0.5)*60
+          // 分层：前面的 puff 更浓更大，后面的更淡更小（先浓后淡）
+          const progress = i / n
+          let preset
+          if (progress < 0.3) {
+            // 前 30%：浓密大团
+            preset = { sizeMin:100,sizeMax:160,lifeMin:5500,lifeMax:8000,opacityMin:0.3,opacityMax:0.5,scaleMin:0.14,scaleMax:0.22,driftBase:80,driftVar:100,riseMin:50,riseMax:80 }
+          } else if (progress < 0.7) {
+            // 中间：中等
+            preset = { sizeMin:70,sizeMax:120,lifeMin:4500,lifeMax:6500,opacityMin:0.2,opacityMax:0.38,scaleMin:0.1,scaleMax:0.18,driftBase:90,driftVar:110,riseMin:60,riseMax:90 }
+          } else {
+            // 后面：稀薄小团
+            preset = { sizeMin:40,sizeMax:80,lifeMin:3500,lifeMax:5000,opacityMin:0.1,opacityMax:0.25,scaleMin:0.06,scaleMax:0.12,driftBase:100,driftVar:120,riseMin:70,riseMax:100 }
+          }
+          const opts = this.makeDomOpts(preset); opts.drift = ox + (Math.random()-0.5)*60
           this.spawnDomPuff(cx + ox, cy + (Math.random()-0.5)*15, opts)
+        }, i * 10)
+      }
+      setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, 3500)
+    },
+
+    // 根据强度吐烟：强度越高，烟越多越浓
+    exhaleByIntensity(intensity) {
+      // intensity: ~0.2 (轻吸) ~ 2.0 (深吸+后期)
+      const pos = this.getBurnPosSync()
+      // Canvas 粒子数：4 ~ 20
+      const canvasCount = Math.round(4 + intensity * 8)
+      // DOM puff 数：8 ~ 40
+      const domCount = Math.round(8 + intensity * 16)
+      // 扩散范围：80 ~ 160
+      const spread = 80 + intensity * 40
+
+      // Canvas 粒子爆发
+      for (let i = 0; i < canvasCount; i++) {
+        this.particles.push(this.createParticle(
+          this.emitterX + (Math.random() - 0.5) * 12,
+          this.emitterY + (Math.random() - 0.5) * 8,
+          'exhale'
+        ))
+      }
+
+      // DOM 烟雾爆发
+      this.startDomFilter()
+      for (let i = 0; i < domCount; i++) {
+        setTimeout(() => {
+          const r1 = Math.random()*2-1, r2 = Math.random()*2-1
+          const ox = (r1+r2)*0.5*spread
+          const progress = i / domCount
+          let preset
+          if (progress < 0.3) {
+            // 前 30%：浓密大团，强度越高越大
+            const sizeBoost = intensity * 30
+            preset = {
+              sizeMin: 100 + sizeBoost, sizeMax: 160 + sizeBoost,
+              lifeMin: 5500, lifeMax: 8000,
+              opacityMin: 0.25 + intensity * 0.08, opacityMax: 0.4 + intensity * 0.1,
+              scaleMin: 0.14, scaleMax: 0.22,
+              driftBase: 80, driftVar: 100, riseMin: 50, riseMax: 80
+            }
+          } else if (progress < 0.7) {
+            preset = {
+              sizeMin: 70 + intensity * 15, sizeMax: 120 + intensity * 20,
+              lifeMin: 4500, lifeMax: 6500,
+              opacityMin: 0.18 + intensity * 0.05, opacityMax: 0.32 + intensity * 0.06,
+              scaleMin: 0.1, scaleMax: 0.18,
+              driftBase: 90, driftVar: 110, riseMin: 60, riseMax: 90
+            }
+          } else {
+            preset = {
+              sizeMin: 40 + intensity * 8, sizeMax: 80 + intensity * 10,
+              lifeMin: 3500, lifeMax: 5000,
+              opacityMin: 0.08 + intensity * 0.03, opacityMax: 0.2 + intensity * 0.05,
+              scaleMin: 0.06, scaleMax: 0.12,
+              driftBase: 100, driftVar: 120, riseMin: 70, riseMax: 100
+            }
+          }
+          const opts = this.makeDomOpts(preset)
+          opts.drift = ox + (Math.random()-0.5)*60
+          this.spawnDomPuff(pos.x + ox, this.canvasH * 0.88 + (Math.random()-0.5)*15, opts)
         }, i * 10)
       }
       setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, 3500)
@@ -501,27 +700,27 @@ export default {
       } else if (newVal === 'lit') {
         this.setSmokeMode('idle')
         this.stopDomFilter(); this.stopInhale()
+        this.startIdleSmoke()
       } else if (newVal === 'smoking') {
         this.setSmokeMode('inhale')
+        this.stopIdleSmoke()
         const pos = getBurnPos()
         this.emitterX = pos.x; this.emitterY = pos.y
         this.startInhale(pos.x, pos.y)
       } else if (newVal === 'exhaling') {
         this.stopInhale()
         this.setSmokeMode('exhale-rise')
-        this.emitExhaleBurst(8)
-        const pos = getBurnPos()
-        this.exhaleBurst(pos.x, this.canvasH * 0.88, 22)
+        // 吐烟已由 onPointerUp 中的 exhaleByIntensity 触发
         setTimeout(() => {
           if (this.state === 'exhaling') this.setSmokeMode('idle')
         }, 2200)
       } else if (newVal === 'burnout') {
         this.setSmokeMode('burnout')
-        this.stopDomFilter(); this.stopInhale()
+        this.stopDomFilter(); this.stopInhale(); this.stopIdleSmoke()
         this.domActivePuffs = 0; this.domFilterActive = false
       } else if (newVal === 'cooldown') {
         this.setSmokeMode('off')
-        this.stopDomFilter(); this.stopInhale()
+        this.stopDomFilter(); this.stopInhale(); this.stopIdleSmoke()
       }
     },
 
@@ -554,6 +753,7 @@ export default {
       } else if (this.state === 'lit' || this.state === 'exhaling') {
         this.state = 'smoking'
         this.smokeStartTime = Date.now() - (this.smokeProgress / 100) * SMOKING_DURATION
+        this.currentPuffStart = Date.now()
         this.startSmokeProgress()
         this.showHint = false
         if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
@@ -578,6 +778,13 @@ export default {
 
     onPointerUp() {
       this.isPressing = false
+      
+      // 无论是否拖动，都要清除吸烟计时器
+      if (this.state === 'smoking') {
+        clearInterval(this.smokeTimer)
+        this.smokeTimer = null
+      }
+      
       if (this.cigDragMoved) { this.cigDragMoved = false; this.isDragging = false; return }
       this.isDragging = false
 
@@ -591,11 +798,20 @@ export default {
       }
 
       if (this.state === 'smoking') {
-        clearInterval(this.smokeTimer)
-        this.smokeTimer = null
+        // 计算本次吸入时长，越久吐烟越多
+        const puffDuration = this.currentPuffStart ? Date.now() - this.currentPuffStart : 1000
+        // 综合因素：进度越后烟越浓，吸入越久烟越多
+        const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6  // 0.4 ~ 1.0
+        const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)     // 0.5 ~ 2.0
+        const intensity = progressFactor * puffFactor                     // ~0.2 ~ 2.0
         this.state = 'exhaling'
         this.sessionExhaleCount++
         if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
+
+        // 根据强度触发吐烟
+        this.exhaleByIntensity(intensity)
+        // 吐烟音效
+        this.playExhale(intensity)
 
         setTimeout(() => {
           if (this.smokeProgress >= 100) {
@@ -613,12 +829,20 @@ export default {
     startSmokeProgress() {
       let lastAshTick = 0
       this.smokeTimer = setInterval(() => {
+        // 安全检查：只有用户正在按压时才推进进度
+        if (!this.isPressing) {
+          clearInterval(this.smokeTimer)
+          this.smokeTimer = null
+          return
+        }
+        
         const elapsed = Date.now() - this.smokeStartTime
         this.smokeProgress = Math.min(100, (elapsed / SMOKING_DURATION) * 100)
 
-        if (elapsed - lastAshTick > 400) {
+        // 烟灰堆积：每 600ms 增长一点
+        if (elapsed - lastAshTick > 600) {
           lastAshTick = elapsed
-          this.growAsh(4)
+          this.growAsh(3)
         }
 
         if (this.smokeProgress >= 100) {
@@ -631,6 +855,21 @@ export default {
     growAsh(amount) {
       if (this.state !== 'lit' && this.state !== 'smoking' && this.state !== 'exhaling') return
       this.ashGrowth = Math.min(200, this.ashGrowth + amount)
+      // 烟灰过长自动断裂
+      if (this.ashGrowth >= this.ashBreakThreshold && (this.state === 'lit' || this.state === 'exhaling')) {
+        this.autoBreakAsh()
+      }
+    },
+
+    autoBreakAsh() {
+      this.ashFalling = true
+      this.playAshDrop()
+      this.showToastMsg('烟灰太长了，自动掉落')
+      setTimeout(() => {
+        this.ashFalling = false
+        this.ashGrowth = Math.max(0, this.ashGrowth - 60 - Math.random() * 40)
+        this.ashBreakThreshold = this.ashGrowth + 100 + Math.random() * 60
+      }, 800)
     },
 
     tapAsh() {
@@ -691,6 +930,61 @@ export default {
       if (uni.vibrateShort) uni.vibrateShort({ type: 'medium' })
     },
 
+    // 吐烟音效：呼出气流声
+    playExhale(intensity) {
+      if (!this.soundEnabled) return
+      const ctx = this.ensureAudio()
+      if (!ctx) return
+      try {
+        const duration = 1.2 + intensity * 0.5  // 根据强度调整时长
+        const sampleRate = ctx.sampleRate
+        const bufferSize = Math.floor(sampleRate * duration)
+        const buffer = ctx.createBuffer(1, bufferSize, sampleRate)
+        const data = buffer.getChannelData(0)
+        
+        // 生成过滤白噪声（气流声）
+        let lastOut = 0
+        for (let i = 0; i < bufferSize; i++) {
+          const t = i / bufferSize
+          // 包络：开始快、中间稳、结尾慢
+          let envelope
+          if (t < 0.1) {
+            envelope = t / 0.1  // 淡入
+          } else if (t > 0.7) {
+            envelope = (1 - t) / 0.3  // 淡出
+          } else {
+            envelope = 1
+          }
+          // 强度影响音量
+          envelope *= 0.15 + intensity * 0.1
+          // 低通滤波白噪声
+          const white = Math.random() * 2 - 1
+          lastOut = lastOut * 0.85 + white * 0.15
+          data[i] = lastOut * envelope
+        }
+        
+        const source = ctx.createBufferSource()
+        source.buffer = buffer
+        
+        // 带通滤波器：模拟气流声
+        const filter = ctx.createBiquadFilter()
+        filter.type = 'bandpass'
+        filter.frequency.value = 800 + intensity * 200  // 中心频率
+        filter.Q.value = 0.8
+        
+        // 音量控制
+        const gain = ctx.createGain()
+        gain.gain.value = 0.6 + intensity * 0.3
+        
+        source.connect(filter)
+        filter.connect(gain)
+        gain.connect(ctx.destination)
+        source.start()
+      } catch (e) {
+        console.warn('Exhale sound failed', e)
+      }
+    },
+
     toggleSound() {
       this.soundEnabled = !this.soundEnabled
       try { uni.setStorageSync('os_sound', this.soundEnabled ? '1' : '0') } catch (e) {}
@@ -744,6 +1038,55 @@ export default {
   color: #e5e7eb;
   position: relative;
   overflow: hidden;
+}
+
+/* 背景火光（由亮渐灭，吸烟时更亮） */
+.bg-ember-glow {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 42%,
+    rgba(255, 140, 30, 0.25) 0%,
+    rgba(255, 90, 15, 0.15) 25%,
+    rgba(220, 60, 10, 0.08) 45%,
+    rgba(180, 40, 0, 0.03) 65%,
+    transparent 85%
+  );
+}
+
+/* 燃烧进度条 */
+.burn-progress {
+  position: absolute;
+  bottom: 200rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320rpx;
+  height: 8rpx;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8rpx;
+  z-index: 30;
+  overflow: visible;
+}
+
+.burn-progress-bar {
+  height: 100%;
+  border-radius: 8rpx;
+  background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8rpx rgba(245, 158, 11, 0.5);
+}
+
+.burn-progress-text {
+  position: absolute;
+  top: -36rpx;
+  right: 0;
+  font-size: 20rpx;
+  color: #9ca3af;
+  white-space: nowrap;
 }
 
 .canvas-wrapper {
