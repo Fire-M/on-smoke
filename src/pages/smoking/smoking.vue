@@ -147,9 +147,10 @@ export default {
       cigDragMoved: false,
       // 音效
       soundEnabled: true,
-      audioCtx: null,
-      burnSoundSource: null,
-      burnSoundGain: null,
+      fireAudio: null,      // 点火音效播放器 (fire.mp3)
+      burnAudio: null,      // 吸烟音效播放器 (input.mp3)
+      exhaleAudio: null,    // 吐烟音效播放器 (output.mp3)
+      audioCtx: null,       // Web Audio 备用
       // 烟圈
       ringActive: false,
       ringPressTimer: null,
@@ -256,6 +257,9 @@ export default {
       const saved = uni.getStorageSync('os_sound')
       if (saved !== null && saved !== undefined) this.soundEnabled = saved === '1' || saved === 1
     } catch (e) {}
+
+    // 预加载点火音效（减少延迟）
+    this.initFireAudio()
   },
 
   onUnload() {
@@ -272,6 +276,9 @@ export default {
       this.stopInhale()
       this.stopIdleSmoke()
       this.stopBurnSound()
+      // 销毁音频播放器
+      if (this.fireAudio) { try { this.fireAudio.destroy() } catch(e) {}; this.fireAudio = null }
+      if (this.burnAudio) { try { this.burnAudio.destroy() } catch(e) {}; this.burnAudio = null }
       this.setSmokeMode('off')
     },
 
@@ -751,7 +758,7 @@ export default {
           this.showHint = true
           this.hintText = '长按吸烟'
           if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
-          this.playClick()
+          this.playFire()  // 点火音效
         }, IGNITE_DELAY)
       } else if (this.state === 'lit' || this.state === 'exhaling') {
         this.state = 'smoking'
@@ -760,7 +767,7 @@ export default {
         this.startSmokeProgress()
         this.showHint = false
         if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
-        // 开始燃烧音效
+        // 开始吸烟音效 (input.mp3)
         this.startBurnSound()
       }
     },
@@ -920,8 +927,23 @@ export default {
     ensureAudio() {
       if (!this.audioCtx) {
         try {
-          this.audioCtx = uni.createWebAudioContext ? uni.createWebAudioContext() : null
-        } catch (e) { this.audioCtx = null }
+          // 尝试多种方式创建音频上下文
+          if (uni.createWebAudioContext) {
+            this.audioCtx = uni.createWebAudioContext()
+          } else if (typeof window !== 'undefined') {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext
+            if (AudioCtx) {
+              this.audioCtx = new AudioCtx()
+            }
+          }
+        } catch (e) { 
+          console.warn('Audio context creation failed', e)
+          this.audioCtx = null 
+        }
+      }
+      // 确保音频上下文处于运行状态
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {})
       }
       return this.audioCtx
     },
@@ -937,129 +959,81 @@ export default {
       if (uni.vibrateShort) uni.vibrateShort({ type: 'medium' })
     },
 
-    // 吐烟音效：呼出气流声
-    playExhale(intensity) {
-      if (!this.soundEnabled) return
-      const ctx = this.ensureAudio()
-      if (!ctx) return
+    // 初始化点火音效播放器 (fire.mp3)
+    initFireAudio() {
+      if (this.fireAudio) return
       try {
-        const duration = 1.2 + intensity * 0.5  // 根据强度调整时长
-        const sampleRate = ctx.sampleRate
-        const bufferSize = Math.floor(sampleRate * duration)
-        const buffer = ctx.createBuffer(1, bufferSize, sampleRate)
-        const data = buffer.getChannelData(0)
-        
-        // 生成过滤白噪声（气流声）
-        let lastOut = 0
-        for (let i = 0; i < bufferSize; i++) {
-          const t = i / bufferSize
-          // 包络：开始快、中间稳、结尾慢
-          let envelope
-          if (t < 0.1) {
-            envelope = t / 0.1  // 淡入
-          } else if (t > 0.7) {
-            envelope = (1 - t) / 0.3  // 淡出
-          } else {
-            envelope = 1
-          }
-          // 强度影响音量
-          envelope *= 0.15 + intensity * 0.1
-          // 低通滤波白噪声
-          const white = Math.random() * 2 - 1
-          lastOut = lastOut * 0.85 + white * 0.15
-          data[i] = lastOut * envelope
-        }
-        
-        const source = ctx.createBufferSource()
-        source.buffer = buffer
-        
-        // 带通滤波器：模拟气流声
-        const filter = ctx.createBiquadFilter()
-        filter.type = 'bandpass'
-        filter.frequency.value = 800 + intensity * 200  // 中心频率
-        filter.Q.value = 0.8
-        
-        // 音量控制
-        const gain = ctx.createGain()
-        gain.gain.value = 0.6 + intensity * 0.3
-        
-        source.connect(filter)
-        filter.connect(gain)
-        gain.connect(ctx.destination)
-        source.start()
+        this.fireAudio = uni.createInnerAudioContext()
+        this.fireAudio.src = '/static/audio/fire.mp3'
+        this.fireAudio.volume = 0.6
       } catch (e) {
-        console.warn('Exhale sound failed', e)
+        console.warn('Fire audio init failed', e)
       }
     },
 
-    // 燃烧音效：持续燃烧声
+    // 点火音效 (fire.mp3)
+    playFire() {
+      if (!this.soundEnabled) return
+      this.initFireAudio()
+      if (this.fireAudio) {
+        try {
+          this.fireAudio.stop()
+          this.fireAudio.play()
+        } catch (e) {
+          console.warn('Fire sound failed', e)
+        }
+      }
+    },
+
+    // 初始化吸烟音效播放器 (input.mp3)
+    initBurnAudio() {
+      if (this.burnAudio) return
+      try {
+        this.burnAudio = uni.createInnerAudioContext()
+        this.burnAudio.src = '/static/audio/input.mp3'
+        this.burnAudio.loop = true
+        this.burnAudio.volume = 0.5
+      } catch (e) {
+        console.warn('Burn audio init failed', e)
+      }
+    },
+
+    // 开始吸烟音效 (长按时播放 input.mp3)
     startBurnSound() {
       if (!this.soundEnabled) return
-      this.stopBurnSound()
-      const ctx = this.ensureAudio()
-      if (!ctx) return
-      try {
-        // 创建持续燃烧噪声
-        const bufferSize = ctx.sampleRate * 2  // 2秒循环缓冲
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-        const data = buffer.getChannelData(0)
-        
-        // 生成燃烧噪声（粉红噪声 + 爆裂声）
-        let b0 = 0, b1 = 0, b2 = 0
-        for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1
-          // 粉红噪声滤波
-          b0 = 0.99765 * b0 + white * 0.0990460
-          b1 = 0.96370 * b1 + white * 0.2965164
-          b2 = 0.57000 * b2 + white * 1.0526913
-          const pink = (b0 + b1 + b2 + white * 0.1848) * 0.11
-          
-          // 随机爆裂声
-          let crackle = 0
-          if (Math.random() < 0.002) {
-            crackle = (Math.random() - 0.5) * 0.3
-          }
-          
-          data[i] = pink + crackle
+      this.initBurnAudio()
+      if (this.burnAudio) {
+        try {
+          this.burnAudio.stop()
+          this.burnAudio.play()
+        } catch (e) {
+          console.warn('Burn sound play failed', e)
         }
-        
-        const source = ctx.createBufferSource()
-        source.buffer = buffer
-        source.loop = true
-        
-        // 带通滤波：模拟燃烧声
-        const filter = ctx.createBiquadFilter()
-        filter.type = 'bandpass'
-        filter.frequency.value = 400
-        filter.Q.value = 0.5
-        
-        // 音量控制
-        const gain = ctx.createGain()
-        gain.gain.value = 0.25
-        
-        source.connect(filter)
-        filter.connect(gain)
-        gain.connect(ctx.destination)
-        source.start()
-        
-        this.burnSoundSource = source
-        this.burnSoundGain = gain
-      } catch (e) {
-        console.warn('Burn sound failed', e)
       }
     },
 
+    // 停止吸烟音效
     stopBurnSound() {
-      if (this.burnSoundSource) {
+      if (this.burnAudio) {
         try {
-          this.burnSoundSource.stop()
-          this.burnSoundSource.disconnect()
+          this.burnAudio.stop()
         } catch (e) {}
-        this.burnSoundSource = null
       }
-      if (this.burnSoundGain) {
-        try { this.burnSoundGain.disconnect() } catch (e) {}
-        this.burnSoundGain = null
+    },
+
+    // 吐烟音效 (output.mp3)
+    playExhale(intensity) {
+      if (!this.soundEnabled) return
+      try {
+        const audio = uni.createInnerAudioContext()
+        audio.src = '/static/audio/output.mp3'
+        audio.volume = Math.min(1, 0.5 + intensity * 0.2)
+        audio.play()
+        // 播放完后销毁
+        audio.onEnded(() => { audio.destroy() })
+        audio.onError(() => { audio.destroy() })
+      } catch (e) {
+        console.warn('Exhale sound failed', e)
       }
     },
 
