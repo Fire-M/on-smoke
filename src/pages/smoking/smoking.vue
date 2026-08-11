@@ -965,7 +965,7 @@ export default {
       try {
         this.fireAudio = uni.createInnerAudioContext()
         this.fireAudio.src = '/static/audio/fire.mp3'
-        this.fireAudio.volume = 0.6
+        this.fireAudio.volume = 1.0
       } catch (e) {
         console.warn('Fire audio init failed', e)
       }
@@ -992,7 +992,7 @@ export default {
         this.burnAudio = uni.createInnerAudioContext()
         this.burnAudio.src = '/static/audio/input.mp3'
         this.burnAudio.loop = true
-        this.burnAudio.volume = 0.5
+        this.burnAudio.volume = 1.0
       } catch (e) {
         console.warn('Burn audio init failed', e)
       }
@@ -1027,7 +1027,7 @@ export default {
       try {
         const audio = uni.createInnerAudioContext()
         audio.src = '/static/audio/output.mp3'
-        audio.volume = Math.min(1, 0.5 + intensity * 0.2)
+        audio.volume = 1.0
         audio.play()
         // 播放完后销毁
         audio.onEnded(() => { audio.destroy() })
