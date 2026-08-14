@@ -79,8 +79,8 @@
         @mousedown="startRingPress" @mouseup="endRingPress">
         <view class="st-tool-ic"><text>💫</text></view>
         <view class="st-tool-lbl">
-          <text class="st-tool-name">吐烟圈</text>
-          <text class="st-tool-val">长按换花样</text>
+          <text class="st-tool-name">吐烟</text>
+          <text class="st-tool-val">{{ smokeStyleNames[ringCurrentStyle] }}</text>
         </view>
       </button>
       <button class="st-tool" @click="passCig">
@@ -108,6 +108,21 @@
     <!-- Toast -->
     <view class="toast" v-if="showToast">
       <text>{{ toastMsg }}</text>
+    </view>
+
+    <!-- 花样选择器 -->
+    <view class="style-picker-mask" :class="{ show: showStylePicker }" @click="showStylePicker = false">
+      <view class="style-picker" @click.stop>
+        <text class="picker-title">选择吐烟花样</text>
+        <view class="picker-grid">
+          <view v-for="(name, idx) in smokeStyleNames" :key="idx"
+            class="picker-item" :class="{ active: ringCurrentStyle === idx }"
+            @click="selectSmokeStyle(idx)">
+            <text class="picker-icon">{{ smokeStyleIcons[idx] }}</text>
+            <text class="picker-name">{{ name }}</text>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -155,6 +170,9 @@ export default {
       ringActive: false,
       ringPressTimer: null,
       ringCurrentStyle: 0,
+      showStylePicker: false,
+      smokeStyleNames: ['烟圈', '爱心形', '龙卷风', '星形', '蘑菇云', '双螺旋', '烟花扩散', '蛇形蜿蜒', '水母状', '文字烟雾', '瀑布流', '分散飘散'],
+      smokeStyleIcons: ['🌀', '❤️', '🌪️', '⭐', '🍄', '🧬', '🎆', '🐍', '🪼', '✨', '🌊', '💨'],
       // 派烟
       showPassModal: false,
       // Toast
@@ -1201,14 +1219,563 @@ export default {
       }
       this.ringActive = true
       this.ringPressTimer = setTimeout(() => {
-        this.ringCurrentStyle = (this.ringCurrentStyle + 1) % 4
-        this.showToastMsg('花样：' + ['标准圆环', '花式心形', '双环交叠', '龙卷风'][this.ringCurrentStyle])
-      }, 1000)
+        this.showStylePicker = true
+      }, 800)
     },
 
     endRingPress() {
       if (this.ringPressTimer) { clearTimeout(this.ringPressTimer); this.ringPressTimer = null }
       this.ringActive = false
+      if (!this.showStylePicker) {
+        this.emitSmokeStyle()
+      }
+    },
+
+    selectSmokeStyle(idx) {
+      this.ringCurrentStyle = idx
+      this.showStylePicker = false
+      this.showToastMsg('花样：' + this.smokeStyleNames[idx])
+    },
+
+    // ---- 吐烟花样发射 ----
+    emitSmokeStyle() {
+      const emitters = [
+        () => this.emitRingEffect(),
+        () => this.emitHeartEffect(),
+        () => this.emitTornadoEffect(),
+        () => this.emitStarEffect(),
+        () => this.emitMushroomEffect(),
+        () => this.emitDoubleHelixEffect(),
+        () => this.emitFireworkEffect(),
+        () => this.emitSnakeEffect(),
+        () => this.emitJellyfishEffect(),
+        () => this.emitTextEffect(),
+        () => this.emitWaterfallEffect(),
+        () => this.emitScatterEffect(),
+      ]
+      const idx = this.ringCurrentStyle
+      if (emitters[idx]) emitters[idx]()
+    },
+
+    // 获取形状效果上下文
+    getShapeCtx() {
+      const wrap = this.$refs.domSmokeWrap
+      const container = wrap ? (wrap.$el || wrap) : null
+      const pos = this.getBurnPosSync()
+      return { container, originX: pos.x, W: this.canvasW, H: this.canvasH }
+    },
+
+    // 通用形状动画框架
+    animateShapeEffect(opts) {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const { getPos, particleCount, puffSize, totalLife, opacityMul } = opts
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const els = []
+      const doc = ctx.container.ownerDocument || document
+      this.startDomFilter()
+      for (let i = 0; i < particleCount; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = puffSize + Math.random() * 5
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        els.push({ el, index: i, size: sz })
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const elapsed = now - t0
+        const p = Math.min(1, elapsed / totalLife)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const centerY = startY - ease * (startY - endY)
+        const scale = 1 + ease * 2.5
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const sizeScale = 1 + ease * 2
+        for (const particle of els) {
+          const pos = getPos(particle.index, particleCount, p, ease, scale, centerY, originX)
+          const sz = particle.size * sizeScale
+          particle.el.style.left = (pos.x - sz / 2) + 'px'
+          particle.el.style.top = (pos.y - sz / 2) + 'px'
+          particle.el.style.width = sz + 'px'
+          particle.el.style.height = sz + 'px'
+          particle.el.style.opacity = alpha * (opacityMul || 0.7)
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 1. 烟圈
+    emitRingEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const particleCount = 64, startRadius = 20, endRadius = 180, puffSize = 16
+      this.startDomFilter()
+      const ringEls = []
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2
+        const el = doc.createElement('div')
+        el.style.width = puffSize + 'px'; el.style.height = puffSize + 'px'
+        el.className = 'dom-smoke-puff'
+        const g = 200 + Math.floor(Math.random() * 40)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        ringEls.push({ el, angle, size: puffSize + Math.random() * 6 })
+      }
+      const innerCount = 32, innerEls = []
+      for (let i = 0; i < innerCount; i++) {
+        const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        el.style.width = '11px'; el.style.height = '11px'
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(200,200,200,0.2) 50%, transparent 75%)`
+        ctx.container.appendChild(el)
+        innerEls.push({ el, angle, size: 11 })
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 3500)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const centerY = startY - ease * (startY - endY)
+        const currentRadius = startRadius + ease * (endRadius - startRadius)
+        const innerRadius = currentRadius * 0.5
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const sizeScale = 1 + ease * 2.2
+        for (const ring of ringEls) {
+          const rx = Math.cos(ring.angle) * currentRadius
+          const ry = Math.sin(ring.angle) * currentRadius * 0.35
+          const cx = originX + rx, cy = centerY + ry, sz = ring.size * sizeScale
+          ring.el.style.left = (cx - sz/2) + 'px'; ring.el.style.top = (cy - sz/2) + 'px'
+          ring.el.style.width = sz + 'px'; ring.el.style.height = sz + 'px'
+          ring.el.style.opacity = alpha * 0.7
+        }
+        for (const inner of innerEls) {
+          const rx = Math.cos(inner.angle) * innerRadius
+          const ry = Math.sin(inner.angle) * innerRadius * 0.35
+          const cx = originX + rx, cy = centerY + ry, sz = inner.size * sizeScale * 0.7
+          inner.el.style.left = (cx - sz/2) + 'px'; inner.el.style.top = (cy - sz/2) + 'px'
+          inner.el.style.width = sz + 'px'; inner.el.style.height = sz + 'px'
+          inner.el.style.opacity = alpha * 0.4
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else { ringEls.forEach(e => e.el.remove()); innerEls.forEach(e => e.el.remove()) }
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 2. 爱心形
+    emitHeartEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const particleCount = 72, scale = 5, puffSize = 16
+      this.startDomFilter()
+      const heartEls = []
+      for (let i = 0; i < particleCount; i++) {
+        const t = (i / particleCount) * Math.PI * 2
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        el.style.width = puffSize + 'px'; el.style.height = puffSize + 'px'
+        const g = 200 + Math.floor(Math.random() * 40)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        heartEls.push({ el, t, size: puffSize + Math.random() * 6 })
+      }
+      const innerCount = 40, innerEls = []
+      for (let i = 0; i < innerCount; i++) {
+        const t = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
+        const r = 0.3 + Math.random() * 0.4
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        el.style.width = '11px'; el.style.height = '11px'
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(200,200,200,0.2) 50%, transparent 75%)`
+        ctx.container.appendChild(el)
+        innerEls.push({ el, t, r, size: 11 })
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 3500)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const centerY = startY - ease * (startY - endY)
+        const currentScale = scale + ease * scale * 2.5
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const sizeScale = 1 + ease * 2.2
+        for (const h of heartEls) {
+          const hx = currentScale * 16 * Math.pow(Math.sin(h.t), 3)
+          const hy = -currentScale * (13*Math.cos(h.t) - 5*Math.cos(2*h.t) - 2*Math.cos(3*h.t) - Math.cos(4*h.t))
+          const cx = originX + hx, cy = centerY + hy * 0.35, sz = h.size * sizeScale
+          h.el.style.left = (cx-sz/2)+'px'; h.el.style.top = (cy-sz/2)+'px'
+          h.el.style.width = sz+'px'; h.el.style.height = sz+'px'
+          h.el.style.opacity = alpha * 0.7
+        }
+        for (const inner of innerEls) {
+          const hx = currentScale * 16 * Math.pow(Math.sin(inner.t), 3) * inner.r
+          const hy = -currentScale * (13*Math.cos(inner.t) - 5*Math.cos(2*inner.t) - 2*Math.cos(3*inner.t) - Math.cos(4*inner.t)) * inner.r
+          const cx = originX + hx, cy = centerY + hy * 0.35, sz = inner.size * sizeScale * 0.7
+          inner.el.style.left = (cx-sz/2)+'px'; inner.el.style.top = (cy-sz/2)+'px'
+          inner.el.style.width = sz+'px'; inner.el.style.height = sz+'px'
+          inner.el.style.opacity = alpha * 0.4
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else { heartEls.forEach(e => e.el.remove()); innerEls.forEach(e => e.el.remove()) }
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 3. 龙卷风
+    emitTornadoEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const layerCount = 10, particlesPerLayer = 16, puffSize = 14
+      const baseRadius = 25, radiusGrowth = 12
+      this.startDomFilter()
+      const allEls = []
+      for (let li = 0; li < layerCount; li++) {
+        const layerRadius = baseRadius + li * radiusGrowth
+        for (let i = 0; i < particlesPerLayer; i++) {
+          const angle = (i / particlesPerLayer) * Math.PI * 2
+          const el = doc.createElement('div')
+          el.className = 'dom-smoke-puff'
+          el.style.width = puffSize + 'px'; el.style.height = puffSize + 'px'
+          const g = 190 + Math.floor(Math.random() * 50)
+          const a = 0.6 - li * 0.03
+          el.style.background = `radial-gradient(circle, rgba(255,255,255,${a+0.15}) 0%, rgba(${g},${g},${g},${a*0.5}) 40%, transparent 72%)`
+          ctx.container.appendChild(el)
+          allEls.push({ el, layerIdx: li, angle, layerRadius, size: puffSize + Math.random() * 5 })
+        }
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 4000)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const centerY = startY - ease * (startY - endY)
+        const rotation = p * 3 * Math.PI * 2
+        const scale = 1 + ease * 2.5
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const sizeScale = 1 + ease * 2
+        const tornadoHeight = 200 * scale
+        for (const pt of allEls) {
+          const currentAngle = pt.angle + rotation + pt.layerIdx * 0.5
+          const rx = Math.cos(currentAngle) * pt.layerRadius * scale
+          const ry = -(pt.layerIdx / layerCount) * tornadoHeight * 0.6
+          const cx = originX + rx, cy = centerY + ry, sz = pt.size * sizeScale
+          pt.el.style.left = (cx-sz/2)+'px'; pt.el.style.top = (cy-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * (0.7 - pt.layerIdx * 0.04)
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else allEls.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 4. 星形
+    emitStarEffect() {
+      this.animateShapeEffect({
+        particleCount: 80, puffSize: 14, totalLife: 3500, opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy, originX) => {
+          const angle = (i / count) * Math.PI * 2 - Math.PI / 2
+          const isOuter = i % 2 === 0
+          const r = (isOuter ? 80 : 35) * scale
+          return { x: originX + Math.cos(angle) * r, y: cy + Math.sin(angle) * r * 0.35 }
+        }
+      })
+    },
+
+    // 5. 蘑菇云
+    emitMushroomEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const count = 100
+      this.startDomFilter()
+      const els = []
+      for (let i = 0; i < count; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = 12 + Math.random() * 8
+        el.style.width = sz + 'px'; el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        els.push({ el, i, size: sz })
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 4000)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const cy = startY - ease * (startY - endY)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + ease * 2.5
+        for (const pt of els) {
+          const ratio = pt.i / count
+          let rx, ry
+          if (ratio < 0.3) {
+            const a = (ratio / 0.3) * Math.PI * 2
+            rx = Math.cos(a) * 15 * scale
+            ry = Math.sin(a) * 15 * scale * 0.3 + ease * 80
+          } else {
+            const a = ((ratio - 0.3) / 0.7) * Math.PI * 2
+            const r = (40 + (ratio - 0.3) * 60) * scale
+            rx = Math.cos(a) * r
+            ry = Math.sin(a) * r * 0.35 - ease * 30
+          }
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (originX+rx-sz/2)+'px'; pt.el.style.top = (cy+ry-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 6. 双螺旋
+    emitDoubleHelixEffect() {
+      this.animateShapeEffect({
+        particleCount: 100, puffSize: 12, totalLife: 4000, opacityMul: 0.65,
+        getPos: (i, count, p, ease, scale, cy, originX) => {
+          const t = (i / count) * Math.PI * 6
+          const strand = i % 2 === 0 ? 1 : -1
+          const r = 35 * scale
+          const rx = Math.cos(t + p * Math.PI * 4) * r * strand
+          const ry = (i / count - 0.5) * 200 * scale * 0.35
+          return { x: originX + rx, y: cy + ry }
+        }
+      })
+    },
+
+    // 7. 烟花扩散
+    emitFireworkEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const count = 120
+      this.startDomFilter()
+      const els = []
+      for (let i = 0; i < count; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = 10 + Math.random() * 10
+        el.style.width = sz + 'px'; el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(${g},${g},${g},0.35) 35%, transparent 70%)`
+        ctx.container.appendChild(el)
+        const angle = Math.random() * Math.PI * 2
+        const speed = 50 + Math.random() * 150
+        els.push({ el, size: sz, angle, speed, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed })
+      }
+      const t0 = performance.now()
+      const cx = originX, cy = H * 0.45
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 3000)
+        const ease = 1 - Math.pow(1 - p, 3)
+        let alpha = p < 0.03 ? p / 0.03 : 1 - Math.pow((p - 0.03) / 0.97, 1.2)
+        for (const pt of els) {
+          const dist = ease * pt.speed * 2
+          const x = cx + pt.vx / pt.speed * dist
+          const y = cy + pt.vy / pt.speed * dist + ease * 30
+          const sz = pt.size * (1 + ease * 1.5)
+          pt.el.style.left = (x-sz/2)+'px'; pt.el.style.top = (y-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 8. 蛇形蜿蜒
+    emitSnakeEffect() {
+      this.animateShapeEffect({
+        particleCount: 80, puffSize: 13, totalLife: 4000, opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy, originX) => {
+          const t = i / count
+          const waveX = Math.sin(t * Math.PI * 4 + p * Math.PI * 6) * 60 * scale
+          const waveY = (t - 0.5) * 180 * scale * 0.35
+          return { x: originX + waveX, y: cy + waveY }
+        }
+      })
+    },
+
+    // 9. 水母状
+    emitJellyfishEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const startY = H * 0.85, endY = H * 0.10
+      const count = 90
+      this.startDomFilter()
+      const els = []
+      for (let i = 0; i < count; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = 12 + Math.random() * 6
+        el.style.width = sz + 'px'; el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        els.push({ el, i, size: sz })
+      }
+      const t0 = performance.now()
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 4000)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const cy = startY - ease * (startY - endY)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + ease * 2.5
+        for (const pt of els) {
+          const ratio = pt.i / count
+          let rx, ry
+          if (ratio < 0.5) {
+            const a = (ratio / 0.5) * Math.PI
+            const r = 55 * scale
+            rx = Math.cos(a) * r - r
+            ry = -Math.sin(a) * r * 0.5
+          } else {
+            const tentacle = Math.floor((ratio - 0.5) / 0.5 * 6)
+            const t = ((ratio - 0.5) / 0.5 * 6 - tentacle)
+            const baseX = (tentacle - 2.5) * 18 * scale
+            rx = baseX + Math.sin(t * Math.PI * 3 + p * 8) * 10 * scale
+            ry = t * 100 * scale * 0.35
+          }
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (originX+rx-sz/2)+'px'; pt.el.style.top = (cy+ry-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * 0.65
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 10. 文字烟雾
+    emitTextEffect() {
+      const textPoints = []
+      const canvas = document.createElement('canvas')
+      canvas.width = 300; canvas.height = 80
+      const tctx = canvas.getContext('2d')
+      tctx.fillStyle = '#fff'
+      tctx.font = 'bold 60px Arial'
+      tctx.textAlign = 'center'
+      tctx.fillText('SMOKE', 150, 58)
+      const data = tctx.getImageData(0, 0, 300, 80).data
+      for (let y = 0; y < 80; y += 3) {
+        for (let x = 0; x < 300; x += 3) {
+          if (data[(y * 300 + x) * 4 + 3] > 128) {
+            textPoints.push({ x: (x - 150) * 0.8, y: (y - 40) * 0.8 })
+          }
+        }
+      }
+      this.animateShapeEffect({
+        particleCount: textPoints.length, puffSize: 10, totalLife: 4000, opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy, originX) => {
+          const pt = textPoints[i] || { x: 0, y: 0 }
+          return { x: originX + pt.x * scale, y: cy + pt.y * scale * 0.35 }
+        }
+      })
+    },
+
+    // 11. 瀑布流
+    emitWaterfallEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const count = 100
+      this.startDomFilter()
+      const els = []
+      for (let i = 0; i < count; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = 12 + Math.random() * 8
+        el.style.width = sz + 'px'; el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        ctx.container.appendChild(el)
+        els.push({ el, i, size: sz, xOff: (Math.random()-0.5)*120, speed: 0.5+Math.random()*0.5 })
+      }
+      const t0 = performance.now()
+      const topY = H * 0.1, bottomY = H * 0.85
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 4000)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + p * 1.5
+        for (const pt of els) {
+          const fallP = Math.min(1, p * pt.speed * 1.5)
+          const y = topY + fallP * (bottomY - topY)
+          const x = originX + pt.xOff * scale + Math.sin(fallP * 4 + pt.i) * 15
+          const sz = pt.size * scale
+          pt.el.style.left = (x-sz/2)+'px'; pt.el.style.top = (y-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * 0.65
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    },
+
+    // 12. 分散飘散
+    emitScatterEffect() {
+      const ctx = this.getShapeCtx()
+      if (!ctx.container) return
+      const doc = ctx.container.ownerDocument || document
+      const H = ctx.H, originX = ctx.originX
+      const count = 80
+      this.startDomFilter()
+      const els = []
+      for (let i = 0; i < count; i++) {
+        const el = doc.createElement('div')
+        el.className = 'dom-smoke-puff'
+        const sz = 14 + Math.random() * 10
+        el.style.width = sz + 'px'; el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(${g},${g},${g},0.35) 35%, transparent 70%)`
+        ctx.container.appendChild(el)
+        const angle = Math.random() * Math.PI * 2
+        const dist = 80 + Math.random() * 200
+        els.push({ el, size: sz, angle, dist, drift: (Math.random()-0.5)*60 })
+      }
+      const t0 = performance.now()
+      const cx = originX, cy = H * 0.5
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / 4500)
+        const ease = 1 - Math.pow(1 - p, 2)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.3)
+        for (const pt of els) {
+          const d = ease * pt.dist
+          const x = cx + Math.cos(pt.angle) * d + pt.drift * ease
+          const y = cy + Math.sin(pt.angle) * d * 0.6 - ease * 50
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (x-sz/2)+'px'; pt.el.style.top = (y-sz/2)+'px'
+          pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
     },
 
     // ---- 派烟 ----
@@ -1578,5 +2145,89 @@ export default {
   padding: 16rpx 32rpx;
   border-radius: 24rpx;
   z-index: 200;
+}
+
+/* ---- 花样选择器 ---- */
+.style-picker-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.style-picker-mask.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.style-picker {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  width: 620rpx;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.picker-title {
+  display: block;
+  text-align: center;
+  font-size: 32rpx;
+  color: #f59e0b;
+  font-weight: bold;
+  margin-bottom: 24rpx;
+}
+
+.picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  justify-content: center;
+}
+
+.picker-item {
+  width: 130rpx;
+  height: 130rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #252525;
+  border: 2px solid #333;
+  border-radius: 16rpx;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.picker-item.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  box-shadow: 0 0 12rpx rgba(245, 158, 11, 0.3);
+}
+
+.picker-item:active {
+  transform: scale(0.95);
+}
+
+.picker-icon {
+  font-size: 40rpx;
+  line-height: 1.2;
+}
+
+.picker-name {
+  font-size: 20rpx;
+  color: #9ca3af;
+  margin-top: 4rpx;
+}
+
+.picker-item.active .picker-name {
+  color: #f59e0b;
 }
 </style>
