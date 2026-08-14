@@ -4,7 +4,7 @@
     <view class="ach-header">
       <view class="ach-header-row">
         <view class="ach-back-btn" @click="goBack">
-          <text class="ach-back-icon">←</text>
+          <text class="ach-back-icon">‹</text>
         </view>
         <text class="ach-title">成就勋章</text>
       </view>
@@ -240,7 +240,7 @@ export default {
 }
 
 .ach-back-icon {
-  font-size: 36rpx;
+  font-size: 48rpx;
   color: #f3f4f6;
 }
 

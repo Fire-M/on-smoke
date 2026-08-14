@@ -4,7 +4,7 @@
     <view class="recovery-header">
       <view class="recovery-header-row">
         <view class="recovery-back-btn" @click="goBack">
-          <text class="recovery-back-icon">←</text>
+          <text class="recovery-back-icon">‹</text>
         </view>
         <text class="recovery-title">身体恢复</text>
       </view>

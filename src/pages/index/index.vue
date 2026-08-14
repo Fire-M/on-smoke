@@ -39,17 +39,76 @@
       <!-- 身体恢复 + 成就徽章 -->
       <view class="mx-20 mb-16 two-col">
         <view class="card p-16 flex items-center gap-12 recovery-card" @click="goToRecovery">
-          <text class="text-2xl">🫁</text>
+          <text class="card-icon">🫁</text>
           <view>
             <text class="text-sm text-gray-300 block">身体恢复</text>
             <text class="text-xs text-gray-600 mt-4 block"><text class="text-amber">{{ milestoneLabel }}</text> <text class="text-amber">里程碑</text></text>
           </view>
         </view>
         <view class="card p-16 flex items-center gap-12 achievement-card" @click="goToAchievements">
-          <text class="text-2xl">🏆</text>
+          <text class="card-icon">🏆</text>
           <view>
             <text class="text-sm text-gray-300 block">成就徽章</text>
             <text class="text-xs text-gray-600 mt-4 block">{{ badgesCount }} / 8 已解锁</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 烟瘾追踪 -->
+      <view class="mx-20 mb-16">
+        <view class="card p-16 flex items-center gap-12 craving-card" @click="goToCraving">
+          <text class="card-icon">📝</text>
+          <view class="flex-1">
+            <text class="text-sm text-gray-300 block">烟瘾追踪</text>
+            <text class="text-xs text-gray-600 mt-4 block">今天 {{ todayCravings }} 次烟瘾 · 抵抗 {{ resistedCount }} 次</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 每日挑战 -->
+      <view class="mx-20 mb-16">
+        <view class="challenge-card" :class="{ completed: challengeCompleted }">
+          <view class="challenge-header">
+            <text class="challenge-icon">{{ challengeIcon }}</text>
+            <view class="flex-1">
+              <text class="text-sm text-gray-300 block">今日挑战</text>
+              <text class="text-xs text-gray-600 mt-4 block">{{ challengeTitle }}</text>
+            </view>
+            <text v-if="challengeCompleted" class="challenge-badge">✅ 已完成</text>
+            <text v-else class="challenge-streak" v-if="challengeStreak > 0">🔥 {{ challengeStreak }}天</text>
+          </view>
+          <view class="challenge-progress-bar" v-if="!challengeCompleted">
+            <view class="challenge-progress-fill" :style="{ width: challengeProgress + '%' }"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 更多功能 -->
+      <view class="mx-20 mb-16">
+        <view class="feature-grid">
+          <view class="feature-item" @click="goToMood">
+            <text class="feature-icon">😊</text>
+            <text class="feature-name">情绪日记</text>
+          </view>
+          <view class="feature-item" @click="goToBreathing">
+            <text class="feature-icon">🧘</text>
+            <text class="feature-name">呼吸引导</text>
+          </view>
+          <view class="feature-item" @click="goToSavings">
+            <text class="feature-icon">💰</text>
+            <text class="feature-name">省钱目标</text>
+          </view>
+          <view class="feature-item" @click="goToTimeCapsule">
+            <text class="feature-icon">✍️</text>
+            <text class="feature-name">时间胶囊</text>
+          </view>
+          <view class="feature-item" @click="goToPet">
+            <text class="feature-icon">🐱</text>
+            <text class="feature-name">我的宠物</text>
+          </view>
+          <view class="feature-item" @click="goToHealthCalc">
+            <text class="feature-icon">❤️</text>
+            <text class="feature-name">健康计算</text>
           </view>
         </view>
       </view>
@@ -108,6 +167,13 @@ export default {
       cooldownStr: '',
       showToast: false,
       toastMsg: '',
+      todayCravings: 0,
+      resistedCount: 0,
+      challengeTitle: '',
+      challengeIcon: '🎯',
+      challengeCompleted: false,
+      challengeStreak: 0,
+      challengeProgress: 0,
       cooldownTimer: null,
       midnightTimer: null
     }
@@ -140,6 +206,28 @@ export default {
       this.quotaPercent = settings.dailyQuota > 0 ? Math.min(today.smokedCount / settings.dailyQuota, 1) * 100 : 0
       this.badgesCount = this.calcBadges()
       this.updateMilestone()
+      
+      // 烟瘾统计
+      const cravingStats = Store.getCravingStats()
+      this.todayCravings = cravingStats.today
+      this.resistedCount = Store.getCravings().filter(c => c.resisted).length
+      
+      // 每日挑战
+      const challenge = Store.getDailyChallenge()
+      this.challengeTitle = challenge.title
+      this.challengeIcon = challenge.icon
+      this.challengeCompleted = challenge.completed
+      this.challengeStreak = Store.getChallengeStreak()
+      
+      // 计算挑战进度
+      if (challenge.type === 'limit') {
+        this.challengeProgress = Math.max(0, Math.min(100, (1 - today.smokedCount / challenge.target) * 100))
+      } else if (challenge.type === 'save') {
+        const saved = Store.getSavedMoney()
+        this.challengeProgress = Math.min(100, (saved / challenge.target) * 100)
+      } else if (challenge.type === 'resist') {
+        this.challengeProgress = Math.min(100, (this.resistedCount / challenge.target) * 100)
+      }
     },
 
     calcBadges() {
@@ -203,6 +291,34 @@ export default {
 
     goToRecovery() {
       uni.navigateTo({ url: '/pages/recovery/recovery' })
+    },
+
+    goToCraving() {
+      uni.navigateTo({ url: '/pages/craving/craving' })
+    },
+
+    goToMood() {
+      uni.navigateTo({ url: '/pages/mood/mood' })
+    },
+
+    goToBreathing() {
+      uni.navigateTo({ url: '/pages/breathing/breathing' })
+    },
+
+    goToSavings() {
+      uni.navigateTo({ url: '/pages/savings/savings' })
+    },
+
+    goToTimeCapsule() {
+      uni.navigateTo({ url: '/pages/time-capsule/time-capsule' })
+    },
+
+    goToPet() {
+      uni.navigateTo({ url: '/pages/pet/pet' })
+    },
+
+    goToHealthCalc() {
+      uni.navigateTo({ url: '/pages/health-calc/health-calc' })
     }
   }
 }
@@ -238,6 +354,11 @@ export default {
   width: 12rpx;
   background-color: #f59e0b;
   flex-shrink: 0;
+}
+
+/* 卡片图标 */
+.card-icon {
+  font-size: 56rpx;
 }
 
 /* 两列布局 */
@@ -443,5 +564,112 @@ export default {
   transform: translateY(-50%);
   font-size: 32rpx;
   color: #6b7280;
+}
+
+.craving-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.craving-card:active {
+  transform: scale(0.97);
+  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+}
+
+.craving-card::after {
+  content: '›';
+  position: absolute;
+  right: 16rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 32rpx;
+  color: #6b7280;
+}
+
+/* 每日挑战卡片 */
+.challenge-card {
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
+  border: 1px solid #2a2a2a;
+  border-radius: 32rpx;
+  padding: 32rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.challenge-card.completed {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);
+}
+
+.challenge-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.challenge-icon {
+  font-size: 56rpx;
+}
+
+.challenge-badge {
+  font-size: 22rpx;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.challenge-streak {
+  font-size: 22rpx;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.challenge-progress-bar {
+  height: 12rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+
+.challenge-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+  border-radius: 8rpx;
+  transition: width 0.3s ease;
+}
+
+/* 更多功能网格 */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.feature-item {
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
+  border: 1px solid #2a2a2a;
+  border-radius: 20rpx;
+  padding: 24rpx 16rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.feature-item:active {
+  transform: scale(0.95);
+  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+}
+
+.feature-icon {
+  font-size: 64rpx;
+}
+
+.feature-name {
+  font-size: 24rpx;
+  color: #d1d5db;
 }
 </style>

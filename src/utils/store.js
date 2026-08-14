@@ -8,7 +8,13 @@ const KEYS = {
   today: 'os_today',
   history: 'os_history',
   stats: 'os_stats',
-  badges: 'os_badges'
+  badges: 'os_badges',
+  cravings: 'os_cravings',
+  challenges: 'os_challenges',
+  moods: 'os_moods',
+  savingsGoals: 'os_savings_goals',
+  timeCapsules: 'os_time_capsules',
+  pet: 'os_pet'
 }
 
 // 默认设置
@@ -213,6 +219,255 @@ function _formatTime(sec) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+// ---- 烟瘾追踪 ----
+export function getCravings() {
+  return _read(KEYS.cravings, [])
+}
+
+export function addCraving(craving) {
+  const list = getCravings()
+  list.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp: Date.now(),
+    ...craving
+  })
+  if (list.length > 200) list.length = 200
+  _write(KEYS.cravings, list)
+}
+
+export function getCravingStats() {
+  const cravings = getCravings()
+  const now = Date.now()
+  const oneDay = 24 * 60 * 60 * 1000
+  
+  // 今天的烟瘾
+  const todayCravings = cravings.filter(c => {
+    const d = new Date(c.timestamp)
+    const today = new Date()
+    return d.toDateString() === today.toDateString()
+  })
+  
+  // 本周烟瘾
+  const weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+  const weekCravings = cravings.filter(c => c.timestamp >= weekStart.getTime())
+  
+  // 烟瘾强度分布
+  const intensityDist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  cravings.forEach(c => {
+    if (c.intensity && intensityDist[c.intensity] !== undefined) {
+      intensityDist[c.intensity]++
+    }
+  })
+  
+  // 触发因素统计
+  const triggers = {}
+  cravings.forEach(c => {
+    if (c.trigger) {
+      triggers[c.trigger] = (triggers[c.trigger] || 0) + 1
+    }
+  })
+  
+  return {
+    total: cravings.length,
+    today: todayCravings.length,
+    thisWeek: weekCravings.length,
+    intensityDist,
+    triggers
+  }
+}
+
+// ---- 每日挑战 ----
+const CHALLENGE_TEMPLATES = [
+  { id: 'limit_3', title: '今日不超过3根', desc: '控制吸烟量在3根以内', type: 'limit', target: 3, icon: '🎯' },
+  { id: 'limit_2', title: '今日不超过2根', desc: '进一步减少吸烟量', type: 'limit', target: 2, icon: '🎯' },
+  { id: 'limit_1', title: '今日只抽1根', desc: '极限挑战，只抽1根', type: 'limit', target: 1, icon: '🎯' },
+  { id: 'save_10', title: '省下10块钱', desc: '减少吸烟节省10元', type: 'save', target: 10, icon: '💰' },
+  { id: 'save_20', title: '省下20块钱', desc: '减少吸烟节省20元', type: 'save', target: 20, icon: '💰' },
+  { id: 'no_smoke_morning', title: '上午不抽烟', desc: '从起床到中午12点不吸烟', type: 'time_range', target: { start: 0, end: 12 }, icon: '☀️' },
+  { id: 'no_smoke_afternoon', title: '下午不抽烟', desc: '从中午12点到晚上6点不吸烟', type: 'time_range', target: { start: 12, end: 18 }, icon: '🌤️' },
+  { id: 'delay_1h', title: '延迟1小时', desc: '想抽烟时等待1小时再决定', type: 'delay', target: 60, icon: '⏰' },
+  { id: 'resist_3', title: '抵抗3次烟瘾', desc: '成功抵抗3次烟瘾来袭', type: 'resist', target: 3, icon: '💪' },
+  { id: 'resist_5', title: '抵抗5次烟瘾', desc: '成功抵抗5次烟瘾来袭', type: 'resist', target: 5, icon: '💪' }
+]
+
+export function getDailyChallenge() {
+  const today = _todayStr()
+  const challenges = _read(KEYS.challenges, {})
+  
+  // 如果今天还没有挑战，生成一个新的
+  if (!challenges[today] || challenges[today].date !== today) {
+    // 基于日期生成伪随机索引
+    const dateNum = today.split('-').join('')
+    const seed = parseInt(dateNum) % CHALLENGE_TEMPLATES.length
+    const template = CHALLENGE_TEMPLATES[seed]
+    
+    challenges[today] = {
+      date: today,
+      challengeId: template.id,
+      title: template.title,
+      desc: template.desc,
+      type: template.type,
+      target: template.target,
+      icon: template.icon,
+      completed: false,
+      progress: 0
+    }
+    _write(KEYS.challenges, challenges)
+  }
+  
+  return challenges[today]
+}
+
+export function updateChallengeProgress(progress) {
+  const today = _todayStr()
+  const challenges = _read(KEYS.challenges, {})
+  
+  if (challenges[today]) {
+    challenges[today].progress = progress
+    
+    // 检查是否完成
+    const challenge = challenges[today]
+    if (challenge.type === 'limit' && progress <= challenge.target) {
+      challenge.completed = true
+    } else if (challenge.type === 'save' && progress >= challenge.target) {
+      challenge.completed = true
+    } else if (challenge.type === 'resist' && progress >= challenge.target) {
+      challenge.completed = true
+    }
+    
+    _write(KEYS.challenges, challenges)
+  }
+}
+
+export function getChallengeStreak() {
+  const challenges = _read(KEYS.challenges, {})
+  const dates = Object.keys(challenges).sort().reverse()
+  
+  let streak = 0
+  const today = new Date()
+  
+  for (let i = 0; i < dates.length; i++) {
+    const date = new Date(dates[i])
+    const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === i && challenges[dates[i]].completed) {
+      streak++
+    } else if (diffDays > i) {
+      break
+    }
+  }
+  
+  return streak
+}
+
+// ---- 情绪日记 ----
+export function getMoods() {
+  return _read(KEYS.moods, [])
+}
+
+export function addMood(mood) {
+  const list = getMoods()
+  list.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp: Date.now(),
+    ...mood
+  })
+  if (list.length > 300) list.length = 300
+  _write(KEYS.moods, list)
+}
+
+export function getMoodStats() {
+  const moods = getMoods()
+  const moodDist = { happy: 0, calm: 0, anxious: 0, sad: 0, angry: 0, bored: 0 }
+  
+  moods.forEach(m => {
+    if (m.mood && moodDist[m.mood] !== undefined) {
+      moodDist[m.mood]++
+    }
+  })
+  
+  // 吸烟时的情绪 vs 不吸烟时的情绪
+  const smokingMoods = moods.filter(m => m.smoked)
+  const nonSmokingMoods = moods.filter(m => !m.smoked)
+  
+  return {
+    total: moods.length,
+    moodDist,
+    smokingMoods: smokingMoods.length,
+    nonSmokingMoods: nonSmokingMoods.length
+  }
+}
+
+// ---- 省钱目标 ----
+export function getSavingsGoals() {
+  return _read(KEYS.savingsGoals, [])
+}
+
+export function addSavingsGoal(goal) {
+  const list = getSavingsGoals()
+  list.push({
+    id: Date.now().toString(36),
+    createdAt: Date.now(),
+    ...goal
+  })
+  _write(KEYS.savingsGoals, list)
+}
+
+export function updateSavingsGoal(id, updates) {
+  const list = getSavingsGoals()
+  const idx = list.findIndex(g => g.id === id)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...updates }
+    _write(KEYS.savingsGoals, list)
+  }
+}
+
+// ---- 时间胶囊 ----
+export function getTimeCapsules() {
+  return _read(KEYS.timeCapsules, [])
+}
+
+export function addTimeCapsule(capsule) {
+  const list = getTimeCapsules()
+  list.push({
+    id: Date.now().toString(36),
+    createdAt: Date.now(),
+    ...capsule
+  })
+  _write(KEYS.timeCapsules, list)
+}
+
+// ---- 虚拟宠物 ----
+export function getPet() {
+  return _read(KEYS.pet, {
+    name: '小烟',
+    health: 100,
+    happiness: 100,
+    level: 1,
+    exp: 0,
+    lastFed: Date.now()
+  })
+}
+
+export function savePet(pet) {
+  _write(KEYS.pet, pet)
+}
+
+export function updatePetHealth(delta) {
+  const pet = getPet()
+  pet.health = Math.max(0, Math.min(100, pet.health + delta))
+  pet.happiness = Math.max(0, Math.min(100, pet.happiness + delta))
+  pet.exp += 10
+  if (pet.exp >= pet.level * 100) {
+    pet.level++
+    pet.exp = 0
+  }
+  savePet(pet)
+  return pet
+}
+
 export default {
   getSettings, saveSettings,
   getToday, saveToday,
@@ -223,5 +478,11 @@ export default {
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
+  getCravings, addCraving, getCravingStats,
+  getDailyChallenge, updateChallengeProgress, getChallengeStreak,
+  getMoods, addMood, getMoodStats,
+  getSavingsGoals, addSavingsGoal, updateSavingsGoal,
+  getTimeCapsules, addTimeCapsule,
+  getPet, savePet, updatePetHealth,
   resetAll
 }

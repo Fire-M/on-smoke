@@ -469,7 +469,7 @@ export default {
 }
 
 .record-icon {
-  font-size: 36rpx;
+  font-size: 56rpx;
   display: block;
   margin-bottom: 8rpx;
 }
