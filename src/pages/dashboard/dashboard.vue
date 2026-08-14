@@ -2,57 +2,115 @@
   <view class="page-container">
     <scroll-view scroll-y class="main-scroll">
       <view class="p-20 pb-100">
-        <text class="page-title">健康看板</text>
+        <text class="page-title">数据中心</text>
 
-        <!-- 无烟时长 -->
-        <view class="card p-20 text-center mb-16">
-          <text class="text-xs text-gray-500 mb-8 block">当前无烟时长</text>
-          <text class="stat-mono">{{ smokeFreeTime }}</text>
-          <text class="text-xs text-gray-600 mt-4 block">坚持就是胜利</text>
-        </view>
-
-        <!-- 今日配额环 -->
-        <view class="card p-20 flex justify-around items-center mb-16">
-          <view class="text-center">
-            <view class="quota-ring-wrapper">
-              <view class="quota-ring-bg">
-                <view class="quota-ring-fill" :style="{ transform: 'rotate(' + quotaAngle + 'deg)' }"></view>
-              </view>
-              <text class="quota-ring-text">{{ todaySmoked }}/{{ quotaTotal }}</text>
-            </view>
-            <text class="text-xs text-gray-500 mt-8 block">今日配额</text>
-          </view>
-          <view>
-            <view class="mb-12">
-              <text class="stat-money">¥{{ savedMoney }}</text>
-              <text class="text-xs text-gray-500 block">已省烟钱</text>
-            </view>
-            <view>
-              <text class="stat-less">{{ lessSmoked }}</text>
-              <text class="text-xs text-gray-500 block">少抽根数</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- 健康恢复进度 -->
+        <!-- 本周概览 -->
         <view class="card p-20 mb-16">
-          <text class="text-xs text-gray-500 mb-12 block">健康恢复进度</text>
-          <view class="milestones">
-            <view v-for="(m, idx) in milestones" :key="idx" class="milestone-item">
-              <view class="milestone-dot" :class="{ done: m.done }"></view>
-              <view class="milestone-info">
-                <text class="text-sm" :class="m.done ? 'text-amber' : 'text-gray-300'">{{ m.label }}</text>
-                <text class="text-xs text-gray-600">{{ m.desc }}</text>
+          <view class="section-header">
+            <text class="section-title">本周概览</text>
+            <text class="section-subtitle">{{ weekRange }}</text>
+          </view>
+          <view class="week-stats">
+            <view class="week-stat">
+              <text class="week-stat-value">{{ weekSmoked }}</text>
+              <text class="week-stat-label">总根数</text>
+            </view>
+            <view class="week-stat">
+              <text class="week-stat-value">{{ weekSaved }}</text>
+              <text class="week-stat-label">省钱(元)</text>
+            </view>
+            <view class="week-stat">
+              <text class="week-stat-value">{{ weekAvg }}</text>
+              <text class="week-stat-label">日均</text>
+            </view>
+          </view>
+          <!-- 7天柱状图 -->
+          <view class="chart-container">
+            <view class="chart-bars">
+              <view v-for="(day, idx) in weekData" :key="idx" class="chart-bar-wrap">
+                <view class="chart-bar" :style="{ height: day.percent + '%' }" :class="{ today: day.isToday }">
+                  <text class="chart-bar-value" v-if="day.count > 0">{{ day.count }}</text>
+                </view>
+                <text class="chart-label">{{ day.label }}</text>
               </view>
             </view>
           </view>
         </view>
 
-        <!-- 连续无烟天数 -->
-        <view class="card p-20 text-center">
-          <text class="text-xs text-gray-500 mb-8 block">连续无烟天数</text>
-          <text class="text-4xl font-bold text-amber">{{ cleanDays }}</text>
-          <text class="text-xs text-gray-600 mt-4 block">天</text>
+        <!-- 个人记录 -->
+        <view class="card p-20 mb-16">
+          <text class="section-title mb-16 block">个人记录</text>
+          <view class="records-grid">
+            <view class="record-item">
+              <text class="record-icon">🔥</text>
+              <text class="record-value">{{ bestStreak }}</text>
+              <text class="record-label">最长连续(天)</text>
+            </view>
+            <view class="record-item">
+              <text class="record-icon">💰</text>
+              <text class="record-value">¥{{ totalSaved }}</text>
+              <text class="record-label">累计省钱</text>
+            </view>
+            <view class="record-item">
+              <text class="record-icon">📉</text>
+              <text class="record-value">{{ leastDay }}</text>
+              <text class="record-label">最少一天(根)</text>
+            </view>
+            <view class="record-item">
+              <text class="record-icon">📊</text>
+              <text class="record-value">{{ totalSmoked }}</text>
+              <text class="record-label">总吸烟(根)</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 月度对比 -->
+        <view class="card p-20 mb-16">
+          <text class="section-title mb-16 block">月度趋势</text>
+          <view class="month-compare">
+            <view class="month-item">
+              <text class="month-label">上月</text>
+              <view class="month-bar-wrap">
+                <view class="month-bar" :style="{ width: lastMonthPercent + '%' }"></view>
+              </view>
+              <text class="month-value">{{ lastMonthCount }}根</text>
+            </view>
+            <view class="month-item">
+              <text class="month-label">本月</text>
+              <view class="month-bar-wrap">
+                <view class="month-bar current" :style="{ width: thisMonthPercent + '%' }"></view>
+              </view>
+              <text class="month-value">{{ thisMonthCount }}根</text>
+            </view>
+          </view>
+          <view class="trend-indicator" v-if="monthTrend !== 0">
+            <text :class="monthTrend < 0 ? 'trend-good' : 'trend-bad'">
+              {{ monthTrend < 0 ? '↓' : '↑' }} {{ Math.abs(monthTrendPercent) }}%
+            </text>
+            <text class="trend-desc" v-if="monthTrend < 0">比上月减少，继续保持！</text>
+            <text class="trend-desc" v-else>比上月增加，注意控制</text>
+          </view>
+        </view>
+
+        <!-- 吸烟日历 -->
+        <view class="card p-20">
+          <view class="section-header mb-16">
+            <text class="section-title">本月日历</text>
+            <text class="section-subtitle">{{ calendarMonth }}</text>
+          </view>
+          <view class="calendar-grid">
+            <view v-for="(day, idx) in calendarDays" :key="idx" 
+              class="calendar-day" :class="{ 
+                'has-smoke': day.count > 0, 
+                'no-smoke': day.count === 0 && day.isPast,
+                'today': day.isToday,
+                'future': day.isFuture
+              }">
+              <text class="calendar-day-num">{{ day.day }}</text>
+              <text class="calendar-day-count" v-if="day.count > 0">{{ day.count }}根</text>
+              <text class="calendar-day-icon" v-else-if="day.isPast">✓</text>
+            </view>
+          </view>
         </view>
       </view>
     </scroll-view>
@@ -64,71 +122,219 @@
 import Store from '@/utils/store.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 
-const HEALTH_MILESTONES = [
-  { seconds: 1200, label: '20分钟', desc: '心率恢复正常' },
-  { seconds: 28800, label: '8小时', desc: '血氧水平恢复' },
-  { seconds: 86400, label: '1天', desc: '心脏病风险降低' },
-  { seconds: 172800, label: '2天', desc: '味觉开始恢复' },
-  { seconds: 604800, label: '1周', desc: '肺部开始修复' },
-  { seconds: 1209600, label: '2周', desc: '循环系统改善' },
-  { seconds: 7776000, label: '3月', desc: '肺功能提升30%' },
-  { seconds: 15552000, label: '1年', desc: '冠心病风险减半' }
-]
-
 export default {
   components: { CustomTabbar },
   data() {
     return {
-      smokeFreeTime: '00:00:00',
-      todaySmoked: 0,
-      quotaTotal: 5,
-      quotaAngle: 0,
-      savedMoney: '0.0',
-      lessSmoked: 0,
-      cleanDays: 0,
-      milestones: [],
-      timer: null
+      weekRange: '',
+      weekSmoked: 0,
+      weekSaved: '0',
+      weekAvg: '0',
+      weekData: [],
+      bestStreak: 0,
+      totalSaved: '0',
+      leastDay: 0,
+      totalSmoked: 0,
+      lastMonthCount: 0,
+      thisMonthCount: 0,
+      lastMonthPercent: 0,
+      thisMonthPercent: 0,
+      monthTrend: 0,
+      monthTrendPercent: 0,
+      calendarMonth: '',
+      calendarDays: []
     }
   },
 
   onShow() {
-    this.refreshData()
-    this.timer = setInterval(() => this.updateTime(), 1000)
-  },
-
-  onHide() {
-    clearInterval(this.timer)
+    this.loadData()
   },
 
   methods: {
-    refreshData() {
+    loadData() {
+      this.loadWeekData()
+      this.loadRecords()
+      this.loadMonthData()
+      this.loadCalendar()
+    },
+
+    loadWeekData() {
+      const history = Store.getHistory()
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const weekStart = new Date(today)
+      weekStart.setDate(today.getDate() - today.getDay())
+      
+      // 本周范围
+      const startStr = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`
+      const endStr = `${now.getMonth() + 1}/${now.getDate()}`
+      this.weekRange = `${startStr} - ${endStr}`
+
+      // 计算本周数据
+      const weekDays = []
+      let weekTotal = 0
+      const dayNames = ['日', '一', '二', '三', '四', '五', '六']
+      
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(weekStart)
+        date.setDate(weekStart.getDate() + i)
+        const dateStr = this.formatDate(date)
+        const dayRecords = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr)
+        const count = dayRecords.length
+        weekTotal += count
+        
+        weekDays.push({
+          label: dayNames[i],
+          count: count,
+          isToday: date.getTime() === today.getTime(),
+          percent: 0
+        })
+      }
+
+      this.weekSmoked = weekTotal
       const settings = Store.getSettings()
-      const today = Store.getToday()
-      this.todaySmoked = today.smokedCount
-      this.quotaTotal = settings.dailyQuota
-      const ratio = settings.dailyQuota > 0 ? Math.min(today.smokedCount / settings.dailyQuota, 1) : 0
-      this.quotaAngle = ratio * 360
-      this.savedMoney = Store.getSavedMoney().toFixed(1)
-      this.lessSmoked = Store.getLessSmoked()
-      this.cleanDays = Store.getCleanDays()
-      this.updateTime()
-      this.updateMilestones()
+      const pricePerCig = settings.cigarettePrice / settings.packSize
+      this.weekSaved = (weekTotal * pricePerCig).toFixed(1)
+      this.weekAvg = (weekTotal / 7).toFixed(1)
+
+      // 计算柱状图高度
+      const maxCount = Math.max(...weekDays.map(d => d.count), 1)
+      weekDays.forEach(d => {
+        d.percent = (d.count / maxCount) * 100
+      })
+      this.weekData = weekDays
     },
 
-    updateTime() {
-      const sec = Store.getSmokeFreeDuration()
-      const h = Math.floor(sec / 3600)
-      const m = Math.floor((sec % 3600) / 60)
-      const s = sec % 60
-      this.smokeFreeTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    loadRecords() {
+      const history = Store.getHistory()
+      const settings = Store.getSettings()
+      const pricePerCig = settings.cigarettePrice / settings.packSize
+      
+      // 总吸烟数
+      this.totalSmoked = history.length
+      
+      // 累计省钱
+      this.totalSaved = (history.length * pricePerCig).toFixed(1)
+      
+      // 最长连续天数
+      this.bestStreak = this.calcBestStreak(history)
+      
+      // 最少一天
+      const dailyCounts = {}
+      history.forEach(r => {
+        const dateStr = this.formatDate(new Date(r.timestamp))
+        dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1
+      })
+      const counts = Object.values(dailyCounts)
+      this.leastDay = counts.length > 0 ? Math.min(...counts) : 0
     },
 
-    updateMilestones() {
-      const sec = Store.getSmokeFreeDuration()
-      this.milestones = HEALTH_MILESTONES.map(m => ({
-        ...m,
-        done: sec >= m.seconds
-      }))
+    loadMonthData() {
+      const history = Store.getHistory()
+      const now = new Date()
+      const thisMonth = now.getMonth()
+      const thisYear = now.getFullYear()
+      
+      // 本月数据
+      const thisMonthRecords = history.filter(r => {
+        const d = new Date(r.timestamp)
+        return d.getMonth() === thisMonth && d.getFullYear() === thisYear
+      })
+      this.thisMonthCount = thisMonthRecords.length
+
+      // 上月数据
+      const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1
+      const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear
+      const lastMonthRecords = history.filter(r => {
+        const d = new Date(r.timestamp)
+        return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear
+      })
+      this.lastMonthCount = lastMonthRecords.length
+
+      // 计算百分比
+      const maxCount = Math.max(this.thisMonthCount, this.lastMonthCount, 1)
+      this.thisMonthPercent = (this.thisMonthCount / maxCount) * 100
+      this.lastMonthPercent = (this.lastMonthCount / maxCount) * 100
+
+      // 计算趋势
+      if (this.lastMonthCount > 0) {
+        this.monthTrend = this.thisMonthCount - this.lastMonthCount
+        this.monthTrendPercent = Math.abs(Math.round((this.monthTrend / this.lastMonthCount) * 100))
+      } else {
+        this.monthTrend = 0
+        this.monthTrendPercent = 0
+      }
+    },
+
+    loadCalendar() {
+      const history = Store.getHistory()
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth()
+      
+      this.calendarMonth = `${year}年${month + 1}月`
+      
+      const firstDay = new Date(year, month, 1)
+      const lastDay = new Date(year, month + 1, 0)
+      const daysInMonth = lastDay.getDate()
+      const startDayOfWeek = firstDay.getDay()
+      
+      const days = []
+      
+      // 添加空白占位
+      for (let i = 0; i < startDayOfWeek; i++) {
+        days.push({ day: '', count: 0, isEmpty: true })
+      }
+      
+      // 添加日期
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d)
+        const dateStr = this.formatDate(date)
+        const count = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr).length
+        const isToday = date.getTime() === new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+        const isFuture = date > now
+        const isPast = date < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        days.push({
+          day: d,
+          count: count,
+          isToday: isToday,
+          isFuture: isFuture,
+          isPast: isPast
+        })
+      }
+      
+      this.calendarDays = days
+    },
+
+    calcBestStreak(history) {
+      if (history.length === 0) return 0
+      
+      const dates = [...new Set(history.map(r => this.formatDate(new Date(r.timestamp))))].sort()
+      let maxStreak = 1
+      let currentStreak = 1
+      
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1])
+        const curr = new Date(dates[i])
+        const diffDays = (curr - prev) / (1000 * 60 * 60 * 24)
+        
+        if (diffDays === 1) {
+          currentStreak++
+          maxStreak = Math.max(maxStreak, currentStreak)
+        } else {
+          currentStreak = 1
+        }
+      }
+      
+      return maxStreak
+    },
+
+    formatDate(date) {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, '0')
+      const d = String(date.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
     }
   }
 }
@@ -152,116 +358,275 @@ export default {
   font-weight: bold;
   text-align: center;
   color: #f3f4f6;
-  margin-bottom: 48rpx;
+  margin-bottom: 40rpx;
 }
 
-.text-center { text-align: center; }
-.stat-mono {
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.section-subtitle {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+/* 本周统计 */
+.week-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 32rpx;
+}
+
+.week-stat {
+  text-align: center;
+}
+
+.week-stat-value {
   display: block;
-  font-size: 56rpx;
-  font-family: monospace;
+  font-size: 40rpx;
   font-weight: bold;
   color: #f59e0b;
 }
 
-.quota-ring-wrapper {
-  position: relative;
-  width: 160rpx;
-  height: 160rpx;
-  margin: 0 auto;
-}
-
-.quota-ring-bg {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 12rpx solid #2a2a2a;
-  position: relative;
-  overflow: hidden;
-}
-
-.quota-ring-fill {
-  position: absolute;
-  top: -12rpx;
-  left: -12rpx;
-  width: calc(100% + 24rpx);
-  height: calc(100% + 24rpx);
-  border-radius: 50%;
-  border: 12rpx solid #f59e0b;
-  clip-path: polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%, 50% 50%);
-  transform-origin: center center;
-}
-
-.quota-ring-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #e5e7eb;
-}
-
-.stat-money {
+.week-stat-label {
   display: block;
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #4ade80;
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-top: 4rpx;
 }
 
-.stat-less {
-  display: block;
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #60a5fa;
+/* 柱状图 */
+.chart-container {
+  margin-top: 16rpx;
 }
 
-.milestones {
+.chart-bars {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 200rpx;
+  padding: 0 8rpx;
+}
+
+.chart-bar-wrap {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  flex: 1;
+}
+
+.chart-bar {
+  width: 40rpx;
+  min-height: 8rpx;
+  background: linear-gradient(to top, #4b5563 0%, #6b7280 100%);
+  border-radius: 8rpx 8rpx 0 0;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.chart-bar.today {
+  background: linear-gradient(to top, #f59e0b 0%, #fbbf24 100%);
+}
+
+.chart-bar-value {
+  position: absolute;
+  top: -28rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18rpx;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.chart-label {
+  font-size: 20rpx;
+  color: #6b7280;
+}
+
+/* 个人记录 */
+.records-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 24rpx;
 }
 
-.milestone-item {
+.record-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16rpx;
+  padding: 20rpx;
+  text-align: center;
+}
+
+.record-icon {
+  font-size: 36rpx;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.record-value {
+  display: block;
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #f59e0b;
+  margin-bottom: 4rpx;
+}
+
+.record-label {
+  display: block;
+  font-size: 20rpx;
+  color: #6b7280;
+}
+
+/* 月度对比 */
+.month-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.month-item {
   display: flex;
   align-items: center;
   gap: 16rpx;
 }
 
-.milestone-dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-  background-color: #2a2a2a;
-  flex-shrink: 0;
+.month-label {
+  font-size: 24rpx;
+  color: #9ca3af;
+  width: 60rpx;
 }
 
-.milestone-dot.done {
-  background-color: #f59e0b;
+.month-bar-wrap {
+  flex: 1;
+  height: 24rpx;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12rpx;
+  overflow: hidden;
 }
 
-.milestone-info {
+.month-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6b7280 0%, #9ca3af 100%);
+  border-radius: 12rpx;
+  transition: width 0.5s ease;
+}
+
+.month-bar.current {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.month-value {
+  font-size: 24rpx;
+  color: #d1d5db;
+  width: 80rpx;
+  text-align: right;
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12rpx;
+}
+
+.trend-good {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #10b981;
+}
+
+.trend-bad {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #ef4444;
+}
+
+.trend-desc {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+/* 日历 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8rpx;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8rpx;
+  position: relative;
 }
 
+.calendar-day.has-smoke {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.calendar-day.no-smoke {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.calendar-day.today {
+  border: 2px solid #f59e0b;
+}
+
+.calendar-day.future {
+  opacity: 0.3;
+}
+
+.calendar-day.isEmpty {
+  background: transparent;
+}
+
+.calendar-day-num {
+  font-size: 22rpx;
+  color: #d1d5db;
+}
+
+.calendar-day-count {
+  font-size: 16rpx;
+  color: #f59e0b;
+  margin-top: 2rpx;
+}
+
+.calendar-day-icon {
+  font-size: 18rpx;
+  color: #10b981;
+  margin-top: 2rpx;
+}
+
+/* 工具类 */
+.card { 
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
+  border: 1px solid #2a2a2a; 
+  border-radius: 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+}
 .p-20 { padding: 40rpx; }
 .pb-100 { padding-bottom: 200rpx; }
-.mb-12 { margin-bottom: 24rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.mt-4 { margin-top: 8rpx; }
-.mt-8 { margin-top: 16rpx; }
-.text-xs { font-size: 24rpx; }
-.text-sm { font-size: 28rpx; }
-.text-4xl { font-size: 72rpx; }
-.font-bold { font-weight: bold; }
+.mb-12 { margin-bottom: 24rpx; }
 .block { display: block; }
-.flex { display: flex; }
-.justify-around { justify-content: space-around; }
-.items-center { align-items: center; }
-.text-gray-300 { color: #d1d5db; }
-.text-gray-500 { color: #6b7280; }
-.text-gray-600 { color: #4b5563; }
-.text-amber { color: #f59e0b; }
-.card { background-color: #1f1f1f; border: 1px solid #2a2a2a; border-radius: 32rpx; }
 </style>

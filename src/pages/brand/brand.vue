@@ -4,6 +4,9 @@
     <scroll-view scroll-y class="brand-scroll">
       <view class="brand-header">
         <view class="brand-header-row">
+          <view class="brand-back-btn" @click="goBack">
+            <text class="brand-back-icon">←</text>
+          </view>
           <text class="brand-header-title">选择香烟</text>
           <text class="brand-header-badge">{{ brands.length }}款</text>
         </view>
@@ -102,6 +105,28 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
+}
+
+.brand-back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.brand-back-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.92);
+}
+
+.brand-back-icon {
+  font-size: 36rpx;
+  color: #f3f4f6;
 }
 
 .brand-header-title {

@@ -7,7 +7,8 @@ const KEYS = {
   settings: 'os_settings',
   today: 'os_today',
   history: 'os_history',
-  stats: 'os_stats'
+  stats: 'os_stats',
+  badges: 'os_badges'
 }
 
 // 默认设置
@@ -182,6 +183,26 @@ export function getLessSmoked() {
   return stats.totalSmoked || 0
 }
 
+// 勋章系统
+export function getUnlockedBadges() {
+  return _read(KEYS.badges, {})
+}
+
+export function saveUnlockedBadges(badges) {
+  uni.setStorageSync(KEYS.badges, JSON.stringify(badges))
+}
+
+export function unlockBadge(badgeId) {
+  const badges = getUnlockedBadges()
+  if (!badges[badgeId]) {
+    badges[badgeId] = true
+    badges[badgeId + '_time'] = Date.now()
+    saveUnlockedBadges(badges)
+    return true // 新解锁
+  }
+  return false // 已解锁
+}
+
 export function resetAll() {
   Object.values(KEYS).forEach(k => uni.removeStorageSync(k))
 }
@@ -201,5 +222,6 @@ export default {
   recordSmoke,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
+  getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   resetAll
 }

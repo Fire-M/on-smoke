@@ -195,10 +195,7 @@ export default {
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
 
-      // 记录吸烟
-      Store.recordSmoke(0)
-
-      // 延迟跳转到抽烟场景
+      // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）
       setTimeout(() => {
         this.boxRemainingCigs = remainingAfterPull
         uni.redirectTo({

@@ -38,14 +38,14 @@
 
       <!-- 身体恢复 + 成就徽章 -->
       <view class="mx-20 mb-16 two-col">
-        <view class="card p-16 flex items-center gap-12">
+        <view class="card p-16 flex items-center gap-12 recovery-card" @click="goToRecovery">
           <text class="text-2xl">🫁</text>
           <view>
             <text class="text-sm text-gray-300 block">身体恢复</text>
             <text class="text-xs text-gray-600 mt-4 block"><text class="text-amber">{{ milestoneLabel }}</text> <text class="text-amber">里程碑</text></text>
           </view>
         </view>
-        <view class="card p-16 flex items-center gap-12">
+        <view class="card p-16 flex items-center gap-12 achievement-card" @click="goToAchievements">
           <text class="text-2xl">🏆</text>
           <view>
             <text class="text-sm text-gray-300 block">成就徽章</text>
@@ -195,6 +195,14 @@ export default {
       }
       // 跳转到品牌选择页
       uni.navigateTo({ url: '/pages/brand/brand' })
+    },
+
+    goToAchievements() {
+      uni.navigateTo({ url: '/pages/achievements/achievements' })
+    },
+
+    goToRecovery() {
+      uni.navigateTo({ url: '/pages/recovery/recovery' })
     }
   }
 }
@@ -393,5 +401,47 @@ export default {
   border: 1px solid #2a2a2a; 
   border-radius: 32rpx;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+}
+
+.achievement-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.achievement-card:active {
+  transform: scale(0.97);
+  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+}
+
+.achievement-card::after {
+  content: '›';
+  position: absolute;
+  right: 16rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 32rpx;
+  color: #6b7280;
+}
+
+.recovery-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.recovery-card:active {
+  transform: scale(0.97);
+  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+}
+
+.recovery-card::after {
+  content: '›';
+  position: absolute;
+  right: 16rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 32rpx;
+  color: #6b7280;
 }
 </style>
