@@ -4,9 +4,10 @@
     <view class="ach-header">
       <view class="ach-header-row">
         <view class="ach-back-btn" @click="goBack">
-          <text class="ach-back-icon">‹</text>
+          <text class="ach-back-icon">&lt;</text>
         </view>
         <text class="ach-title">成就勋章</text>
+        <view class="ach-back-btn-placeholder"></view>
       </view>
       <view class="ach-progress-bar">
         <view class="ach-progress-fill" :style="{ width: progressPercent + '%' }"></view>
@@ -218,7 +219,7 @@ export default {
 .ach-header-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  justify-content: space-between;
   margin-bottom: 20rpx;
 }
 
@@ -232,6 +233,11 @@ export default {
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.ach-back-btn-placeholder {
+  width: 64rpx;
+  height: 64rpx;
 }
 
 .ach-back-btn:active {

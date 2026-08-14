@@ -375,8 +375,8 @@ export default {
 }
 
 .section-subtitle {
-  font-size: 22rpx;
-  color: #6b7280;
+  font-size: 26rpx;
+  color: #9ca3af;
 }
 
 /* 本周统计 */
@@ -399,8 +399,8 @@ export default {
 
 .week-stat-label {
   display: block;
-  font-size: 22rpx;
-  color: #6b7280;
+  font-size: 24rpx;
+  color: #9ca3af;
   margin-top: 4rpx;
 }
 
@@ -449,8 +449,8 @@ export default {
 }
 
 .chart-label {
-  font-size: 20rpx;
-  color: #6b7280;
+  font-size: 24rpx;
+  color: #9ca3af;
 }
 
 /* 个人记录 */
@@ -484,8 +484,8 @@ export default {
 
 .record-label {
   display: block;
-  font-size: 20rpx;
-  color: #6b7280;
+  font-size: 24rpx;
+  color: #9ca3af;
 }
 
 /* 月度对比 */

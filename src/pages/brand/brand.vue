@@ -5,10 +5,10 @@
       <view class="brand-header">
         <view class="brand-header-row">
           <view class="brand-back-btn" @click="goBack">
-            <text class="brand-back-icon">←</text>
+            <text class="brand-back-icon">&lt;</text>
           </view>
           <text class="brand-header-title">选择香烟</text>
-          <text class="brand-header-badge">{{ brands.length }}款</text>
+          <view class="brand-back-btn-placeholder"></view>
         </view>
         <text class="brand-header-sub">挑一包解解馋 · 全是假的</text>
       </view>
@@ -104,7 +104,7 @@ export default {
 .brand-header-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  justify-content: space-between;
 }
 
 .brand-back-btn {
@@ -119,13 +119,18 @@ export default {
   transition: all 0.2s;
 }
 
+.brand-back-btn-placeholder {
+  width: 64rpx;
+  height: 64rpx;
+}
+
 .brand-back-btn:active {
   background: rgba(255, 255, 255, 0.12);
   transform: scale(0.92);
 }
 
 .brand-back-icon {
-  font-size: 36rpx;
+  font-size: 48rpx;
   color: #f3f4f6;
 }
 

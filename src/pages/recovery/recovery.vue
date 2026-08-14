@@ -4,9 +4,10 @@
     <view class="recovery-header">
       <view class="recovery-header-row">
         <view class="recovery-back-btn" @click="goBack">
-          <text class="recovery-back-icon">‹</text>
+          <text class="recovery-back-icon">&lt;</text>
         </view>
         <text class="recovery-title">身体恢复</text>
+        <view class="recovery-back-btn-placeholder"></view>
       </view>
       <view class="recovery-subtitle">
         <text class="recovery-days">已戒烟 {{ quitDays }} 天</text>
@@ -197,7 +198,7 @@ export default {
 .recovery-header-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  justify-content: space-between;
   margin-bottom: 16rpx;
 }
 
@@ -213,13 +214,18 @@ export default {
   transition: all 0.2s;
 }
 
+.recovery-back-btn-placeholder {
+  width: 64rpx;
+  height: 64rpx;
+}
+
 .recovery-back-btn:active {
   background: rgba(255, 255, 255, 0.12);
   transform: scale(0.92);
 }
 
 .recovery-back-icon {
-  font-size: 36rpx;
+  font-size: 48rpx;
   color: #f3f4f6;
 }
 

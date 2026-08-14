@@ -3,9 +3,10 @@
     <view class="header">
       <view class="header-row">
         <view class="back-btn" @click="goBack">
-          <text class="back-icon">←</text>
+          <text class="back-icon">&lt;</text>
         </view>
         <text class="page-title">呼吸引导</text>
+        <view class="back-btn-placeholder"></view>
       </view>
     </view>
 
@@ -141,7 +142,7 @@ export default {
 .header-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  justify-content: space-between;
 }
 
 .back-btn {
@@ -155,8 +156,13 @@ export default {
   cursor: pointer;
 }
 
+.back-btn-placeholder {
+  width: 64rpx;
+  height: 64rpx;
+}
+
 .back-icon {
-  font-size: 36rpx;
+  font-size: 48rpx;
   color: #f3f4f6;
 }
 

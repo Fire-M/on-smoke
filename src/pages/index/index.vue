@@ -4,7 +4,7 @@
     <scroll-view scroll-y class="main-scroll">
       <!-- 顶部：戒烟天数 + 激励语 -->
       <view class="px-20 pt-40 pb-16">
-        <text class="text-sm text-gray-500">戒烟 第 <text class="text-amber font-bold text-base">{{ quitDays }}</text> 天</text>
+        <text class="text-sm text-gray-400">戒烟 第 <text class="text-amber font-bold text-base">{{ quitDays }}</text> 天</text>
         <text class="text-2xl font-bold text-gray-100 mt-4 block">嘴又痒了?</text>
       </view>
 
@@ -13,9 +13,9 @@
         <view class="flex">
           <view class="saved-bar"></view>
           <view class="flex-1 p-20">
-            <text class="text-xs text-gray-500 mb-8 block">至今已省</text>
+            <text class="text-sm text-gray-400 mb-8 block">至今已省</text>
             <text class="text-4xl font-bold text-amber">¥{{ savedAmount }}</text>
-            <text class="text-xs text-gray-600 mt-12 block">约 {{ Math.floor(savedAmount / 5) }} 包辣条 · {{ Math.floor(savedAmount / 15) }} 杯咖啡</text>
+            <text class="text-sm text-gray-500 mt-12 block">约 {{ Math.floor(savedAmount / 5) }} 包辣条 · {{ Math.floor(savedAmount / 15) }} 杯咖啡</text>
           </view>
         </view>
       </view>
@@ -23,16 +23,16 @@
       <!-- 今日假抽 + 连续打卡 -->
       <view class="mx-20 mb-16 two-col">
         <view class="card p-16">
-          <text class="text-xs text-gray-500 mb-8 block">今日假抽</text>
+          <text class="text-sm text-gray-400 mb-8 block">今日假抽</text>
           <text class="text-2xl font-bold text-gray-100">{{ todaySmoked }} / {{ quotaTotal }} 根</text>
           <view class="progress-bar">
             <view class="progress-fill" :style="{ width: quotaPercent + '%' }"></view>
           </view>
         </view>
         <view class="card p-16">
-          <text class="text-xs text-gray-500 mb-8 block">连续打卡</text>
+          <text class="text-sm text-gray-400 mb-8 block">连续打卡</text>
           <text class="text-2xl font-bold text-gray-100">{{ quitDays }} 天</text>
-          <text class="text-xs text-amber mt-8 block">🔥 别破戒</text>
+          <text class="text-sm text-amber mt-8 block">🔥 别破戒</text>
         </view>
       </view>
 
@@ -42,14 +42,14 @@
           <text class="card-icon">🫁</text>
           <view>
             <text class="text-sm text-gray-300 block">身体恢复</text>
-            <text class="text-xs text-gray-600 mt-4 block"><text class="text-amber">{{ milestoneLabel }}</text> <text class="text-amber">里程碑</text></text>
+            <text class="text-sm text-gray-500 mt-4 block"><text class="text-amber">{{ milestoneLabel }}</text> <text class="text-amber">里程碑</text></text>
           </view>
         </view>
         <view class="card p-16 flex items-center gap-12 achievement-card" @click="goToAchievements">
           <text class="card-icon">🏆</text>
           <view>
             <text class="text-sm text-gray-300 block">成就徽章</text>
-            <text class="text-xs text-gray-600 mt-4 block">{{ badgesCount }} / 8 已解锁</text>
+            <text class="text-sm text-gray-500 mt-4 block">{{ badgesCount }} / 8 已解锁</text>
           </view>
         </view>
       </view>
@@ -60,7 +60,7 @@
           <text class="card-icon">📝</text>
           <view class="flex-1">
             <text class="text-sm text-gray-300 block">烟瘾追踪</text>
-            <text class="text-xs text-gray-600 mt-4 block">今天 {{ todayCravings }} 次烟瘾 · 抵抗 {{ resistedCount }} 次</text>
+            <text class="text-sm text-gray-500 mt-4 block">今天 {{ todayCravings }} 次烟瘾 · 抵抗 {{ resistedCount }} 次</text>
           </view>
         </view>
       </view>
@@ -72,7 +72,7 @@
             <text class="challenge-icon">{{ challengeIcon }}</text>
             <view class="flex-1">
               <text class="text-sm text-gray-300 block">今日挑战</text>
-              <text class="text-xs text-gray-600 mt-4 block">{{ challengeTitle }}</text>
+              <text class="text-sm text-gray-500 mt-4 block">{{ challengeTitle }}</text>
             </view>
             <text v-if="challengeCompleted" class="challenge-badge">✅ 已完成</text>
             <text v-else class="challenge-streak" v-if="challengeStreak > 0">🔥 {{ challengeStreak }}天</text>

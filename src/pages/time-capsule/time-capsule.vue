@@ -2,8 +2,9 @@
   <view class="page-container">
     <view class="header">
       <view class="header-row">
-        <view class="back-btn" @click="goBack"><text class="back-icon">←</text></view>
+        <view class="back-btn" @click="goBack"><text class="back-icon">&lt;</text></view>
         <text class="page-title">时间胶囊</text>
+        <view class="back-btn-placeholder"></view>
       </view>
     </view>
     <scroll-view scroll-y class="main-scroll">
@@ -38,9 +39,10 @@ export default {
 <style>
 .page-container { height: 100vh; width: 100vw; background-color: #0f0f0f; color: #e5e7eb; display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
-.header-row { display: flex; align-items: center; gap: 16rpx; }
+.header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
-.back-icon { font-size: 36rpx; color: #f3f4f6; }
+.back-btn-placeholder { width: 64rpx; height: 64rpx; }
+.back-icon { font-size: 48rpx; color: #f3f4f6; }
 .page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
 .main-scroll { flex: 1; height: 100%; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
