@@ -13,26 +13,46 @@
 
         <!-- 统计摘要 -->
         <view class="summary-card" v-if="summaryCount > 0">
-          <text class="text-xs text-gray-500">本周期抽烟 <text class="text-amber font-bold">{{ summaryCount }}</text> 根</text>
+          <view class="summary-row">
+            <view class="summary-item">
+              <text class="summary-num text-amber">{{ summaryCount }}</text>
+              <text class="summary-label">抽烟次数</text>
+            </view>
+            <view class="summary-divider"></view>
+            <view class="summary-item">
+              <text class="summary-num text-gray-200">{{ totalDuration }}</text>
+              <text class="summary-label">总时长(分)</text>
+            </view>
+            <view class="summary-divider"></view>
+            <view class="summary-item">
+              <text class="summary-num text-gray-200">{{ avgDuration }}</text>
+              <text class="summary-label">平均(秒)</text>
+            </view>
+          </view>
         </view>
 
         <!-- 记录列表 -->
         <view class="record-list">
-          <view v-for="record in filteredRecords" :key="record.id" class="record-item card">
+          <view v-for="(record, index) in filteredRecords" :key="record.id" class="record-item card">
+            <view class="record-index">{{ filteredRecords.length - index }}</view>
             <view class="record-left">
-              <text class="text-2xl">🚬</text>
+              <text class="record-icon">🚬</text>
             </view>
             <view class="record-info">
               <text class="text-sm text-gray-200">{{ formatTime(record.timestamp) }}</text>
               <text class="text-xs text-gray-500">持续 {{ formatDuration(record.duration) }}</text>
+            </view>
+            <view class="record-right">
+              <text class="text-xs text-gray-600">{{ formatRelativeTime(record.timestamp) }}</text>
             </view>
           </view>
         </view>
 
         <!-- 空状态 -->
         <view class="empty-state" v-if="filteredRecords.length === 0">
-          <text class="text-gray-600 text-sm">暂无记录</text>
-          <text class="text-gray-700 text-xs mt-4 block">去抽一根吧</text>
+          <text class="empty-icon">🚭</text>
+          <text class="text-gray-500 text-sm">暂无记录</text>
+          <text class="text-gray-700 text-xs mt-8 block">去抽一根吧</text>
         </view>
       </view>
     </scroll-view>
@@ -51,7 +71,9 @@ export default {
       tabRange: 'day',
       allRecords: [],
       filteredRecords: [],
-      summaryCount: 0
+      summaryCount: 0,
+      totalDuration: 0,
+      avgDuration: 0
     }
   },
 
@@ -70,15 +92,29 @@ export default {
       const now = Date.now()
       let start = 0
       if (this.tabRange === 'day') {
-        start = now - 86400000
+        // 今日从凌昨0点开始
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        start = today.getTime()
       } else if (this.tabRange === 'week') {
-        start = now - 7 * 86400000
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        weekAgo.setHours(0, 0, 0, 0)
+        start = weekAgo.getTime()
       } else {
-        start = now - 30 * 86400000
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 30)
+        monthAgo.setHours(0, 0, 0, 0)
+        start = monthAgo.getTime()
       }
 
       this.filteredRecords = this.allRecords.filter(r => r.timestamp >= start)
       this.summaryCount = this.filteredRecords.length
+      
+      // 计算总时长和平均时长
+      const totalSec = this.filteredRecords.reduce((sum, r) => sum + (r.duration || 0), 0)
+      this.totalDuration = Math.round(totalSec / 60 * 10) / 10
+      this.avgDuration = this.summaryCount > 0 ? Math.round(totalSec / this.summaryCount) : 0
     },
 
     formatTime(ts) {
@@ -96,6 +132,20 @@ export default {
       const s = sec % 60
       if (m > 0) return `${m}分${s}秒`
       return `${s}秒`
+    },
+
+    formatRelativeTime(ts) {
+      const now = Date.now()
+      const diff = now - ts
+      const minutes = Math.floor(diff / 60000)
+      const hours = Math.floor(diff / 3600000)
+      const days = Math.floor(diff / 86400000)
+      
+      if (minutes < 1) return '刚刚'
+      if (minutes < 60) return `${minutes}分钟前`
+      if (hours < 24) return `${hours}小时前`
+      if (days < 7) return `${days}天前`
+      return ''
     }
   }
 }
@@ -130,58 +180,121 @@ export default {
 }
 
 .history-tab {
-  padding: 12rpx 24rpx;
+  padding: 12rpx 32rpx;
   border-radius: 999rpx;
   font-size: 24rpx;
   color: #6b7280;
   background-color: #1f1f1f;
-  border: none;
+  border: 1px solid #2a2a2a;
+  transition: all 0.2s;
 }
 
 .history-tab.active {
   background-color: #f59e0b;
   color: #0f0f0f;
+  border-color: #f59e0b;
+  font-weight: bold;
 }
 
+/* 统计摘要卡片 */
 .summary-card {
-  background-color: #1f1f1f;
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
   border: 1px solid #2a2a2a;
   border-radius: 32rpx;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  text-align: center;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
 }
 
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.summary-num {
+  font-size: 44rpx;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.summary-label {
+  font-size: 20rpx;
+  color: #6b7280;
+}
+
+.summary-divider {
+  width: 1px;
+  height: 60rpx;
+  background-color: #2a2a2a;
+}
+
+/* 记录列表 */
 .record-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .record-item {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 24rpx;
+  padding: 20rpx 24rpx;
+}
+
+.record-index {
+  font-size: 22rpx;
+  color: #4b5563;
+  width: 40rpx;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.record-left {
+  flex-shrink: 0;
+}
+
+.record-icon {
+  font-size: 40rpx;
 }
 
 .record-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 4rpx;
 }
 
+.record-right {
+  flex-shrink: 0;
+}
+
+/* 空状态 */
 .empty-state {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 128rpx 0;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
 }
 
 .p-20 { padding: 40rpx; }
 .pb-100 { padding-bottom: 200rpx; }
-.mb-4 { margin-bottom: 32rpx; }
-.mt-4 { margin-top: 8rpx; }
+.mt-8 { margin-top: 16rpx; }
 .text-xs { font-size: 24rpx; }
 .text-sm { font-size: 28rpx; }
-.text-2xl { font-size: 48rpx; }
 .font-bold { font-weight: bold; }
 .block { display: block; }
 .text-gray-200 { color: #e5e7eb; }
@@ -189,5 +302,9 @@ export default {
 .text-gray-600 { color: #4b5563; }
 .text-gray-700 { color: #374151; }
 .text-amber { color: #f59e0b; }
-.card { background-color: #1f1f1f; border: 1px solid #2a2a2a; border-radius: 32rpx; }
+.card { 
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
+  border: 1px solid #2a2a2a; 
+  border-radius: 24rpx;
+}
 </style>

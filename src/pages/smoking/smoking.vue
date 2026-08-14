@@ -25,13 +25,13 @@
       </view>
 
       <!-- 2D 香烟 -->
-      <view class="cigarette-3d" :class="cigClass" :style="cigBurnStyle">
+      <view class="cigarette-3d" ref="cigarette3d" :class="cigClass" :style="cigBurnStyle">
         <view class="cig-flat-ash" :class="{ show: ashGrowth > 0, 'ash-falling': ashFalling }" :style="ashStyle"></view>
         <view class="cig-flat-charring" :class="{ show: ashGrowth > 0 }" :style="{ opacity: ashGrowth > 0 ? (0.4 + Math.min(1, ashGrowth / 80) * 0.6) : 0 }"></view>
         <view class="cig-flat-burn">
           <view class="cig-flat-burn-core"></view>
         </view>
-        <view class="cig-flat cig-flat-paper">
+        <view class="cig-flat cig-flat-paper" :style="paperStyle">
           <view class="cig-flat-band"></view>
         </view>
         <view class="cig-flat cig-flat-filter"></view>
@@ -202,22 +202,42 @@ export default {
 
     ashStyle() {
       if (this.ashGrowth <= 0) return { height: '0px' }
-      const h = 52 * 0.9 * (this.ashGrowth / 100)
-      return { height: Math.max(3, h) + 'px' }
+      // 烟灰高度：非线性增长，模拟真实烟灰的堆积感
+      const normalizedGrowth = this.ashGrowth / 200  // 0 ~ 1
+      const curve = Math.pow(normalizedGrowth, 0.7)  // 更明显的堆积曲线
+      const maxH = 90  // 最大烟灰高度增大
+      const h = maxH * curve
+      return { 
+        height: Math.max(3, h) + 'px',
+        // 烟灰宽度不超过烟身宽度
+        width: `calc(var(--cig-width) * ${1.0 - normalizedGrowth * 0.05})`
+      }
     },
 
     // 香烟燃烧变短：减少容器高度，烟头位置不变
     cigBurnStyle() {
       if (this.smokeProgress <= 0) return {}
-      const totalH = 560 // --cig-total-h
-      // 最多缩短 70%（保留滤嘴）
-      const deltaH = (this.smokeProgress / 100) * totalH * 0.7
+      const totalH = 520 // --cig-total-h
+      // 最多缩短 60%（保留滤嘴）
+      const deltaH = (this.smokeProgress / 100) * totalH * 0.6
       const newH = totalH - deltaH
       // 补偿 translateY：容器变短后要下移，保持烟头位置不变
       const offsetY = deltaH / 2
       return {
         height: newH + 'px',
         transform: `translate(-50%, calc(-50% + ${offsetY}px))`
+      }
+    },
+
+    // 纸身样式：随吸烟进度缩短
+    paperStyle() {
+      if (this.smokeProgress <= 0) return {}
+      const paperH = 360 // --cig-total-h(520) - --cig-filter-h(160)
+      // 纸身最多缩短 80%
+      const newPaperH = paperH * (1 - (this.smokeProgress / 100) * 0.8)
+      return {
+        height: newPaperH + 'px',
+        flex: 'none'
       }
     },
 
@@ -258,8 +278,10 @@ export default {
       if (saved !== null && saved !== undefined) this.soundEnabled = saved === '1' || saved === 1
     } catch (e) {}
 
-    // 预加载点火音效（减少延迟）
+    // 预加载所有音效（减少延迟）
     this.initFireAudio()
+    this.initBurnAudio()
+    this.initExhaleAudio()
   },
 
   onUnload() {
@@ -279,6 +301,7 @@ export default {
       // 销毁音频播放器
       if (this.fireAudio) { try { this.fireAudio.destroy() } catch(e) {}; this.fireAudio = null }
       if (this.burnAudio) { try { this.burnAudio.destroy() } catch(e) {}; this.burnAudio = null }
+      if (this.exhaleAudio) { try { this.exhaleAudio.destroy() } catch(e) {}; this.exhaleAudio = null }
       this.setSmokeMode('off')
     },
 
@@ -631,20 +654,32 @@ export default {
     exhaleByIntensity(intensity) {
       // intensity: ~0.2 (轻吸) ~ 2.0 (深吸+后期)
       const pos = this.getBurnPosSync()
-      // Canvas 粒子数：4 ~ 20
-      const canvasCount = Math.round(4 + intensity * 8)
-      // DOM puff 数：8 ~ 40
-      const domCount = Math.round(8 + intensity * 16)
-      // 扩散范围：80 ~ 160
-      const spread = 80 + intensity * 40
+      
+      // 根据强度决定吐烟风格
+      const isDeepExhale = intensity > 1.2  // 深吸后吐烟
+      const isLightPuff = intensity < 0.5   // 轻吸轻吐
+      
+      // Canvas 粒子数：4 ~ 25（强度越高越多）
+      const canvasCount = Math.round(4 + intensity * 10)
+      // DOM puff 数：10 ~ 50
+      const domCount = Math.round(10 + intensity * 20)
+      // 扩散范围：60 ~ 180
+      const spread = 60 + intensity * 60
 
-      // Canvas 粒子爆发
+      // Canvas 粒子爆发 - 从烟头位置向上喷吐
       for (let i = 0; i < canvasCount; i++) {
-        this.particles.push(this.createParticle(
-          this.emitterX + (Math.random() - 0.5) * 12,
-          this.emitterY + (Math.random() - 0.5) * 8,
+        const p = this.createParticle(
+          this.emitterX + (Math.random() - 0.5) * 15,
+          this.emitterY + (Math.random() - 0.5) * 10,
           'exhale'
-        ))
+        )
+        // 深吸时粒子更大更浓
+        if (isDeepExhale) {
+          p.size *= 1.3
+          p.maxSize *= 1.2
+          p.vy *= 1.4  // 更快的上升速度
+        }
+        this.particles.push(p)
       }
 
       // DOM 烟雾爆发
@@ -654,40 +689,87 @@ export default {
           const r1 = Math.random()*2-1, r2 = Math.random()*2-1
           const ox = (r1+r2)*0.5*spread
           const progress = i / domCount
+          
           let preset
-          if (progress < 0.3) {
-            // 前 30%：浓密大团，强度越高越大
-            const sizeBoost = intensity * 30
-            preset = {
-              sizeMin: 100 + sizeBoost, sizeMax: 160 + sizeBoost,
-              lifeMin: 5500, lifeMax: 8000,
-              opacityMin: 0.25 + intensity * 0.08, opacityMax: 0.4 + intensity * 0.1,
-              scaleMin: 0.14, scaleMax: 0.22,
-              driftBase: 80, driftVar: 100, riseMin: 50, riseMax: 80
+          if (isDeepExhale) {
+            // 深吸后吐烟：大团浓烟，分三个阶段
+            if (progress < 0.25) {
+              // 第一阶段：最浓的核心烟团
+              preset = {
+                sizeMin: 140, sizeMax: 200,
+                lifeMin: 6000, lifeMax: 9000,
+                opacityMin: 0.4, opacityMax: 0.55,
+                scaleMin: 0.18, scaleMax: 0.28,
+                driftBase: 60, driftVar: 80, riseMin: 40, riseMax: 60
+              }
+            } else if (progress < 0.6) {
+              // 第二阶段：扩散的烟团
+              preset = {
+                sizeMin: 100, sizeMax: 160,
+                lifeMin: 5000, lifeMax: 7500,
+                opacityMin: 0.3, opacityMax: 0.45,
+                scaleMin: 0.14, scaleMax: 0.22,
+                driftBase: 90, driftVar: 120, riseMin: 55, riseMax: 80
+              }
+            } else {
+              // 第三阶段：稀薄扩散的尾烟
+              preset = {
+                sizeMin: 60, sizeMax: 110,
+                lifeMin: 4000, lifeMax: 6000,
+                opacityMin: 0.15, opacityMax: 0.28,
+                scaleMin: 0.08, scaleMax: 0.16,
+                driftBase: 110, driftVar: 140, riseMin: 70, riseMax: 100
+              }
             }
-          } else if (progress < 0.7) {
+          } else if (isLightPuff) {
+            // 轻吸：小团淡烟
             preset = {
-              sizeMin: 70 + intensity * 15, sizeMax: 120 + intensity * 20,
-              lifeMin: 4500, lifeMax: 6500,
-              opacityMin: 0.18 + intensity * 0.05, opacityMax: 0.32 + intensity * 0.06,
-              scaleMin: 0.1, scaleMax: 0.18,
-              driftBase: 90, driftVar: 110, riseMin: 60, riseMax: 90
+              sizeMin: 40, sizeMax: 70,
+              lifeMin: 3000, lifeMax: 4500,
+              opacityMin: 0.1, opacityMax: 0.2,
+              scaleMin: 0.06, scaleMax: 0.1,
+              driftBase: 70, driftVar: 90, riseMin: 60, riseMax: 85
             }
           } else {
-            preset = {
-              sizeMin: 40 + intensity * 8, sizeMax: 80 + intensity * 10,
-              lifeMin: 3500, lifeMax: 5000,
-              opacityMin: 0.08 + intensity * 0.03, opacityMax: 0.2 + intensity * 0.05,
-              scaleMin: 0.06, scaleMax: 0.12,
-              driftBase: 100, driftVar: 120, riseMin: 70, riseMax: 100
+            // 普通吐烟
+            if (progress < 0.3) {
+              preset = {
+                sizeMin: 90 + intensity * 25, sizeMax: 140 + intensity * 30,
+                lifeMin: 5000, lifeMax: 7500,
+                opacityMin: 0.25 + intensity * 0.06, opacityMax: 0.38 + intensity * 0.08,
+                scaleMin: 0.12, scaleMax: 0.2,
+                driftBase: 80, driftVar: 100, riseMin: 50, riseMax: 75
+              }
+            } else if (progress < 0.7) {
+              preset = {
+                sizeMin: 60 + intensity * 15, sizeMax: 100 + intensity * 20,
+                lifeMin: 4000, lifeMax: 6000,
+                opacityMin: 0.15 + intensity * 0.04, opacityMax: 0.28 + intensity * 0.06,
+                scaleMin: 0.09, scaleMax: 0.16,
+                driftBase: 95, driftVar: 115, riseMin: 60, riseMax: 85
+              }
+            } else {
+              preset = {
+                sizeMin: 35 + intensity * 8, sizeMax: 65 + intensity * 12,
+                lifeMin: 3000, lifeMax: 4500,
+                opacityMin: 0.08 + intensity * 0.03, opacityMax: 0.18 + intensity * 0.04,
+                scaleMin: 0.05, scaleMax: 0.1,
+                driftBase: 105, driftVar: 130, riseMin: 70, riseMax: 95
+              }
             }
           }
+          
           const opts = this.makeDomOpts(preset)
-          opts.drift = ox + (Math.random()-0.5)*60
-          this.spawnDomPuff(pos.x + ox, this.canvasH * 0.88 + (Math.random()-0.5)*15, opts)
-        }, i * 10)
+          opts.drift = ox + (Math.random()-0.5)*50
+          // 深吸时烟从更低的位置升起（像从嘴里吐出）
+          const startY = isDeepExhale ? this.canvasH * 0.92 : this.canvasH * 0.88
+          this.spawnDomPuff(pos.x + ox, startY + (Math.random()-0.5)*12, opts)
+        }, i * 8)  // 稍微加快爆发速度
       }
-      setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, 3500)
+      
+      // 深吸后延长烟雾持续时间
+      const filterDuration = isDeepExhale ? 5000 : 3500
+      setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, filterDuration)
     },
 
     // ============ 烟雾模式同步 ============
@@ -854,9 +936,9 @@ export default {
         this.smokeProgress = Math.min(100, (elapsed / SMOKING_DURATION) * 100)
 
         // 烟灰堆积：每 600ms 增长一点
-        if (elapsed - lastAshTick > 600) {
+        if (elapsed - lastAshTick > 500) {
           lastAshTick = elapsed
-          this.growAsh(3)
+          this.growAsh(5)
         }
 
         if (this.smokeProgress >= 100) {
@@ -868,7 +950,7 @@ export default {
     // ---- 烟灰 ----
     growAsh(amount) {
       if (this.state !== 'lit' && this.state !== 'smoking' && this.state !== 'exhaling') return
-      this.ashGrowth = Math.min(200, this.ashGrowth + amount)
+      this.ashGrowth = Math.min(250, this.ashGrowth + amount)
       // 烟灰过长自动断裂
       if (this.ashGrowth >= this.ashBreakThreshold && (this.state === 'lit' || this.state === 'exhaling')) {
         this.autoBreakAsh()
@@ -879,23 +961,81 @@ export default {
       this.ashFalling = true
       this.playAshDrop()
       this.showToastMsg('烟灰太长了，自动掉落')
+      // 自动断裂时清零
+      this.ashGrowth = 0
       setTimeout(() => {
         this.ashFalling = false
-        this.ashGrowth = Math.max(0, this.ashGrowth - 60 - Math.random() * 40)
-        this.ashBreakThreshold = this.ashGrowth + 100 + Math.random() * 60
+        // 重置断裂阈值
+        this.ashBreakThreshold = 100 + Math.random() * 60
       }, 800)
     },
 
     tapAsh() {
       if (this.ashGrowth > 0) {
-        this.ashFalling = true
-        setTimeout(() => {
-          this.ashFalling = false
-          this.ashGrowth = Math.max(0, this.ashGrowth - 80)
-        }, 700)
+        // 创建烟灰碎片粒子效果，烟灰越多碎片越多
+        this.createAshParticles(this.ashGrowth)
+        this.ashGrowth = 0
         this.playAshDrop()
+        this.showToastMsg('弹掉烟灰')
+      } else {
+        this.showToastMsg('没有烟灰可弹')
       }
-      this.showToastMsg(this.ashGrowth > 0 ? '弹掉一部分烟灰' : '没有烟灰可弹')
+    },
+
+    // 创建烟灰掉落粒子，数量与烟灰量成正比
+    createAshParticles(ashAmount) {
+      const container = this.$refs.cigarette3d?.$el || this.$refs.cigarette3d
+      if (!container) return
+      
+      // 烟灰越多，碎片越多（基础 6 个，最多 20 个）
+      const particleCount = Math.min(20, 6 + Math.floor(ashAmount / 15))
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div')
+        particle.className = 'ash-particle'
+        
+        // 随机碎片大小
+        const size = 3 + Math.random() * 6
+        particle.style.width = size + 'px'
+        particle.style.height = size * (0.5 + Math.random() * 0.7) + 'px'
+        
+        // 从烟灰两侧不规则落下
+        // 左侧或右侧随机
+        const side = Math.random() > 0.5 ? 1 : -1
+        // 水平偏移：从烟身中心向两侧散开
+        const startX = side * (5 + Math.random() * 15)
+        // 垂直位置：烟灰顶部区域
+        const startY = Math.random() * 15
+        
+        particle.style.left = `calc(50% + ${startX}px)`
+        particle.style.top = `-${startY}px`
+        
+        // 运动方向：向下并向两侧散开
+        const angle = (side > 0 ? 20 : -20) + (Math.random() - 0.5) * 40
+        const velocity = 60 + Math.random() * 50
+        const vx = Math.sin(angle * Math.PI / 180) * velocity * side
+        const vy = Math.cos(angle * Math.PI / 180) * velocity
+        
+        // 随机旋转
+        const rotation = (Math.random() - 0.5) * 540 * side
+        
+        // 设置动画变量
+        particle.style.setProperty('--vx', vx + 'px')
+        particle.style.setProperty('--vy', vy + 'px')
+        particle.style.setProperty('--rotation', rotation + 'deg')
+        
+        // 随机延迟，让掉落更自然
+        particle.style.animationDelay = (Math.random() * 0.15) + 's'
+        
+        container.appendChild(particle)
+        
+        // 动画结束后移除
+        setTimeout(() => {
+          if (particle.parentNode) {
+            particle.parentNode.removeChild(particle)
+          }
+        }, 1300)
+      }
     },
 
     // ---- 完成吸烟 ----
@@ -1021,19 +1161,29 @@ export default {
       }
     },
 
-    // 吐烟音效 (output.mp3)
+    // 吐烟音效 (output.mp3) - 预初始化
+    initExhaleAudio() {
+      if (this.exhaleAudio) return
+      try {
+        this.exhaleAudio = uni.createInnerAudioContext()
+        this.exhaleAudio.src = '/static/audio/output.mp3'
+        this.exhaleAudio.volume = 1.0
+      } catch (e) {
+        console.warn('Exhale audio init failed', e)
+      }
+    },
+
+    // 吐烟音效
     playExhale(intensity) {
       if (!this.soundEnabled) return
-      try {
-        const audio = uni.createInnerAudioContext()
-        audio.src = '/static/audio/output.mp3'
-        audio.volume = 1.0
-        audio.play()
-        // 播放完后销毁
-        audio.onEnded(() => { audio.destroy() })
-        audio.onError(() => { audio.destroy() })
-      } catch (e) {
-        console.warn('Exhale sound failed', e)
+      this.initExhaleAudio()
+      if (this.exhaleAudio) {
+        try {
+          this.exhaleAudio.stop()
+          this.exhaleAudio.play()
+        } catch (e) {
+          console.warn('Exhale sound failed', e)
+        }
       }
     },
 

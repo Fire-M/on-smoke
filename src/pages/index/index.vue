@@ -15,7 +15,7 @@
           <view class="flex-1 p-20">
             <text class="text-xs text-gray-500 mb-8 block">至今已省</text>
             <text class="text-4xl font-bold text-amber">¥{{ savedAmount }}</text>
-            <text class="text-xs text-gray-600 mt-8 block">够买 {{ Math.floor(savedAmount / 5) }} 包辣条 · 或 {{ Math.floor(savedAmount / 15) }} 杯咖啡</text>
+            <text class="text-xs text-gray-600 mt-12 block">约 {{ Math.floor(savedAmount / 5) }} 包辣条 · {{ Math.floor(savedAmount / 15) }} 杯咖啡</text>
           </view>
         </view>
       </view>
@@ -33,18 +33,6 @@
           <text class="text-xs text-gray-500 mb-8 block">连续打卡</text>
           <text class="text-2xl font-bold text-gray-100">{{ quitDays }} 天</text>
           <text class="text-xs text-amber mt-8 block">🔥 别破戒</text>
-        </view>
-      </view>
-
-      <!-- 广告位 -->
-      <view class="mx-20 mb-16 card p-12 flex items-center gap-12">
-        <text class="ad-badge">广告</text>
-        <view class="flex-1">
-          <text class="text-xs text-gray-300 block truncate">物资短缺、寒夜逼近，快来安排你的末日...</text>
-          <text class="text-[10px] text-gray-600 mt-2 block">无尽冬日-3亿玩家推荐</text>
-        </view>
-        <view class="ad-icon">
-          <text class="text-lg">🎮</text>
         </view>
       </view>
 
@@ -233,8 +221,9 @@ export default {
 .saved-card {
   border-radius: 32rpx;
   overflow: hidden;
-  background-color: #1f1f1f;
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
   border: 1px solid #2a2a2a;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
 }
 
 .saved-bar {
@@ -266,33 +255,12 @@ export default {
   transition: width 0.3s;
 }
 
-/* 广告 */
-.ad-badge {
-  font-size: 20rpx;
-  color: #4b5563;
-  background-color: #1f2937;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-  flex-shrink: 0;
-}
-
-.ad-icon {
-  width: 128rpx;
-  height: 96rpx;
-  border-radius: 16rpx;
-  background: linear-gradient(135deg, #334155, #0f172a);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* 底部按钮 */
 .btn-container {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(100rpx + env(safe-area-inset-bottom, 0px));
+  bottom: calc(140rpx + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   padding: 16rpx 40rpx 0;
   background: linear-gradient(to top, #0f0f0f 40%, transparent);
@@ -420,5 +388,10 @@ export default {
 .text-gray-600 { color: #4b5563; }
 .text-amber { color: #f59e0b; }
 .bg-amber { background-color: #f59e0b; }
-.card { background-color: #1f1f1f; border: 1px solid #2a2a2a; border-radius: 32rpx; }
+.card { 
+  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
+  border: 1px solid #2a2a2a; 
+  border-radius: 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
+}
 </style>

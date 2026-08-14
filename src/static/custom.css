@@ -1192,9 +1192,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 :root {
   --cig-width: 46px;
-  --cig-total-h: 560px;
+  --cig-total-h: 520px;
   --cig-filter-h: 160px;
-  --cig-paper-h: 400px;
+  --cig-paper-h: 360px;
 }
 
 /* 香烟容器：垂直居中，flex列排列 */
@@ -1533,87 +1533,157 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   left: 50%;
   top: 0;
   transform: translateX(-50%) translateY(-100%);
-  width: calc(var(--cig-width) * 1.15);
+  width: var(--cig-width);
   transform-origin: bottom center;
+  /* 烟灰堆积效果：多层渐变模拟烟灰一层层堆积 */
   background:
-    /* 底层：暗灰基底（烟灰底部更密实） */
+    /* 纵向裂纹：模拟烟灰开裂 */
+    linear-gradient(88deg,
+      transparent 0%,
+      transparent 35%,
+      rgba(40, 35, 30, 0.15) 35.5%,
+      rgba(40, 35, 30, 0.15) 36%,
+      transparent 36.5%,
+      transparent 62%,
+      rgba(35, 30, 25, 0.12) 62.3%,
+      rgba(35, 30, 25, 0.12) 62.8%,
+      transparent 63.3%,
+      transparent 100%),
+    /* 堆积层纹：不规则间距，模拟烟灰一层层压实 */
+    repeating-linear-gradient(to top,
+      transparent 0px,
+      transparent 4px,
+      rgba(45, 40, 35, 0.22) 4px,
+      rgba(45, 40, 35, 0.22) 5px,
+      rgba(65, 60, 55, 0.12) 5px,
+      rgba(65, 60, 55, 0.12) 6px,
+      transparent 6px,
+      transparent 11px),
+    /* 表面细微裂纹 */
+    repeating-linear-gradient(78deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(40, 35, 30, 0.08) 3px,
+      rgba(40, 35, 30, 0.08) 3.5px,
+      transparent 3.5px,
+      transparent 7px),
+    /* 主体渐变：底部深灰（近火），顶部浅灰白 */
     linear-gradient(to top,
-      #4a4540 0%,
-      #5a5450 5%,
-      #6a6560 12%,
-      #7a7570 20%,
-      #8a857f 35%,
-      #9a958f 55%,
-      #a8a39d 75%,
-      #b2ada7 100%);
+      #2a2520 0%,
+      #3a3530 6%,
+      #4a4540 14%,
+      #5a5550 24%,
+      #6a6560 36%,
+      #7a7570 48%,
+      #8a8580 60%,
+      #9a9590 74%,
+      #a8a3a0 86%,
+      #b5b0ab 100%);
   opacity: 0;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.35s ease, height 0.4s ease-out;
   pointer-events: none;
   z-index: 6;
-  /* 蘑菇形：底部宽（100%），顶部窄（55%），两侧圆滑过渡 */
+  /* 堆积形状：高度不规则，边缘锯齿状，模拟真实烟灰断裂 */
+  border-radius: 2px 2px 0 0;
   clip-path: polygon(
+    /* 底部 */
     0% 100%, 100% 100%,
-    97% 85%, 94% 70%, 92% 55%, 88% 40%,
-    82% 28%, 75% 18%, 68% 10%, 60% 4%,
-    50% 0%, 40% 4%, 32% 10%, 25% 18%,
-    18% 28%, 12% 40%, 8% 55%, 6% 70%,
-    3% 85%, 0% 100%
+    /* 右侧：不规则锯齿 */
+    100% 96%, 98% 92%, 101% 86%, 97% 80%, 99% 74%,
+    96% 68%, 98% 62%, 95% 56%, 97% 50%, 94% 44%,
+    96% 38%, 93% 32%, 95% 26%, 91% 20%, 88% 14%,
+    84% 9%, 78% 5%, 70% 2%, 60% 0%,
+    /* 顶部：参差不齐，像断裂的烟灰 */
+    52% 3%, 46% 1%, 40% 4%, 34% 2%, 28% 5%,
+    /* 左侧：不规则锯齿 */
+    22% 9%, 16% 14%, 12% 20%, 8% 26%, 6% 32%,
+    4% 38%, 5% 44%, 3% 50%, 5% 56%, 2% 62%,
+    4% 68%, 1% 74%, 3% 80%, 0% 86%, 2% 92%,
+    0% 96%, 0% 100%
   );
-  filter: blur(0.3px);
+  filter: blur(0.2px);
+  box-shadow: 
+    inset 0 -3px 5px rgba(0, 0, 0, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.08),
+    inset 2px 0 4px rgba(0, 0, 0, 0.12),
+    inset -2px 0 4px rgba(0, 0, 0, 0.12);
 }
 
-/* 烟灰主体：堆叠层次 + 颗粒纹理 + 火光 */
+/* 烟灰堆积层：不规则裂纹 + 颗粒感 + 微小火光 */
 .cig-flat-ash::before {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    /* 火光：底部中心橙色余烬 */
-    radial-gradient(ellipse 45% 28% at 50% 92%,
-      rgba(255, 160, 50, 0.85) 0%,
-      rgba(255, 120, 30, 0.7) 20%,
-      rgba(220, 80, 15, 0.55) 40%,
-      rgba(160, 50, 10, 0.35) 60%,
-      transparent 85%),
-    /* 横向堆叠层次线：模拟烟灰一层层压实 */
-    repeating-linear-gradient(0deg,
-      transparent 0px,
-      transparent 3px,
-      rgba(40, 35, 30, 0.15) 3px,
-      rgba(40, 35, 30, 0.15) 4px,
-      transparent 4px,
-      transparent 7px,
-      rgba(55, 48, 42, 0.12) 7px,
-      rgba(55, 48, 42, 0.12) 8px,
-      transparent 8px,
-      transparent 12px,
-      rgba(70, 62, 55, 0.08) 12px,
-      rgba(70, 62, 55, 0.08) 13px),
-    /* 颗粒感：随机散布的暗色颗粒 */
-    radial-gradient(circle at 28% 15%, rgba(60,55,50,0.45) 1px, transparent 2px),
-    radial-gradient(circle at 62% 30%, rgba(70,65,60,0.4) 1.2px, transparent 2.5px),
-    radial-gradient(circle at 42% 48%, rgba(55,50,45,0.5) 1px, transparent 2px),
-    radial-gradient(circle at 72% 62%, rgba(65,60,55,0.35) 1px, transparent 2px),
-    radial-gradient(circle at 22% 78%, rgba(50,45,40,0.45) 1px, transparent 2px),
-    radial-gradient(circle at 55% 88%, rgba(80,75,68,0.3) 1px, transparent 2px),
-    radial-gradient(circle at 80% 22%, rgba(55,50,45,0.4) 1px, transparent 2px),
-    radial-gradient(circle at 38% 68%, rgba(60,55,50,0.35) 1px, transparent 2px);
+    /* 底部火光：烟灰与燃烧交界处的微弱橙光 */
+    radial-gradient(ellipse 70% 18% at 50% 96%,
+      rgba(255, 130, 35, 0.55) 0%,
+      rgba(220, 95, 18, 0.35) 25%,
+      rgba(180, 65, 12, 0.2) 45%,
+      rgba(120, 45, 8, 0.1) 65%,
+      transparent 90%),
+    /* 斜向裂纹：模拟烟灰表面开裂 */
+    linear-gradient(115deg,
+      transparent 0%,
+      transparent 28%,
+      rgba(35, 30, 25, 0.18) 28.5%,
+      rgba(35, 30, 25, 0.18) 29%,
+      transparent 29.5%,
+      transparent 55%,
+      rgba(40, 35, 30, 0.15) 55.3%,
+      rgba(40, 35, 30, 0.15) 55.8%,
+      transparent 56.3%,
+      transparent 78%,
+      rgba(35, 30, 25, 0.12) 78.2%,
+      rgba(35, 30, 25, 0.12) 78.6%,
+      transparent 79%,
+      transparent 100%),
+    /* 颗粒纹理：散布的深浅颗粒，模拟烟灰粗糙表面 */
+    radial-gradient(circle at 22% 10%, rgba(55,50,45,0.5) 1px, transparent 2px),
+    radial-gradient(circle at 72% 22%, rgba(65,60,55,0.45) 1.2px, transparent 2.5px),
+    radial-gradient(circle at 35% 35%, rgba(50,45,40,0.55) 1px, transparent 2px),
+    radial-gradient(circle at 80% 48%, rgba(60,55,50,0.4) 1px, transparent 2px),
+    radial-gradient(circle at 15% 62%, rgba(45,40,35,0.5) 1px, transparent 2px),
+    radial-gradient(circle at 55% 75%, rgba(70,65,60,0.35) 1px, transparent 2px),
+    radial-gradient(circle at 88% 15%, rgba(50,45,40,0.45) 1px, transparent 2px),
+    radial-gradient(circle at 42% 88%, rgba(55,50,45,0.4) 1px, transparent 2px),
+    radial-gradient(circle at 28% 52%, rgba(60,55,50,0.3) 0.8px, transparent 1.5px),
+    radial-gradient(circle at 68% 68%, rgba(45,40,35,0.35) 0.8px, transparent 1.5px),
+    /* 额外颗粒增加粗糙感 */
+    radial-gradient(circle at 12% 30%, rgba(50,45,40,0.4) 0.8px, transparent 1.5px),
+    radial-gradient(circle at 85% 55%, rgba(55,50,45,0.35) 0.8px, transparent 1.5px),
+    radial-gradient(circle at 45% 15%, rgba(60,55,50,0.3) 0.8px, transparent 1.5px);
   pointer-events: none;
   mix-blend-mode: multiply;
 }
 
-/* 烟灰内芯：覆盖在基底之上，提供灰白主体色和渐变 */
+/* 烟灰内芯：不规则灰白主体，增加结块感 + 裂纹 */
 .cig-flat-ash::after {
   content: '';
   position: absolute;
-  inset: 3% 8% 2% 8%;
-  background: linear-gradient(to top,
-    rgba(40, 35, 30, 0.45) 0%,
-    rgba(60, 55, 50, 0.3) 8%,
-    rgba(85, 80, 75, 0.15) 20%,
-    rgba(120, 115, 110, 0.05) 40%,
-    rgba(155, 150, 145, 0) 65%,
-    rgba(170, 165, 160, 0) 100%);
+  inset: 2% 6% 1% 8%;
+  background: 
+    /* 不规则暗斑：模拟烟灰结块，位置更分散 */
+    radial-gradient(ellipse 30% 22% at 25% 18%, rgba(60,55,50,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 25% 28% at 75% 42%, rgba(55,50,45,0.3) 0%, transparent 65%),
+    radial-gradient(ellipse 35% 18% at 40% 68%, rgba(50,45,40,0.25) 0%, transparent 60%),
+    radial-gradient(ellipse 20% 15% at 60% 85%, rgba(45,40,35,0.2) 0%, transparent 55%),
+    /* 细小裂纹点缀 */
+    linear-gradient(105deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(40,35,30,0.1) 40.3%,
+      rgba(40,35,30,0.1) 40.6%,
+      transparent 41%,
+      transparent 100%),
+    /* 底部深色渐变：靠近火处更暗 */
+    linear-gradient(to top,
+      rgba(30, 25, 20, 0.55) 0%,
+      rgba(50, 45, 40, 0.4) 10%,
+      rgba(75, 70, 65, 0.25) 25%,
+      rgba(100, 95, 90, 0.12) 45%,
+      rgba(130, 125, 120, 0.05) 65%,
+      rgba(150, 145, 140, 0) 100%);
   pointer-events: none;
 }
 
@@ -1622,36 +1692,112 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .cig-flat-ash.ash-falling {
-  animation: ashFall 0.7s ease-in forwards;
+  animation: ashFallScatter 0.6s ease-out forwards;
 }
 
-@keyframes ashFall {
-  0% { opacity: 1; transform: translateX(-50%) translateY(-100%); }
-  40% { transform: translateX(-45%) translateY(-60%) rotate(-8deg); }
-  100% { opacity: 0; transform: translateX(-55%) translateY(20%) rotate(12deg); }
+/* 烟灰散落动画：主体分裂成多块向不同方向掉落 */
+@keyframes ashFallScatter {
+  0% { 
+    opacity: 1;
+    clip-path: polygon(
+      0% 100%, 100% 100%,
+      100% 96%, 98% 92%, 101% 86%, 97% 80%, 99% 74%,
+      96% 68%, 98% 62%, 95% 56%, 97% 50%, 94% 44%,
+      96% 38%, 93% 32%, 95% 26%, 91% 20%, 88% 14%,
+      84% 9%, 78% 5%, 70% 2%, 60% 0%,
+      52% 3%, 46% 1%, 40% 4%, 34% 2%, 28% 5%,
+      22% 9%, 16% 14%, 12% 20%, 8% 26%, 6% 32%,
+      4% 38%, 5% 44%, 3% 50%, 5% 56%, 2% 62%,
+      4% 68%, 1% 74%, 3% 80%, 0% 86%, 2% 92%,
+      0% 96%, 0% 100%
+    );
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-100%) rotate(-5deg);
+    clip-path: polygon(
+      0% 100%, 45% 100%, 42% 80%, 38% 60%, 35% 40%, 30% 20%, 25% 0%,
+      20% 5%, 15% 15%, 10% 30%, 5% 50%, 2% 70%, 0% 90%, 0% 100%
+    );
+  }
+  60% {
+    opacity: 0.8;
+    transform: translateX(-60%) translateY(-60%) rotate(-15deg);
+  }
+  100% { 
+    opacity: 0;
+    transform: translateX(-75%) translateY(-20%) rotate(-25deg);
+  }
 }
 
-/* 烟灰底部焦黑环：烟灰与纸身交界处的烧焦痕迹 */
+/* 烟灰碎片粒子效果 */
+.ash-particle {
+  position: absolute;
+  background: linear-gradient(to bottom, 
+    #4a4540 0%, 
+    #6a6560 30%, 
+    #8a8580 60%, 
+    #a8a3a0 100%);
+  border-radius: 30% 40% 35% 45% / 40% 35% 45% 30%;
+  opacity: 1;
+  pointer-events: none;
+  z-index: 10;
+  animation: ashParticleFall 1s ease-out forwards;
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 烟灰碎片掉落动画 */
+@keyframes ashParticleFall {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(calc(var(--vx) * 0.2), calc(var(--vy) * 0.2)) rotate(calc(var(--rotation) * 0.2)) scale(0.95);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(calc(var(--vx) * 0.5), calc(var(--vy) * 0.6)) rotate(calc(var(--rotation) * 0.5)) scale(0.85);
+  }
+  80% {
+    opacity: 0.5;
+    transform: translate(calc(var(--vx) * 0.8), calc(var(--vy) * 0.9)) rotate(calc(var(--rotation) * 0.8)) scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--vx), calc(var(--vy) * 1.2)) rotate(var(--rotation)) scale(0.5);
+  }
+}
+
+/* 烟灰底部焦黑环：烟灰与纸身交界处的烧焦痕迹，更真实的不规则边缘 */
 .cig-flat-charring {
   position: absolute;
   left: 50%;
   bottom: 100%;
   transform: translateX(-50%) translateY(50%);
-  width: calc(var(--cig-width) * 1.05);
-  height: 8px;
+  width: var(--cig-width);
+  height: 12px;
   background:
-    radial-gradient(ellipse at center,
-      rgba(25, 18, 12, 0.85) 0%,
-      rgba(35, 25, 18, 0.7) 30%,
-      rgba(50, 38, 28, 0.5) 55%,
-      rgba(70, 55, 40, 0.3) 75%,
+    radial-gradient(ellipse 100% 100% at 50% 50%,
+      rgba(20, 15, 10, 0.92) 0%,
+      rgba(30, 22, 15, 0.82) 25%,
+      rgba(45, 32, 22, 0.62) 50%,
+      rgba(60, 45, 30, 0.38) 75%,
       transparent 100%);
-  border-radius: 50%;
+  /* 更不规则的圆角，模拟烧焦边缘 */
+  border-radius: 42% 55% 48% 50% / 52% 48% 50% 46%;
   pointer-events: none;
   z-index: 5;
   filter: blur(1.2px);
   opacity: 0;
   transition: opacity 0.3s ease;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 8px rgba(80, 40, 10, 0.25),
+    inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .cig-flat-charring.show {

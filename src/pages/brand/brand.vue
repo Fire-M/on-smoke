@@ -3,29 +3,38 @@
     <!-- 品牌网格 -->
     <scroll-view scroll-y class="brand-scroll">
       <view class="brand-header">
-        <text class="brand-header-title">选择香烟</text>
-        <text class="brand-header-sub">挑一包解解馋</text>
+        <view class="brand-header-row">
+          <text class="brand-header-title">选择香烟</text>
+          <text class="brand-header-badge">{{ brands.length }}款</text>
+        </view>
+        <text class="brand-header-sub">挑一包解解馋 · 全是假的</text>
       </view>
 
       <view class="brand-grid">
         <view v-for="(brand, index) in brands" :key="brand.id"
           class="brand-card" :class="'theme-' + brand.theme"
-          :style="{ animationDelay: index * 0.08 + 's' }"
+          :style="{ animationDelay: index * 0.06 + 's' }"
           @click="selectBrand(brand)">
-          <text class="brand-price">¥{{ brand.price }}</text>
-          <text class="brand-name-cn">{{ brand.cn }}</text>
-          <text class="brand-name-en">{{ brand.en }}</text>
-          <view class="brand-seal"></view>
-          <view class="brand-desc">
+          <view class="brand-card-top">
+            <text class="brand-price">¥{{ brand.price }}</text>
+            <view class="brand-seal"></view>
+          </view>
+          <view class="brand-card-center">
+            <text class="brand-name-cn">{{ brand.cn }}</text>
+            <text class="brand-name-en">{{ brand.en }}</text>
+          </view>
+          <view class="brand-card-bottom">
             <text class="brand-tag">{{ brand.tag }}</text>
             <text class="brand-quote">“{{ brand.quote }}”</text>
           </view>
+          <view class="brand-card-shine"></view>
         </view>
       </view>
 
       <!-- 底部声明 -->
       <view class="disclaimer">
-        <text>虚构品牌 · 纯属戏谑 · 真烟请远离</text>
+        <text class="disclaimer-icon">🚫</text>
+        <text class="disclaimer-text">虚构品牌 · 纯属戏谑 · 真烟请远离</text>
       </view>
     </scroll-view>
   </view>
@@ -82,23 +91,37 @@ export default {
 
 .brand-scroll {
   flex: 1;
-  padding: 0 32rpx;
+  padding: 0 28rpx;
 }
 
 .brand-header {
-  padding: 48rpx 8rpx 32rpx;
+  padding: 40rpx 12rpx 28rpx;
+}
+
+.brand-header-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
 }
 
 .brand-header-title {
-  display: block;
   font-size: 44rpx;
   font-weight: bold;
   color: #f3f4f6;
 }
 
+.brand-header-badge {
+  font-size: 22rpx;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
 .brand-header-sub {
   display: block;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #6b7280;
   margin-top: 8rpx;
 }
@@ -106,22 +129,22 @@ export default {
 .brand-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24rpx;
+  gap: 20rpx;
 }
 
-/* 品牌卡片 - 还原原始 3D 渐变风格 */
+/* 品牌卡片 */
 .brand-card {
   position: relative;
-  border-radius: 32rpx;
-  padding: 40rpx 24rpx 28rpx;
+  border-radius: 28rpx;
+  padding: 28rpx 20rpx 24rpx;
   cursor: pointer;
   transition: all 0.25s ease;
   overflow: hidden;
-  min-height: 400rpx;
+  min-height: 380rpx;
   display: flex;
   flex-direction: column;
-  align-items: center;
   animation: cardFadeIn 0.4s ease-out both;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .brand-card::before {
@@ -131,105 +154,136 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 40%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 50%);
   pointer-events: none;
   border-radius: inherit;
 }
 
+/* 卡片光泽效果 */
+.brand-card-shine {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.03) 45%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.03) 55%,
+    transparent 60%
+  );
+  pointer-events: none;
+  transform: rotate(0deg);
+}
+
 .brand-card:active {
   transform: scale(0.96);
-  filter: brightness(1.2);
+  filter: brightness(1.15);
 }
 
 /* 卡片主题渐变 */
-.brand-card.theme-blue   { background: linear-gradient(160deg, #1e3a5f 0%, #0d2240 100%); }
-.brand-card.theme-red    { background: linear-gradient(160deg, #7a1f2b 0%, #4a0f18 100%); }
-.brand-card.theme-black  { background: linear-gradient(160deg, #2a2a2a 0%, #141414 100%); }
-.brand-card.theme-gold   { background: linear-gradient(160deg, #8b6914 0%, #5a4510 100%); }
-.brand-card.theme-lightblue { background: linear-gradient(160deg, #2d5a6e 0%, #1a3d4f 100%); }
-.brand-card.theme-purple { background: linear-gradient(160deg, #4a2d6e 0%, #2d1a45 100%); }
+.brand-card.theme-blue   { background: linear-gradient(155deg, #1e3a5f 0%, #0d2240 100%); }
+.brand-card.theme-red    { background: linear-gradient(155deg, #7a1f2b 0%, #4a0f18 100%); }
+.brand-card.theme-black  { background: linear-gradient(155deg, #2a2a2a 0%, #141414 100%); }
+.brand-card.theme-gold   { background: linear-gradient(155deg, #8b6914 0%, #5a4510 100%); }
+.brand-card.theme-lightblue { background: linear-gradient(155deg, #2d5a6e 0%, #1a3d4f 100%); }
+.brand-card.theme-purple { background: linear-gradient(155deg, #4a2d6e 0%, #2d1a45 100%); }
 
-/* 价格 */
+/* 卡片顶部：价格 + 印章 */
+.brand-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16rpx;
+}
+
 .brand-price {
-  position: absolute;
-  top: 24rpx;
-  right: 28rpx;
-  font-size: 24rpx;
-  color: rgba(240, 230, 210, 0.5);
-  font-weight: 500;
-}
-
-/* 品牌中文名 */
-.brand-name-cn {
-  font-size: 48rpx;
-  font-weight: 800;
-  color: #f0e6d2;
-  letter-spacing: 8rpx;
-  text-align: center;
-  line-height: 1.3;
-}
-
-/* 品牌英文名 */
-.brand-name-en {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: rgba(240, 230, 210, 0.65);
-  letter-spacing: 6rpx;
-  text-align: center;
-  margin-top: 4rpx;
+  font-size: 26rpx;
+  color: rgba(240, 230, 210, 0.6);
+  font-weight: 600;
 }
 
 /* 圆形印章 */
 .brand-seal {
-  width: 72rpx;
-  height: 72rpx;
+  width: 56rpx;
+  height: 56rpx;
   border-radius: 50%;
-  border: 4rpx solid rgba(240, 230, 210, 0.35);
-  margin: 20rpx auto 0;
+  border: 3rpx solid rgba(240, 230, 210, 0.3);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.15);
 }
 
 .brand-seal::after {
   content: '';
-  width: 24rpx;
-  height: 24rpx;
+  width: 18rpx;
+  height: 18rpx;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(240,230,210,0.5) 0%, rgba(240,230,210,0.1) 100%);
+  background: radial-gradient(circle, rgba(240,230,210,0.45) 0%, rgba(240,230,210,0.08) 100%);
 }
 
-/* 品牌描述 */
-.brand-desc {
-  margin-top: auto;
-  padding-top: 24rpx;
+/* 卡片中心：品牌名 */
+.brand-card-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 0;
+}
+
+.brand-name-cn {
+  font-size: 52rpx;
+  font-weight: 800;
+  color: #f0e6d2;
+  letter-spacing: 6rpx;
   text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
+}
+
+.brand-name-en {
+  font-size: 20rpx;
+  font-weight: 500;
+  color: rgba(240, 230, 210, 0.55);
+  letter-spacing: 4rpx;
+  text-align: center;
+  margin-top: 6rpx;
+}
+
+/* 卡片底部：描述 */
+.brand-card-bottom {
+  padding-top: 16rpx;
+  text-align: center;
+  border-top: 1px solid rgba(240, 230, 210, 0.08);
 }
 
 .brand-tag {
   display: block;
-  font-size: 24rpx;
-  font-weight: 700;
-  color: rgba(240, 230, 210, 0.9);
-  letter-spacing: 2rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: rgba(240, 230, 210, 0.85);
+  letter-spacing: 1rpx;
 }
 
 .brand-quote {
   display: block;
-  font-size: 20rpx;
-  color: rgba(240, 230, 210, 0.5);
-  margin-top: 8rpx;
+  font-size: 18rpx;
+  color: rgba(240, 230, 210, 0.4);
+  margin-top: 6rpx;
   font-style: italic;
-  line-height: 1.4;
+  line-height: 1.3;
 }
 
 /* 卡片入场动画 */
 @keyframes cardFadeIn {
   from {
     opacity: 0;
-    transform: translateY(40rpx) scale(0.95);
+    transform: translateY(30rpx) scale(0.96);
   }
   to {
     opacity: 1;
@@ -237,11 +291,21 @@ export default {
   }
 }
 
+/* 底部声明 */
 .disclaimer {
-  text-align: center;
-  font-size: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 48rpx 0 140rpx;
+}
+
+.disclaimer-icon {
+  font-size: 40rpx;
+}
+
+.disclaimer-text {
+  font-size: 22rpx;
   color: #374151;
-  margin-top: 48rpx;
-  margin-bottom: 120rpx;
 }
 </style>
