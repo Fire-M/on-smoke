@@ -1,5 +1,10 @@
 <template>
   <view class="page-container">
+    <!-- 返回按钮 -->
+    <view class="smoke-back-btn" @click="goBack">
+      <text class="smoke-back-icon">&lt;</text>
+    </view>
+
     <!-- 背景火光（由亮渐灭） -->
     <view class="bg-ember-glow" :style="bgGlowStyle"></view>
 
@@ -52,10 +57,37 @@
       <text>{{ hintText }}</text>
     </view>
 
-    <!-- 燃烧进度条 -->
-    <view class="burn-progress" v-if="state !== 'ready' && state !== 'burnout' && state !== 'cooldown'">
-      <view class="burn-progress-bar" :style="{ width: smokeProgress + '%' }"></view>
-      <text class="burn-progress-text">{{ Math.round(smokeProgress) }}%</text>
+    <!-- 肺部承受力可视化 -->
+    <view class="lung-container" v-if="state !== 'ready' && state !== 'burnout' && state !== 'cooldown'">
+      <view class="lung-visual">
+        <!-- 肺部图标 -->
+        <view class="lung-icon">
+          <svg viewBox="0 0 100 100" class="lung-svg">
+            <!-- 左肺 -->
+            <path class="lung-path lung-left" :class="{ 'lung-full': lungFill >= 100 }"
+              d="M 30 20 Q 20 25 18 35 Q 15 50 20 65 Q 25 75 35 75 Q 40 75 42 70 Q 45 60 43 45 Q 42 30 38 22 Z"
+              :style="{ fill: getLungColor(lungFill) }" />
+            <!-- 右肺 -->
+            <path class="lung-path lung-right" :class="{ 'lung-full': lungFill >= 100 }"
+              d="M 70 20 Q 80 25 82 35 Q 85 50 80 65 Q 75 75 65 75 Q 60 75 58 70 Q 55 60 57 45 Q 58 30 62 22 Z"
+              :style="{ fill: getLungColor(lungFill) }" />
+            <!-- 气管 -->
+            <path class="lung-trachea" d="M 50 15 L 50 35 M 50 35 Q 45 40 40 45 M 50 35 Q 55 40 60 45"
+              stroke="#9ca3af" stroke-width="2" fill="none" />
+          </svg>
+          <!-- 填充动画层 -->
+          <view class="lung-fill-overlay" :style="{ height: lungFill + '%', background: getLungGradient(lungFill) }"></view>
+        </view>
+        <!-- 数值显示 -->
+        <view class="lung-info">
+          <text class="lung-label">🫁 肺部负荷</text>
+          <text class="lung-value" :class="{ 'lung-warning': lungFill > 70 }">{{ Math.round(lungFill) }}%</text>
+        </view>
+      </view>
+      <!-- 警告提示 -->
+      <view class="lung-alert" v-if="lungFill > 70">
+        <text class="lung-alert-text">{{ lungFill >= 100 ? '⚠️ 肺部已满，必须吐烟！' : '⚠️ 肺部压力过大' }}</text>
+      </view>
     </view>
 
     <!-- 功能按钮 -->
@@ -132,12 +164,14 @@ import Store from '@/utils/store.js'
 
 const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
+const MAX_PUFF_DURATION = 8000  // 单次吸烟最长时长（8秒）
 
 export default {
   data() {
     return {
       brandId: '',
       remaining: 0,
+      cancelled: false,  // 标记是否取消抽烟
       // 状态机: ready / igniting / lit / smoking / exhaling / burnout / cooldown
       state: 'ready',
       sceneReady: false,
@@ -151,9 +185,11 @@ export default {
       smokeStartTime: 0,
       sessionStartTs: 0,
       sessionExhaleCount: 0,
+      lungFill: 0,  // 肺部填充度 (0-100)
       // 计时器
       smokeTimer: null,
       pressTimer: null,
+      puffTimer: null,  // 单次吸烟自动停止计时器
       isPressing: false,
       // 拖拽检测
       isDragging: false,
@@ -289,6 +325,7 @@ export default {
     this.state = 'ready'
     this.showHint = true
     this.hintText = '长按点火'
+    this.lungFill = 0  // 每次进入页面重置肺部填充度
 
     // 读取音效设置
     try {
@@ -307,9 +344,40 @@ export default {
   },
 
   methods: {
+    goBack() {
+      // 标记为取消，不记录抽烟
+      this.cancelled = true
+      // 清理资源
+      this.cleanup()
+      // 返回首页
+      uni.navigateBack({
+        delta: 1,
+        fail: () => {
+          uni.switchTab({ url: '/pages/index/index' })
+        }
+      })
+    },
+
+    // 根据肺部填充度返回颜色
+    getLungColor(fill) {
+      if (fill >= 100) return '#ef4444'  // 红色 - 已满
+      if (fill >= 80) return '#f97316'   // 橙色 - 接近满
+      if (fill >= 60) return '#eab308'   // 黄色 - 中等
+      if (fill >= 40) return '#84cc16'   // 黄绿色 - 较轻
+      if (fill >= 20) return '#22c55e'   // 绿色 - 正常
+      return '#10b981'                    // 深绿色 - 健康
+    },
+
+    // 根据肺部填充度返回渐变
+    getLungGradient(fill) {
+      const color = this.getLungColor(fill)
+      return `linear-gradient(to top, ${color} 0%, ${color}80 100%)`
+    },
+
     cleanup() {
       if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
       if (this.pressTimer) { clearTimeout(this.pressTimer); this.pressTimer = null }
+      if (this.puffTimer) { clearTimeout(this.puffTimer); this.puffTimer = null }
       if (this.ringPressTimer) { clearTimeout(this.ringPressTimer); this.ringPressTimer = null }
       this.stopCanvasLoop()
       this.stopDomFilter()
@@ -861,6 +929,15 @@ export default {
           this.playFire()  // 点火音效
         }, IGNITE_DELAY)
       } else if (this.state === 'lit' || this.state === 'exhaling') {
+        // 肺部已满，禁止吸烟
+        if (this.lungFill >= 100) {
+          this.showHint = true
+          this.hintText = '⚠️ 肺部已满，请先吐烟'
+          if (uni.vibrateShort) uni.vibrateShort({ type: 'medium' })
+          this.isPressing = false
+          return
+        }
+        
         this.state = 'smoking'
         this.smokeStartTime = Date.now() - (this.smokeProgress / 100) * SMOKING_DURATION
         this.currentPuffStart = Date.now()
@@ -869,6 +946,48 @@ export default {
         if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
         // 开始吸烟音效 (input.mp3)
         this.startBurnSound()
+        
+        // 设置单次吸烟最长时长限制
+        this.puffTimer = setTimeout(() => {
+          if (this.state === 'smoking') {
+            // 自动停止吸烟
+            this.isPressing = false
+            clearInterval(this.smokeTimer)
+            this.smokeTimer = null
+            this.stopBurnSound()
+            
+            // 计算吸入时长
+            const puffDuration = MAX_PUFF_DURATION
+            const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
+            const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
+            const intensity = progressFactor * puffFactor
+            
+            this.state = 'exhaling'
+            this.sessionExhaleCount++
+            if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
+            
+            // 触发吐烟
+            this.exhaleByIntensity(intensity)
+            this.playExhale(intensity)
+            
+            // 吐烟过程中平滑减少肺部填充度
+            const exhaleDuration = 2000
+            const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
+            const exhaleTimer = setInterval(() => {
+              this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
+            }, 50)
+            
+            setTimeout(() => {
+              clearInterval(exhaleTimer)
+              this.lungFill = 0  // 确保完全重置
+              if (this.state === 'exhaling') {
+                this.state = 'lit'
+                this.showHint = true
+                this.hintText = '长按吸烟'
+              }
+            }, exhaleDuration)
+          }
+        }, MAX_PUFF_DURATION)
       }
     },
 
@@ -895,6 +1014,11 @@ export default {
       if (this.state === 'smoking') {
         clearInterval(this.smokeTimer)
         this.smokeTimer = null
+        // 清除自动停止计时器
+        if (this.puffTimer) {
+          clearTimeout(this.puffTimer)
+          this.puffTimer = null
+        }
       }
       
       if (this.cigDragMoved) { this.cigDragMoved = false; this.isDragging = false; return }
@@ -926,8 +1050,17 @@ export default {
         this.exhaleByIntensity(intensity)
         // 吐烟音效
         this.playExhale(intensity)
-
+        
+        // 吐烟过程中平滑减少肺部填充度
+        const exhaleDuration = 2200  // 吐烟动画时长
+        const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)  // 每 50ms 减少的量
+        const exhaleTimer = setInterval(() => {
+          this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
+        }, 50)
+        
         setTimeout(() => {
+          clearInterval(exhaleTimer)
+          this.lungFill = 0  // 确保完全重置
           if (this.smokeProgress >= 100) {
             this.finishSmoking()
           } else {
@@ -935,7 +1068,7 @@ export default {
             this.showHint = true
             this.hintText = '长按继续吸'
           }
-        }, 2200)
+        }, exhaleDuration)
       }
     },
 
@@ -952,6 +1085,46 @@ export default {
         
         const elapsed = Date.now() - this.smokeStartTime
         this.smokeProgress = Math.min(100, (elapsed / SMOKING_DURATION) * 100)
+
+        // 肺部填充度增加：适中速度
+        // 吸烟越久，增加越多
+        const lungIncrease = 0.8 + (this.smokeProgress / 100) * 0.7  // 0.8 ~ 1.5% per tick
+        this.lungFill = Math.min(100, this.lungFill + lungIncrease)
+
+        // 肺部已满，强制停止吸烟
+        if (this.lungFill >= 100) {
+          clearInterval(this.smokeTimer)
+          this.smokeTimer = null
+          this.isPressing = false
+          this.stopBurnSound()
+          
+          // 强制进入吐烟状态
+          const intensity = 1.5 + (this.smokeProgress / 100) * 0.5
+          this.state = 'exhaling'
+          this.sessionExhaleCount++
+          if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })
+          
+          this.exhaleByIntensity(intensity)
+          this.playExhale(intensity)
+          
+          // 吐烟过程中平滑减少肺部填充度
+          const exhaleDuration = 2500
+          const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
+          const exhaleTimer = setInterval(() => {
+            this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
+          }, 50)
+          
+          setTimeout(() => {
+            clearInterval(exhaleTimer)
+            this.lungFill = 0  // 确保完全重置
+            if (this.state === 'exhaling') {
+              this.state = 'lit'
+              this.showHint = true
+              this.hintText = '长按吸烟'
+            }
+          }, exhaleDuration)
+          return
+        }
 
         // 烟灰堆积：每 600ms 增长一点
         if (elapsed - lastAshTick > 500) {
@@ -1067,15 +1240,19 @@ export default {
       const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
       const totalDuration = Math.round((Date.now() - this.sessionStartTs) / 1000)
 
-      Store.recordSmoke(duration)
+      // 只有未取消时才记录抽烟
+      if (!this.cancelled) {
+        Store.recordSmoke(duration, this.brandId)
+      }
 
       if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })
 
       setTimeout(() => {
         this.state = 'cooldown'
         setTimeout(() => {
-          uni.redirectTo({
-            url: `/pages/share/share?brandId=${this.brandId}&remaining=${this.remaining}&duration=${totalDuration}`
+          // 返回首页（关闭所有页面）
+          uni.reLaunch({
+            url: '/pages/index/index'
           })
         }, 1500)
       }, 2000)
@@ -1807,6 +1984,143 @@ export default {
   color: #e5e7eb;
   position: relative;
   overflow: hidden;
+}
+
+/* 返回按钮 */
+.smoke-back-btn {
+  position: absolute;
+  top: 80rpx;
+  left: 40rpx;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 100;
+}
+
+.smoke-back-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.92);
+}
+
+.smoke-back-icon {
+  font-size: 48rpx;
+  color: #f3f4f6;
+}
+
+/* 肺部承受力可视化 */
+.lung-container {
+  position: absolute;
+  top: 160rpx;
+  left: 40rpx;
+  width: 220rpx;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  backdrop-filter: blur(10rpx);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
+}
+
+.lung-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.lung-icon {
+  position: relative;
+  width: 150rpx;
+  height: 150rpx;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lung-svg {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.lung-path {
+  transition: fill 0.3s ease;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+}
+
+.lung-path.lung-full {
+  animation: lungPulse 1s ease-in-out infinite;
+}
+
+.lung-trachea {
+  opacity: 0.6;
+}
+
+.lung-fill-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transition: height 0.3s ease;
+  opacity: 0.6;
+  z-index: 1;
+  border-radius: 16rpx;
+}
+
+.lung-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.lung-label {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.lung-value {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #10b981;
+  transition: color 0.3s ease;
+}
+
+.lung-value.lung-warning {
+  color: #f97316;
+  animation: textPulse 1.5s ease-in-out infinite;
+}
+
+.lung-alert {
+  margin-top: 12rpx;
+  padding: 8rpx 12rpx;
+  background: rgba(239, 68, 68, 0.2);
+  border-radius: 12rpx;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.lung-alert-text {
+  font-size: 20rpx;
+  color: #ef4444;
+  text-align: center;
+}
+
+@keyframes lungPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes textPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
 }
 
 /* 背景火光（由亮渐灭，吸烟时更亮） */

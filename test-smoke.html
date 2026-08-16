@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>吐烟过程测试</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    .scene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* 烟雾层 */
+    .smoke-filter-wrap {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      filter: url(#smoke-filter) blur(3px) contrast(115%);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .exhale-layer {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+    }
+
+    .smoke-puff {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    /* 控制面板 */
+    .controls {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .controls button {
+      padding: 12px 24px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .controls button:hover {
+      background: rgba(255,255,255,0.18);
+      border-color: rgba(255,255,255,0.6);
+    }
+
+    .controls button:active { transform: scale(0.95); }
+
+    .info {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.5);
+      font-size: 14px;
+      z-index: 100;
+      text-align: center;
+    }
+
+    .status {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,200,100,0.7);
+      font-size: 13px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="smoke-filter">
+        <feTurbulence id="turbulence" type="fractalNoise" baseFrequency="0.03" numOctaves="20" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="40" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="scene">
+    <div class="smoke-filter-wrap">
+      <div class="exhale-layer" id="exhaleLayer"></div>
+    </div>
+  </div>
+
+  <div class="info">吐烟过程演示</div>
+  <div class="status" id="status"></div>
+
+  <div class="controls">
+    <button onclick="exhaleSmoke('ring')">吐烟圈</button>
+    <button onclick="exhaleSmoke('heart')">爱心形</button>
+    <button onclick="exhaleSmoke('tornado')">龙卷风</button>
+    <button onclick="exhaleSmoke('star')">星形</button>
+    <button onclick="exhaleSmoke('mushroom')">蘑菇云</button>
+    <button onclick="exhaleSmoke('double-helix')">双螺旋</button>
+    <button onclick="exhaleSmoke('firework')">烟花扩散</button>
+    <button onclick="exhaleSmoke('snake')">蛇形蜿蜒</button>
+    <button onclick="exhaleSmoke('jellyfish')">水母状</button>
+    <button onclick="exhaleSmoke('text')">文字烟雾</button>
+    <button onclick="exhaleSmoke('waterfall')">瀑布流</button>
+    <button onclick="exhaleSmoke('scatter')">分散飘散</button>
+    <button onclick="clearSmoke()">清除</button>
+  </div>
+
+  <script>
+    // SVG turbulence 动画
+    const turbulence = document.querySelector('#turbulence');
+    let frames = 1;
+    const rad = Math.PI / 180;
+
+    (function animateTurbulence() {
+      frames += 0.2;
+      turbulence.setAttributeNS(null, 'baseFrequency',
+        (0.03 + 0.005 * Math.cos(frames * rad)) + ' ' +
+        (0.03 + 0.005 * Math.sin(frames * rad))
+      );
+      requestAnimationFrame(animateTurbulence);
+    })();
+
+    const layer = document.getElementById('exhaleLayer')
+    const status = document.getElementById('status')
+    const W = window.innerWidth
+    const H = window.innerHeight
+    // 吐烟起点：屏幕底部中央
+    const originX = W / 2
+    const originY = H - 20
+
+    function setStatus(msg) { status.textContent = msg }
+
+    // ===== 通用烟雾粒子 =====
+    function spawnPuff(x, y, opts) {
+      const el = document.createElement('div')
+      el.className = 'smoke-puff'
+      const size = opts.size || 60
+      const life = opts.life || 3000
+      const dx = opts.dx || 0
+      const dy = opts.dy || -200
+      const maxScale = opts.maxScale || 4
+      const peakAlpha = opts.peakAlpha || 0.4
+      const delay = opts.delay || 0
+
+      el.style.width = size + 'px'
+      el.style.height = size + 'px'
+      el.style.left = (x - size / 2) + 'px'
+      el.style.top = (y - size / 2) + 'px'
+
+      const g = 180 + Math.floor(Math.random() * 50)
+      el.style.background = `radial-gradient(circle, rgba(255,255,255,${peakAlpha}) 0%, rgba(${g},${g},${g},${peakAlpha * 0.35}) 45%, transparent 72%)`
+
+      layer.appendChild(el)
+
+      const t0 = performance.now() + delay
+
+      function tick(now) {
+        const elapsed = now - t0
+        if (elapsed < 0) { el.style.opacity = '0'; requestAnimationFrame(tick); return }
+        const p = Math.min(1, elapsed / life)
+
+        let alpha, scale, tx, ty
+
+        if (p < 0.12) {
+          // 喷出
+          const t = p / 0.12
+          alpha = t * peakAlpha
+          scale = 0.3 + t * 0.5
+          tx = dx * 0.08 * t
+          ty = dy * 0.1 * t
+        } else if (p < 0.35) {
+          // 膨胀上升
+          const t = (p - 0.12) / 0.23
+          alpha = peakAlpha + t * 0.05
+          scale = 0.8 + t * (maxScale * 0.4)
+          tx = dx * (0.08 + t * 0.3)
+          ty = dy * (0.1 + t * 0.4)
+        } else if (p < 0.65) {
+          // 扩散
+          const t = (p - 0.35) / 0.3
+          alpha = peakAlpha + 0.05 - t * 0.12
+          scale = maxScale * 0.4 + t * (maxScale * 0.6)
+          tx = dx * (0.38 + t * 0.45) + Math.sin(t * 4) * 10
+          ty = dy * (0.5 + t * 0.35)
+        } else {
+          // 消散
+          const t = (p - 0.65) / 0.35
+          alpha = (peakAlpha - 0.07) * (1 - t * t)
+          scale = maxScale + t * 0.8
+          tx = dx * 0.83 + Math.sin(t * 3) * 15
+          ty = dy * (0.85 + t * 0.15)
+        }
+
+        el.style.opacity = alpha
+        el.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`
+        p < 1 ? requestAnimationFrame(tick) : el.remove()
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 吐烟模式 =====
+    function exhaleSmoke(type) {
+      clearSmoke()
+
+      if (type === 'light') {
+        setStatus('轻吐...')
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 12, originY, {
+              size: 25 + Math.random() * 25,
+              life: 3000 + Math.random() * 1500,
+              dx: (Math.random() - 0.5) * 40,
+              dy: -(H * 0.3 + Math.random() * H * 0.15),
+              maxScale: 2.5,
+              peakAlpha: 0.25 + Math.random() * 0.1
+            })
+          }, i * 70)
+        }
+      }
+
+      else if (type === 'normal') {
+        setStatus('普通吐烟...')
+        // 阶段1：密集喷出
+        for (let i = 0; i < 15; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 14, originY, {
+              size: 35 + Math.random() * 35,
+              life: 3500 + Math.random() * 2000,
+              dx: (Math.random() - 0.5) * 70,
+              dy: -(H * 0.4 + Math.random() * H * 0.15),
+              maxScale: 3.5,
+              peakAlpha: 0.35 + Math.random() * 0.12
+            })
+          }, i * 22)
+        }
+        // 阶段2：扩散
+        for (let i = 0; i < 12; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 40, originY - 30, {
+              size: 50 + Math.random() * 45,
+              life: 3200 + Math.random() * 2000,
+              dx: (Math.random() - 0.5) * 100,
+              dy: -(H * 0.45 + Math.random() * H * 0.1),
+              maxScale: 4,
+              peakAlpha: 0.22 + Math.random() * 0.1
+            })
+          }, 350 + i * 45)
+        }
+      }
+
+      else if (type === 'deep') {
+        setStatus('深吸深吐...')
+        // 阶段1：猛烈喷出
+        for (let i = 0; i < 25; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 18, originY, {
+              size: 45 + Math.random() * 45,
+              life: 4500 + Math.random() * 2500,
+              dx: (Math.random() - 0.5) * 80,
+              dy: -(H * 0.5 + Math.random() * H * 0.2),
+              maxScale: 5,
+              peakAlpha: 0.45 + Math.random() * 0.15
+            })
+          }, i * 18)
+        }
+        // 阶段2：大量扩散
+        for (let i = 0; i < 20; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 60, originY - 40, {
+              size: 60 + Math.random() * 60,
+              life: 4000 + Math.random() * 3000,
+              dx: (Math.random() - 0.5) * 140,
+              dy: -(H * 0.55 + Math.random() * H * 0.1),
+              maxScale: 6,
+              peakAlpha: 0.28 + Math.random() * 0.12
+            })
+          }, 450 + i * 30)
+        }
+        // 阶段3：尾烟
+        for (let i = 0; i < 14; i++) {
+          setTimeout(() => {
+            spawnPuff(originX + (Math.random() - 0.5) * 100, originY - 80, {
+              size: 70 + Math.random() * 80,
+              life: 5000 + Math.random() * 3000,
+              dx: (Math.random() - 0.5) * 180,
+              dy: -(H * 0.6 + Math.random() * H * 0.05),
+              maxScale: 7,
+              peakAlpha: 0.12 + Math.random() * 0.1
+            })
+          }, 1000 + i * 70)
+        }
+      }
+
+      else if (type === 'ring') {
+        setStatus('吐烟圈...')
+        emitSmokeRing()
+      }
+
+      else if (type === 'heart') {
+        setStatus('爱心形烟雾...')
+        emitSmokeHeart()
+      }
+
+      else if (type === 'tornado') {
+        setStatus('龙卷风...')
+        emitSmokeTornado()
+      }
+
+      else if (type === 'star') {
+        setStatus('星形烟雾...')
+        emitSmokeStar()
+      }
+
+      else if (type === 'mushroom') {
+        setStatus('蘑菇云...')
+        emitSmokeMushroom()
+      }
+
+      else if (type === 'double-helix') {
+        setStatus('双螺旋...')
+        emitSmokeDoubleHelix()
+      }
+
+      else if (type === 'firework') {
+        setStatus('烟花扩散...')
+        emitSmokeFirework()
+      }
+
+      else if (type === 'snake') {
+        setStatus('蛇形蜿蜒...')
+        emitSmokeSnake()
+      }
+
+      else if (type === 'jellyfish') {
+        setStatus('水母状...')
+        emitSmokeJellyfish()
+      }
+
+      else if (type === 'text') {
+        setStatus('文字烟雾...')
+        emitSmokeText()
+      }
+
+      else if (type === 'waterfall') {
+        setStatus('瀑布流...')
+        emitSmokeWaterfall()
+      }
+
+      else if (type === 'scatter') {
+        setStatus('分散飘散...')
+        emitSmokeScatter()
+      }
+    }
+
+    // ===== 烟圈效果 =====
+    function emitSmokeRing() {
+      // 从下往上吐：圆环从屏幕底部开始，向上移动，逐渐变大变浅
+      // 模拟烟圈向上飘散的透视效果
+
+      const particleCount = 64      // 增加粒子数
+      const startRadius = 20
+      const endRadius = 180
+      const puffSize = 16           // 增大粒子
+
+      // 创建环形粒子
+      const ringEls = []
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2
+        const el = document.createElement('div')
+        el.style.width = puffSize + 'px'
+        el.style.height = puffSize + 'px'
+        el.className = 'smoke-puff'
+
+        const g = 200 + Math.floor(Math.random() * 40)
+        // 提高不透明度
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+
+        layer.appendChild(el)
+        ringEls.push({ el, angle, size: puffSize + Math.random() * 6 })
+      }
+
+      // 内环粒子（让环更饱满）
+      const innerCount = 32         // 增加
+      const innerEls = []
+      for (let i = 0; i < innerCount; i++) {
+        const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        el.style.width = '11px'
+        el.style.height = '11px'
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(200,200,200,0.2) 50%, transparent 75%)`
+        layer.appendChild(el)
+        innerEls.push({ el, angle, size: 11 })
+      }
+
+      const t0 = performance.now()
+      const totalLife = 3500
+
+      // 起始位置：屏幕下方 85%
+      const startY = H * 0.85
+      // 结束位置：屏幕上方 10%
+      const endY = H * 0.10
+
+      function tick(now) {
+        const elapsed = now - t0
+        const p = Math.min(1, elapsed / totalLife)
+
+        // 缓动函数：开始快，后面慢（ease-out）
+        const ease = 1 - Math.pow(1 - p, 2)
+
+        // 圆心 Y：从下往上移动
+        const centerY = startY - ease * (startY - endY)
+
+        // 环半径：从小到大
+        const currentRadius = startRadius + ease * (endRadius - startRadius)
+
+        // 内环半径
+        const innerRadius = currentRadius * 0.5
+
+        // 透明度：从清晰到淡出
+        // 前 5% 淡入，之后持续变淡
+        let alpha
+        if (p < 0.05) alpha = p / 0.05
+        else alpha = 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+
+        // 粒子大小随环扩大而增大
+        const sizeScale = 1 + ease * 2.2
+
+        // 更新外环粒子
+        for (const ring of ringEls) {
+          const rx = Math.cos(ring.angle) * currentRadius
+          const ry = Math.sin(ring.angle) * currentRadius * 0.35  // 压扁垂直方向 = 透视效果
+
+          const cx = originX + rx
+          const cy = centerY + ry
+          const sz = ring.size * sizeScale
+
+          ring.el.style.left = (cx - sz / 2) + 'px'
+          ring.el.style.top = (cy - sz / 2) + 'px'
+          ring.el.style.width = sz + 'px'
+          ring.el.style.height = sz + 'px'
+          ring.el.style.opacity = alpha * 0.7
+        }
+
+        // 更新内环粒子
+        for (const inner of innerEls) {
+          const rx = Math.cos(inner.angle) * innerRadius
+          const ry = Math.sin(inner.angle) * innerRadius * 0.35
+
+          const cx = originX + rx
+          const cy = centerY + ry
+          const sz = inner.size * sizeScale * 0.7
+
+          inner.el.style.left = (cx - sz / 2) + 'px'
+          inner.el.style.top = (cy - sz / 2) + 'px'
+          inner.el.style.width = sz + 'px'
+          inner.el.style.height = sz + 'px'
+          inner.el.style.opacity = alpha * 0.4
+        }
+
+        if (p < 1) {
+          requestAnimationFrame(tick)
+        } else {
+          for (const r of ringEls) r.el.remove()
+          for (const r of innerEls) r.el.remove()
+        }
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 爱心形烟雾效果 =====
+    function emitSmokeHeart() {
+      // 心型参数方程：
+      // x = 16sin³(t)
+      // y = -(13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t))
+      // 从下往上飘升，逐渐变大变浅，与烟圈相同的透视效果
+
+      const particleCount = 72      // 增加
+      const scale = 5
+      const puffSize = 16           // 增大
+
+      // 创建心型粒子
+      const heartEls = []
+      for (let i = 0; i < particleCount; i++) {
+        const t = (i / particleCount) * Math.PI * 2
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        el.style.width = puffSize + 'px'
+        el.style.height = puffSize + 'px'
+
+        const g = 200 + Math.floor(Math.random() * 40)
+        // 提高不透明度
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+
+        layer.appendChild(el)
+        heartEls.push({ el, t, size: puffSize + Math.random() * 6 })
+      }
+
+      // 内部填充粒子（让心型更饱满）
+      const innerCount = 40         // 增加
+      const innerEls = []
+      for (let i = 0; i < innerCount; i++) {
+        const t = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
+        const r = 0.3 + Math.random() * 0.4
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        el.style.width = '11px'
+        el.style.height = '11px'
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.5) 0%, rgba(200,200,200,0.2) 50%, transparent 75%)`
+        layer.appendChild(el)
+        innerEls.push({ el, t, r, size: 11 })
+      }
+
+      const t0 = performance.now()
+      const totalLife = 3500
+
+      // 起始位置：屏幕下方 85%
+      const startY = H * 0.85
+      // 结束位置：屏幕上方 10%
+      const endY = H * 0.10
+
+      function tick(now) {
+        const elapsed = now - t0
+        const p = Math.min(1, elapsed / totalLife)
+
+        // 缓动函数
+        const ease = 1 - Math.pow(1 - p, 2)
+
+        // 圆心 Y：从下往上
+        const centerY = startY - ease * (startY - endY)
+
+        // 心型缩放：从小到大
+        const currentScale = scale + ease * scale * 2.5
+
+        // 透明度：从清晰到淡出
+        let alpha
+        if (p < 0.05) alpha = p / 0.05
+        else alpha = 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+
+        // 粒子大小
+        const sizeScale = 1 + ease * 2.2
+
+        // 更新心型轮廓粒子
+        for (const h of heartEls) {
+          // 心型参数方程
+          const hx = currentScale * 16 * Math.pow(Math.sin(h.t), 3)
+          const hy = -currentScale * (13 * Math.cos(h.t) - 5 * Math.cos(2 * h.t) - 2 * Math.cos(3 * h.t) - Math.cos(4 * h.t))
+
+          const cx = originX + hx
+          // 压扁垂直方向 = 透视效果（与烟圈一致）
+          const cy = centerY + hy * 0.35
+          const sz = h.size * sizeScale
+
+          h.el.style.left = (cx - sz / 2) + 'px'
+          h.el.style.top = (cy - sz / 2) + 'px'
+          h.el.style.width = sz + 'px'
+          h.el.style.height = sz + 'px'
+          h.el.style.opacity = alpha * 0.7
+        }
+
+        // 更新内部填充粒子
+        for (const inner of innerEls) {
+          const hx = currentScale * 16 * Math.pow(Math.sin(inner.t), 3) * inner.r
+          const hy = -currentScale * (13 * Math.cos(inner.t) - 5 * Math.cos(2 * inner.t) - 2 * Math.cos(3 * inner.t) - Math.cos(4 * inner.t)) * inner.r
+
+          const cx = originX + hx
+          // 压扁垂直方向 = 透视效果
+          const cy = centerY + hy * 0.35
+          const sz = inner.size * sizeScale * 0.7
+
+          inner.el.style.left = (cx - sz / 2) + 'px'
+          inner.el.style.top = (cy - sz / 2) + 'px'
+          inner.el.style.width = sz + 'px'
+          inner.el.style.height = sz + 'px'
+          inner.el.style.opacity = alpha * 0.4
+        }
+
+        if (p < 1) {
+          requestAnimationFrame(tick)
+        } else {
+          for (const h of heartEls) h.el.remove()
+          for (const h of innerEls) h.el.remove()
+        }
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 龙卷风烟雾效果 =====
+    function emitSmokeTornado() {
+      // 螺旋上升的龙卷风效果
+      // 多层圆环叠加，每层在不同高度和角度，形成漩涡
+
+      const layerCount = 10         // 增加层数
+      const particlesPerLayer = 16  // 增加每层粒子
+      const puffSize = 14           // 增大粒子
+      const baseRadius = 25
+      const radiusGrowth = 12
+
+      const allEls = []
+
+      // 创建龙卷风粒子
+      for (let li = 0; li < layerCount; li++) {
+        const layerRadius = baseRadius + li * radiusGrowth
+        const layerHeight = li / layerCount
+
+        for (let i = 0; i < particlesPerLayer; i++) {
+          const angle = (i / particlesPerLayer) * Math.PI * 2
+          const el = document.createElement('div')
+          el.className = 'smoke-puff'
+          el.style.width = puffSize + 'px'
+          el.style.height = puffSize + 'px'
+
+          const g = 190 + Math.floor(Math.random() * 50)
+          // 提高不透明度
+          const a = 0.6 - li * 0.03
+          el.style.background = `radial-gradient(circle, rgba(255,255,255,${a + 0.15}) 0%, rgba(${g},${g},${g},${a * 0.5}) 40%, transparent 72%)`
+
+          layer.appendChild(el)
+          allEls.push({
+            el,
+            layerIdx: li,
+            angle,
+            layerRadius,
+            layerHeight,
+            size: puffSize + Math.random() * 5
+          })
+        }
+      }
+
+      const t0 = performance.now()
+      const totalLife = 4000
+      const rotationSpeed = 3  // 旋转速度（圈数）
+
+      // 起始位置：屏幕下方 85%
+      const startY = H * 0.85
+      // 结束位置：屏幕上方 10%
+      const endY = H * 0.10
+
+      function tick(now) {
+        const elapsed = now - t0
+        const p = Math.min(1, elapsed / totalLife)
+
+        // 缓动函数
+        const ease = 1 - Math.pow(1 - p, 2)
+
+        // 整体中心 Y：从下往上
+        const centerY = startY - ease * (startY - endY)
+
+        // 旋转角度（随时间增加）
+        const rotation = p * rotationSpeed * Math.PI * 2
+
+        // 整体缩放
+        const scale = 1 + ease * 2.5
+
+        // 透明度
+        let alpha
+        if (p < 0.05) alpha = p / 0.05
+        else alpha = 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+
+        // 粒子大小
+        const sizeScale = 1 + ease * 2
+
+        // 龙卷风总高度（像素）
+        const tornadoHeight = 200 * scale
+
+        for (const particle of allEls) {
+          const { layerIdx, angle, layerRadius, layerHeight, size } = particle
+
+          // 当前角度 = 初始角度 + 旋转 + 层偏移（形成螺旋）
+          const currentAngle = angle + rotation + layerIdx * 0.5
+
+          // X 位置：圆形分布
+          const rx = Math.cos(currentAngle) * layerRadius * scale
+
+          // Y 位置：层高度 + 中心偏移
+          // 每层在垂直方向分布，形成龙卷风的高度
+          const layerY = -layerHeight * tornadoHeight
+          // 加上透视压扁
+          const ry = layerY * 0.6
+
+          const cx = originX + rx
+          const cy = centerY + ry
+          const sz = size * sizeScale
+
+          particle.el.style.left = (cx - sz / 2) + 'px'
+          particle.el.style.top = (cy - sz / 2) + 'px'
+          particle.el.style.width = sz + 'px'
+          particle.el.style.height = sz + 'px'
+          particle.el.style.opacity = alpha * (0.7 - layerIdx * 0.04)
+        }
+
+        if (p < 1) {
+          requestAnimationFrame(tick)
+        } else {
+          for (const particle of allEls) particle.el.remove()
+        }
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 通用动画框架 =====
+    function animateShape(opts) {
+      const { getPos, particleCount, puffSize, totalLife, startY, endY, opacityMul } = opts
+      const els = []
+      for (let i = 0; i < particleCount; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = puffSize + Math.random() * 5
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        layer.appendChild(el)
+        els.push({ el, index: i, size: sz })
+      }
+
+      const t0 = performance.now()
+      function tick(now) {
+        const elapsed = now - t0
+        const p = Math.min(1, elapsed / totalLife)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const centerY = startY - ease * (startY - endY)
+        const scale = 1 + ease * 2.5
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const sizeScale = 1 + ease * 2
+
+        for (const particle of els) {
+          const pos = getPos(particle.index, particleCount, p, ease, scale, centerY)
+          const sz = particle.size * sizeScale
+          particle.el.style.left = (pos.x - sz / 2) + 'px'
+          particle.el.style.top = (pos.y - sz / 2) + 'px'
+          particle.el.style.width = sz + 'px'
+          particle.el.style.height = sz + 'px'
+          particle.el.style.opacity = alpha * (opacityMul || 0.7)
+        }
+
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 星形效果 =====
+    function emitSmokeStar() {
+      const points = 5
+      const outerR = 80
+      const innerR = 35
+      animateShape({
+        particleCount: 80,
+        puffSize: 14,
+        totalLife: 3500,
+        startY: H * 0.85,
+        endY: H * 0.10,
+        opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy) => {
+          // 五角星顶点
+          const idx = i % count
+          const angle = (idx / count) * Math.PI * 2 - Math.PI / 2
+          const isOuter = idx % 2 === 0
+          const r = isOuter ? outerR : innerR
+          const rx = Math.cos(angle) * r * scale
+          const ry = Math.sin(angle) * r * scale * 0.35
+          return { x: originX + rx, y: cy + ry }
+        }
+      })
+    }
+
+    // ===== 蘑菇云效果 =====
+    function emitSmokeMushroom() {
+      const els = []
+      const count = 100
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = 12 + Math.random() * 8
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        layer.appendChild(el)
+        els.push({ el, i, size: sz })
+      }
+
+      const t0 = performance.now()
+      const startY = H * 0.85, endY = H * 0.10
+
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 4000)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const cy = startY - ease * (startY - endY)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + ease * 2.5
+
+        for (const pt of els) {
+          const ratio = pt.i / count
+          let rx, ry
+          if (ratio < 0.3) {
+            // 茎部：细柱
+            const a = (ratio / 0.3) * Math.PI * 2
+            const r = 15 * scale
+            rx = Math.cos(a) * r
+            ry = Math.sin(a) * r * 0.3 + ease * 80
+          } else {
+            // 伞盖：大圆球
+            const a = ((ratio - 0.3) / 0.7) * Math.PI * 2
+            const r = (40 + (ratio - 0.3) * 60) * scale
+            rx = Math.cos(a) * r
+            ry = Math.sin(a) * r * 0.35 - ease * 30
+          }
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (originX + rx - sz / 2) + 'px'
+          pt.el.style.top = (cy + ry - sz / 2) + 'px'
+          pt.el.style.width = sz + 'px'
+          pt.el.style.height = sz + 'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 双螺旋效果 =====
+    function emitSmokeDoubleHelix() {
+      animateShape({
+        particleCount: 100,
+        puffSize: 12,
+        totalLife: 4000,
+        startY: H * 0.85,
+        endY: H * 0.10,
+        opacityMul: 0.65,
+        getPos: (i, count, p, ease, scale, cy) => {
+          const t = (i / count) * Math.PI * 6  // 3 圈
+          const strand = i % 2 === 0 ? 1 : -1
+          const r = 35 * scale
+          const rx = Math.cos(t + p * Math.PI * 4) * r * strand
+          const ry = (i / count - 0.5) * 200 * scale * 0.35
+          return { x: originX + rx, y: cy + ry }
+        }
+      })
+    }
+
+    // ===== 烟花扩散效果 =====
+    function emitSmokeFirework() {
+      const els = []
+      const count = 120
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = 10 + Math.random() * 10
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(${g},${g},${g},0.35) 35%, transparent 70%)`
+        layer.appendChild(el)
+        const angle = Math.random() * Math.PI * 2
+        const speed = 50 + Math.random() * 150
+        els.push({ el, size: sz, angle, speed, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed })
+      }
+
+      const t0 = performance.now()
+      const cx = originX, cy = H * 0.45
+
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 3000)
+        const ease = 1 - Math.pow(1 - p, 3)
+        let alpha = p < 0.03 ? p / 0.03 : 1 - Math.pow((p - 0.03) / 0.97, 1.2)
+
+        for (const pt of els) {
+          const dist = ease * pt.speed * 2
+          const x = cx + pt.vx / pt.speed * dist
+          const y = cy + pt.vy / pt.speed * dist + ease * 30  // 重力
+          const sz = pt.size * (1 + ease * 1.5)
+          pt.el.style.left = (x - sz / 2) + 'px'
+          pt.el.style.top = (y - sz / 2) + 'px'
+          pt.el.style.width = sz + 'px'
+          pt.el.style.height = sz + 'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 蛇形蜿蜒效果 =====
+    function emitSmokeSnake() {
+      animateShape({
+        particleCount: 80,
+        puffSize: 13,
+        totalLife: 4000,
+        startY: H * 0.85,
+        endY: H * 0.10,
+        opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy) => {
+          const t = i / count
+          const waveX = Math.sin(t * Math.PI * 4 + p * Math.PI * 6) * 60 * scale
+          const waveY = (t - 0.5) * 180 * scale * 0.35
+          return { x: originX + waveX, y: cy + waveY }
+        }
+      })
+    }
+
+    // ===== 水母状效果 =====
+    function emitSmokeJellyfish() {
+      const els = []
+      const count = 90
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = 12 + Math.random() * 6
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        layer.appendChild(el)
+        els.push({ el, i, size: sz })
+      }
+
+      const t0 = performance.now()
+      const startY = H * 0.85, endY = H * 0.10
+
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 4000)
+        const ease = 1 - Math.pow(1 - p, 2)
+        const cy = startY - ease * (startY - endY)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + ease * 2.5
+
+        for (const pt of els) {
+          const ratio = pt.i / count
+          let rx, ry
+          if (ratio < 0.5) {
+            // 伞盖：半圆
+            const a = (ratio / 0.5) * Math.PI
+            const r = 55 * scale
+            rx = Math.cos(a) * r - r
+            ry = -Math.sin(a) * r * 0.5
+          } else {
+            // 触须：下垂波浪
+            const tentacle = Math.floor((ratio - 0.5) / 0.5 * 6)
+            const t = ((ratio - 0.5) / 0.5 * 6 - tentacle)
+            const baseX = (tentacle - 2.5) * 18 * scale
+            rx = baseX + Math.sin(t * Math.PI * 3 + p * 8) * 10 * scale
+            ry = t * 100 * scale * 0.35
+          }
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (originX + rx - sz / 2) + 'px'
+          pt.el.style.top = (cy + ry - sz / 2) + 'px'
+          pt.el.style.width = sz + 'px'
+          pt.el.style.height = sz + 'px'
+          pt.el.style.opacity = alpha * 0.65
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 文字烟雾效果 =====
+    function emitSmokeText() {
+      // 用粒子拼出 "SMOKE" 的大致轮廓
+      const textPoints = []
+      const canvas = document.createElement('canvas')
+      canvas.width = 300
+      canvas.height = 80
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 60px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('SMOKE', 150, 58)
+      const data = ctx.getImageData(0, 0, 300, 80).data
+      for (let y = 0; y < 80; y += 3) {
+        for (let x = 0; x < 300; x += 3) {
+          if (data[(y * 300 + x) * 4 + 3] > 128) {
+            textPoints.push({ x: (x - 150) * 0.8, y: (y - 40) * 0.8 })
+          }
+        }
+      }
+
+      animateShape({
+        particleCount: textPoints.length,
+        puffSize: 10,
+        totalLife: 4000,
+        startY: H * 0.85,
+        endY: H * 0.10,
+        opacityMul: 0.7,
+        getPos: (i, count, p, ease, scale, cy) => {
+          const pt = textPoints[i] || { x: 0, y: 0 }
+          return { x: originX + pt.x * scale, y: cy + pt.y * scale * 0.35 }
+        }
+      })
+    }
+
+    // ===== 瀑布流效果 =====
+    function emitSmokeWaterfall() {
+      const els = []
+      const count = 100
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = 12 + Math.random() * 8
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(${g},${g},${g},0.35) 40%, transparent 72%)`
+        layer.appendChild(el)
+        els.push({ el, i, size: sz, xOff: (Math.random() - 0.5) * 120, speed: 0.5 + Math.random() * 0.5 })
+      }
+
+      const t0 = performance.now()
+      const topY = H * 0.1, bottomY = H * 0.85
+
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 4000)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.5)
+        const scale = 1 + p * 1.5
+
+        for (const pt of els) {
+          const fallP = Math.min(1, p * pt.speed * 1.5)
+          const y = topY + fallP * (bottomY - topY)
+          const x = originX + pt.xOff * scale + Math.sin(fallP * 4 + pt.i) * 15
+          const sz = pt.size * scale
+          pt.el.style.left = (x - sz / 2) + 'px'
+          pt.el.style.top = (y - sz / 2) + 'px'
+          pt.el.style.width = sz + 'px'
+          pt.el.style.height = sz + 'px'
+          pt.el.style.opacity = alpha * 0.65
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    // ===== 分散飘散效果 =====
+    function emitSmokeScatter() {
+      const els = []
+      const count = 80
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div')
+        el.className = 'smoke-puff'
+        const sz = 14 + Math.random() * 10
+        el.style.width = sz + 'px'
+        el.style.height = sz + 'px'
+        const g = 195 + Math.floor(Math.random() * 45)
+        el.style.background = `radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(${g},${g},${g},0.35) 35%, transparent 70%)`
+        layer.appendChild(el)
+        const angle = Math.random() * Math.PI * 2
+        const dist = 80 + Math.random() * 200
+        els.push({ el, size: sz, angle, dist, drift: (Math.random() - 0.5) * 60 })
+      }
+
+      const t0 = performance.now()
+      const cx = originX, cy = H * 0.5
+
+      function tick(now) {
+        const p = Math.min(1, (now - t0) / 4500)
+        const ease = 1 - Math.pow(1 - p, 2)
+        let alpha = p < 0.05 ? p / 0.05 : 1 - Math.pow((p - 0.05) / 0.95, 1.3)
+
+        for (const pt of els) {
+          const d = ease * pt.dist
+          const x = cx + Math.cos(pt.angle) * d + pt.drift * ease
+          const y = cy + Math.sin(pt.angle) * d * 0.6 - ease * 50
+          const sz = pt.size * (1 + ease * 2)
+          pt.el.style.left = (x - sz / 2) + 'px'
+          pt.el.style.top = (y - sz / 2) + 'px'
+          pt.el.style.width = sz + 'px'
+          pt.el.style.height = sz + 'px'
+          pt.el.style.opacity = alpha * 0.7
+        }
+        if (p < 1) requestAnimationFrame(tick)
+        else els.forEach(e => e.el.remove())
+      }
+      requestAnimationFrame(tick)
+    }
+
+    function clearSmoke() {
+      layer.innerHTML = ''
+      setStatus('')
+    }
+  </script>
+</body>
+</html>

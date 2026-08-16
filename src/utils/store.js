@@ -132,19 +132,27 @@ export function getCooldownRemain() {
   return 0
 }
 
-export function recordSmoke(duration) {
+export function recordSmoke(duration, brandId = null) {
   const today = getToday()
   const settings = getSettings()
   const now = Date.now()
 
   today.smokedCount += 1
   today.lastSmokeTime = now
+  
+  // 记录品牌吸烟次数
+  if (brandId) {
+    if (!today.brandCounts) today.brandCounts = {}
+    today.brandCounts[brandId] = (today.brandCounts[brandId] || 0) + 1
+  }
+  
   saveToday(today)
 
   addHistory({
     id: now.toString(36) + Math.random().toString(36).slice(2, 6),
     timestamp: now,
-    duration: duration
+    duration: duration,
+    brandId: brandId
   })
 
   const stats = getStats()
@@ -152,6 +160,21 @@ export function recordSmoke(duration) {
   const pricePerCig = settings.cigarettePrice / settings.packSize
   stats.totalSaved = (stats.totalSaved || 0) + pricePerCig
   saveStats(stats)
+}
+
+// 获取某品牌今日吸烟次数
+export function getBrandSmokedCount(brandId) {
+  const today = getToday()
+  if (!today.brandCounts || !today.brandCounts[brandId]) return 0
+  return today.brandCounts[brandId]
+}
+
+// 获取某品牌今日剩余数量
+export function getBrandRemaining(brandId) {
+  const settings = getSettings()
+  const quota = settings.dailyQuota || 20
+  const smoked = getBrandSmokedCount(brandId)
+  return Math.max(0, quota - smoked)
 }
 
 export function getSmokeFreeDuration() {
@@ -475,6 +498,7 @@ export default {
   getStats, saveStats,
   canSmoke, getCooldownRemain,
   recordSmoke,
+  getBrandSmokedCount, getBrandRemaining,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,

@@ -2,14 +2,16 @@
   <view id="pack-detail" class="page-container" :class="'theme-' + brand.theme">
     <!-- 顶栏 -->
     <view class="header">
-      <button class="header-btn" @click="changePack">
-        <text class="text-xl">‹</text> <text>换一包</text>
-      </button>
-      <view class="header-center">
-        <text class="brand-en">{{ brand.en }}</text>
-        <text class="brand-cn">{{ brand.cn }}</text>
+      <view class="header-row">
+        <view class="back-btn" @click="changePack">
+          <text class="back-icon">&lt;</text>
+        </view>
+        <view class="header-center">
+          <text class="brand-en">{{ brand.en }}</text>
+          <text class="brand-cn">{{ brand.cn }}</text>
+        </view>
+        <view class="back-btn-placeholder"></view>
       </view>
-      <view class="w-64"></view>
     </view>
 
     <!-- 烟盒展示区 -->
@@ -205,6 +207,7 @@ export default {
     },
 
     changePack() {
+      // 返回品牌选择页
       uni.navigateBack()
     },
 
@@ -247,21 +250,40 @@ export default {
 }
 
 .header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 48rpx 40rpx 16rpx;
 }
 
-.header-btn {
-  font-size: 28rpx;
-  color: #d1d5db;
-  background: transparent;
-  border: none;
-  padding: 0;
+.header-row {
   display: flex;
   align-items: center;
-  gap: 4rpx;
+  justify-content: space-between;
+}
+
+.back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn-placeholder {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.back-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.92);
+}
+
+.back-icon {
+  font-size: 48rpx;
+  color: #f3f4f6;
 }
 
 .header-center {

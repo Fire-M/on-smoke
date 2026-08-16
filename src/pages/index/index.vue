@@ -121,7 +121,7 @@
     <view class="btn-container">
       <button class="btn-have-one" :disabled="cooldownRemain > 0" @click="haveOne">
         <view class="btn-fire-wrap">
-          <text class="btn-fire">🔥</text>
+          <text class="btn-fire">🚬</text>
         </view>
         <view class="btn-text-wrap">
           <text class="btn-main-text">{{ cooldownRemain > 0 ? '冷却中' : '来一根' }}</text>
@@ -210,7 +210,12 @@ export default {
       // 烟瘾统计
       const cravingStats = Store.getCravingStats()
       this.todayCravings = cravingStats.today
-      this.resistedCount = Store.getCravings().filter(c => c.resisted).length
+      // 统计今天抵抗的次数
+      const todayDate = new Date()
+      this.resistedCount = Store.getCravings().filter(c => {
+        const d = new Date(c.timestamp)
+        return d.toDateString() === todayDate.toDateString() && c.resisted
+      }).length
       
       // 每日挑战
       const challenge = Store.getDailyChallenge()
@@ -221,7 +226,18 @@ export default {
       
       // 计算挑战进度
       if (challenge.type === 'limit') {
-        this.challengeProgress = Math.max(0, Math.min(100, (1 - today.smokedCount / challenge.target) * 100))
+        // 限制类挑战：已吸烟数越少，进度越高
+        if (today.smokedCount === 0) {
+          this.challengeProgress = 50
+        } else if (today.smokedCount >= challenge.target) {
+          this.challengeProgress = 0
+        } else if (challenge.target === 1) {
+          // 目标是 1 根时，抽了 0 根就是 100%
+          this.challengeProgress = 100
+        } else {
+          // 已抽 target-1 根时，进度为 100%
+          this.challengeProgress = Math.max(0, Math.min(100, (1 - (today.smokedCount - 1) / (challenge.target - 1)) * 100))
+        }
       } else if (challenge.type === 'save') {
         const saved = Store.getSavedMoney()
         this.challengeProgress = Math.min(100, (saved / challenge.target) * 100)
@@ -397,7 +413,7 @@ export default {
 
 .btn-have-one {
   width: 100%;
-  padding: 24rpx 32rpx;
+  padding: 36rpx 32rpx;
   border-radius: 28rpx;
   display: flex;
   align-items: center;
@@ -421,21 +437,29 @@ export default {
   opacity: 0.5;
 }
 
-/* 脉冲动画 */
-@keyframes btnPulse {
-  0%, 100% { box-shadow: 0 12rpx 40rpx rgba(238, 90, 36, 0.35), 0 0 0 0 rgba(238, 90, 36, 0.4); }
-  50% { box-shadow: 0 12rpx 40rpx rgba(238, 90, 36, 0.35), 0 0 0 16rpx rgba(238, 90, 36, 0); }
+/* 闪烁动画 */
+@keyframes btnFlash {
+  0%, 100% { 
+    box-shadow: 0 12rpx 40rpx rgba(238, 90, 36, 0.35);
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 16rpx 50rpx rgba(238, 90, 36, 0.6), 0 0 30rpx rgba(255, 200, 100, 0.4);
+    filter: brightness(1.15);
+    transform: scale(1.02);
+  }
 }
 
 .btn-have-one:not([disabled]) {
-  animation: btnPulse 2.8s ease-in-out infinite;
+  animation: btnFlash 1.5s ease-in-out infinite;
 }
 
 .btn-fire-wrap {
-  width: 72rpx;
-  height: 72rpx;
+  width: 88rpx;
+  height: 88rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -443,27 +467,27 @@ export default {
 }
 
 .btn-fire {
-  font-size: 40rpx;
+  font-size: 80rpx;
   line-height: 1;
 }
 
 .btn-text-wrap {
   flex: 1;
-  text-align: left;
+  text-align: center;
 }
 
 .btn-main-text {
   display: block;
-  font-size: 34rpx;
+  font-size: 42rpx;
   font-weight: bold;
   line-height: 1.2;
 }
 
 .btn-sub-text {
   display: block;
-  font-size: 22rpx;
+  font-size: 24rpx;
   opacity: 0.75;
-  margin-top: 4rpx;
+  margin-top: 6rpx;
   line-height: 1.3;
 }
 

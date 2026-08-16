@@ -28,7 +28,11 @@
           </view>
           <view class="brand-card-bottom">
             <text class="brand-tag">{{ brand.tag }}</text>
-            <text class="brand-quote">“{{ brand.quote }}”</text>
+            <text class="brand-quote">"{{ brand.quote }}"</text>
+          </view>
+          <!-- 剩余根数 -->
+          <view class="brand-remaining">
+            <text class="brand-remaining-num">{{ brand.remaining }}/{{ quota }}</text>
           </view>
           <view class="brand-card-shine"></view>
         </view>
@@ -58,8 +62,21 @@ const BRANDS = [
 export default {
   data() {
     return {
-      brands: BRANDS
+      brands: [],
+      quota: 20
     }
+  },
+
+  onShow() {
+    // 加载配额
+    const settings = Store.getSettings()
+    this.quota = settings.dailyQuota || 20
+    
+    // 重新加载品牌列表，包含剩余数量
+    this.brands = BRANDS.map(brand => ({
+      ...brand,
+      remaining: Store.getBrandRemaining(brand.id)
+    }))
   },
 
   methods: {
@@ -76,7 +93,10 @@ export default {
     },
 
     goBack() {
-      uni.navigateBack()
+      // 直接返回首页
+      uni.switchTab({
+        url: '/pages/index/index'
+      })
     }
   }
 }
@@ -168,13 +188,18 @@ export default {
   border-radius: 28rpx;
   padding: 28rpx 20rpx 24rpx;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   min-height: 380rpx;
   display: flex;
   flex-direction: column;
   animation: cardFadeIn 0.4s ease-out both;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 8rpx 24rpx rgba(0, 0, 0, 0.4),
+    0 2rpx 8rpx rgba(0, 0, 0, 0.3),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
+  transform: perspective(1000px) rotateX(0deg) rotateY(0deg);
 }
 
 .brand-card::before {
@@ -184,7 +209,19 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 50%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.brand-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(0deg, rgba(0,0,0,0.3) 0%, transparent 100%);
   pointer-events: none;
   border-radius: inherit;
 }
@@ -199,18 +236,42 @@ export default {
   background: linear-gradient(
     45deg,
     transparent 40%,
-    rgba(255, 255, 255, 0.03) 45%,
-    rgba(255, 255, 255, 0.05) 50%,
-    rgba(255, 255, 255, 0.03) 55%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.05) 55%,
     transparent 60%
   );
   pointer-events: none;
   transform: rotate(0deg);
+  transition: all 0.5s ease;
 }
 
 .brand-card:active {
-  transform: scale(0.96);
-  filter: brightness(1.15);
+  transform: perspective(1000px) scale(0.95) rotateX(5deg);
+  box-shadow: 
+    0 4rpx 12rpx rgba(0, 0, 0, 0.5),
+    0 1rpx 4rpx rgba(0, 0, 0, 0.4),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.15);
+  filter: brightness(1.2);
+}
+
+.brand-card:active .brand-card-shine {
+  transform: rotate(15deg) translate(10%, 10%);
+}
+
+/* 悬浮效果 */
+.brand-card:hover {
+  transform: perspective(1000px) translateY(-12rpx) rotateX(2deg);
+  box-shadow: 
+    0 16rpx 40rpx rgba(0, 0, 0, 0.5),
+    0 6rpx 16rpx rgba(0, 0, 0, 0.4),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.brand-card:hover .brand-card-shine {
+  transform: rotate(-5deg) translate(5%, 5%);
+  opacity: 1.5;
 }
 
 /* 卡片主题渐变 */
@@ -307,6 +368,20 @@ export default {
   margin-top: 6rpx;
   font-style: italic;
   line-height: 1.3;
+}
+
+/* 剩余根数 */
+.brand-remaining {
+  position: absolute;
+  top: 16rpx;
+  left: 16rpx;
+  z-index: 10;
+}
+
+.brand-remaining-num {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* 卡片入场动画 */
