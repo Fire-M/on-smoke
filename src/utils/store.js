@@ -14,7 +14,12 @@ const KEYS = {
   moods: 'os_moods',
   savingsGoals: 'os_savings_goals',
   timeCapsules: 'os_time_capsules',
-  pet: 'os_pet'
+  pet: 'os_pet',
+  adRewards: 'os_ad_rewards',
+  stickers: 'os_stickers',
+    petAccessories: 'os_pet_accessories',
+  backgrounds: 'os_backgrounds',
+  smokeStyles: 'os_smoke_styles'
 }
 
 // 默认设置
@@ -109,8 +114,9 @@ export function saveStats(s) {
 export function canSmoke() {
   const settings = getSettings()
   const today = getToday()
+  const effectiveQuota = getEffectiveQuota()
 
-  if (today.smokedCount >= settings.dailyQuota) {
+  if (today.smokedCount >= effectiveQuota) {
     return { can: false, reason: '今日配额已用完' }
   }
 
@@ -491,6 +497,365 @@ export function updatePetHealth(delta) {
   return pet
 }
 
+// ---- 广告奖励：额外配额 ----
+export function getAdRewards() {
+  return _read(KEYS.adRewards, { extraQuota: 0, lastResetDate: _todayStr() })
+}
+
+// 获取今日额外配额（看广告获得的 +1）
+export function getExtraQuota() {
+  const rewards = getAdRewards()
+  // 跨天重置
+  if (rewards.lastResetDate !== _todayStr()) {
+    rewards.extraQuota = 0
+    rewards.lastResetDate = _todayStr()
+    _write(KEYS.adRewards, rewards)
+  }
+  return rewards.extraQuota || 0
+}
+
+// 看广告获得额外配额 +1
+export function addExtraQuota() {
+  const rewards = getAdRewards()
+  if (rewards.lastResetDate !== _todayStr()) {
+    rewards.extraQuota = 0
+    rewards.lastResetDate = _todayStr()
+  }
+  rewards.extraQuota += 1
+  _write(KEYS.adRewards, rewards)
+  return rewards.extraQuota
+}
+
+// 获取含额外配额的有效配额
+export function getEffectiveQuota() {
+  const settings = getSettings()
+  return settings.dailyQuota + getExtraQuota()
+}
+
+// ---- 广告奖励：烟盒皮肤 ----
+// 烟身贴纸列表
+const STICKER_LIST = [
+  // 文字系列
+  { id: 'text-lucky', name: '幸运', type: 'text', content: '幸运', rarity: 'common', icon: '🍀' },
+  { id: 'text-cool', name: '冷酷', type: 'text', content: 'COOL', rarity: 'common', icon: '😎' },
+  { id: 'text-love', name: '爱情', type: 'text', content: 'LOVE', rarity: 'rare', icon: '💕' },
+  { id: 'text-king', name: '王者', type: 'text', content: 'KING', rarity: 'rare', icon: '👑' },
+  { id: 'text-dream', name: '梦想', type: 'text', content: '梦想', rarity: 'epic', icon: '🌟' },
+  { id: 'text-free', name: '自由', type: 'text', content: 'FREE', rarity: 'epic', icon: '🕊️' },
+  // 图案系列
+  { id: 'pattern-stripes', name: '条纹', type: 'pattern', content: 'stripes', rarity: 'common', icon: '📊' },
+  { id: 'pattern-grid', name: '格子', type: 'pattern', content: 'grid', rarity: 'common', icon: '🔲' },
+  { id: 'pattern-wave', name: '波浪', type: 'pattern', content: 'wave', rarity: 'rare', icon: '🌊' },
+  { id: 'pattern-heart', name: '爱心', type: 'pattern', content: 'heart', rarity: 'rare', icon: '💖' },
+  { id: 'pattern-star', name: '星空', type: 'pattern', content: 'stars', rarity: 'epic', icon: '✨' },
+  // Emoji 系列
+  { id: 'emoji-fire', name: '火焰', type: 'emoji', content: '🔥', rarity: 'common', icon: '🔥' },
+  { id: 'emoji-star', name: '星星', type: 'emoji', content: '⭐', rarity: 'common', icon: '⭐' },
+  { id: 'emoji-dragon', name: '龙', type: 'emoji', content: '🐉', rarity: 'rare', icon: '🐉' },
+  { id: 'emoji-phoenix', name: '凤凰', type: 'emoji', content: '🦅', rarity: 'epic', icon: '🦅' },
+  { id: 'emoji-rose', name: '玫瑰', type: 'emoji', content: '🌹', rarity: 'rare', icon: '🌹' },
+  { id: 'emoji-skull', name: '骷髅', type: 'emoji', content: '💀', rarity: 'legendary', icon: '💀' }
+]
+
+// 获取当前选中的贴纸信息
+export function getActiveSticker() {
+  const stickers = getStickers()
+  if (!stickers.selected) return null
+  return STICKER_LIST.find(s => s.id === stickers.selected) || null
+}
+
+// 兼容旧名称（皮肤 = 贴纸）
+export function getActiveSkin() {
+  return getActiveSticker()
+}
+
+export function getStickers() {
+  return _read(KEYS.stickers, { unlocked: ['text-lucky'], selected: 'text-lucky' })
+}
+
+export function saveStickers(stickers) {
+  _write(KEYS.stickers, stickers)
+}
+
+export function getUnlockedStickers() {
+  return getStickers().unlocked || []
+}
+
+export function getSelectedSticker() {
+  return getStickers().selected
+}
+
+// 解锁指定贴纸
+export function unlockSticker(stickerId) {
+  const stickers = getStickers()
+  if (stickers.unlocked.includes(stickerId)) return { success: false, msg: '已解锁' }
+  const sticker = STICKER_LIST.find(s => s.id === stickerId)
+  if (!sticker) return { success: false, msg: '贴纸不存在' }
+  stickers.unlocked.push(stickerId)
+  saveStickers(stickers)
+  return { success: true, sticker }
+}
+
+// 随机解锁一个贴纸
+export function unlockRandomSticker() {
+  const stickers = getStickers()
+  const locked = STICKER_LIST.filter(s => !stickers.unlocked.includes(s.id))
+  if (locked.length === 0) return { success: false, msg: '已解锁全部贴纸' }
+  const sticker = locked[Math.floor(Math.random() * locked.length)]
+  stickers.unlocked.push(sticker.id)
+  saveStickers(stickers)
+  return { success: true, sticker }
+}
+
+export function selectSticker(stickerId) {
+  const stickers = getStickers()
+  if (stickerId === null || stickers.unlocked.includes(stickerId)) {
+    stickers.selected = stickerId
+    saveStickers(stickers)
+    return true
+  }
+  return false
+}
+
+export function getStickerList() {
+  const stickers = getStickers()
+  return STICKER_LIST.map(s => ({
+    ...s,
+    unlocked: stickers.unlocked.includes(s.id),
+    selected: stickers.selected === s.id
+  }))
+}
+
+// ---- 广告奖励：宠物加速 ----
+export function petAccelerate() {
+  const pet = getPet()
+  pet.exp += 50  // 额外 +50 经验
+  pet.happiness = Math.min(100, pet.happiness + 10)
+  if (pet.exp >= pet.level * 100) {
+    pet.level++
+    pet.exp = pet.exp - (pet.level - 1) * 100
+  }
+  savePet(pet)
+  return pet
+}
+
+// ---- 背景解锁系统 ----
+const BG_LIST = {
+  // 品牌页背景
+  brand: [
+    { id: 'default', name: '默认黑夜', type: 'brand', css: 'background: #0f0f0f', rarity: 'common' },
+    { id: 'city-night', name: '霓虹都市', type: 'brand', css: 'background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', rarity: 'rare' },
+    { id: 'sunset', name: '落日余晖', type: 'brand', css: 'background: linear-gradient(135deg, #1a0a0a 0%, #4a1a2e 40%, #2d1b3d 100%)', rarity: 'rare' },
+    { id: 'forest', name: '暗夜森林', type: 'brand', css: 'background: linear-gradient(135deg, #0a1a0a 0%, #1a2e1a 50%, #0f1f0f 100%)', rarity: 'common' },
+    { id: 'ocean', name: '深海之蓝', type: 'brand', css: 'background: linear-gradient(135deg, #0a0f1a 0%, #0d2137 50%, #0a1628 100%)', rarity: 'rare' },
+    { id: 'aurora', name: '极光之夜', type: 'brand', css: 'background: linear-gradient(135deg, #0a0f1a 0%, #1a2e4a 30%, #2d1b4e 60%, #0f1a2e 100%)', rarity: 'epic' },
+    { id: 'cyber', name: '赛博朋克', type: 'brand', css: 'background: linear-gradient(135deg, #0a0015 0%, #1a0033 40%, #330044 70%, #0a0015 100%)', rarity: 'epic' },
+    { id: 'gold-luxury', name: '金色奢华', type: 'brand', css: 'background: linear-gradient(135deg, #1a1400 0%, #2a2000 50%, #1a1400 100%)', rarity: 'legendary' }
+  ],
+  // 吸烟页背景
+  smoking: [
+    { id: 'default', name: '暗夜寂静', type: 'smoking', css: 'background: #0f0f0f', rarity: 'common' },
+    { id: 'rainy', name: '雨夜窗边', type: 'smoking', css: 'background: linear-gradient(160deg, #0c1929 0%, #162a43 40%, #0d1a2d 100%)', rarity: 'rare' },
+    { id: 'neon', name: '霓虹都市', type: 'smoking', css: 'background: linear-gradient(160deg, #0f0020 0%, #1a0040 30%, #2d0050 60%, #0f0020 100%)', rarity: 'rare' },
+    { id: 'bar', name: '威士忌酒吧', type: 'smoking', css: 'background: linear-gradient(160deg, #1a0e00 0%, #2e1a05 40%, #1a0f02 100%)', rarity: 'rare' },
+    { id: 'aurora', name: '北极光', type: 'smoking', css: 'background: linear-gradient(160deg, #020818 0%, #0a1e3d 30%, #0d3a2e 60%, #020818 100%)', rarity: 'epic' },
+    { id: 'space', name: '星际漫游', type: 'smoking', css: 'background: radial-gradient(ellipse at 30% 20%, #1a0a3e 0%, #0a0a1a 40%, #000005 100%)', rarity: 'epic' },
+    { id: 'underwater', name: '深海幻境', type: 'smoking', css: 'background: linear-gradient(160deg, #001830 0%, #003050 35%, #002040 65%, #000e20 100%)', rarity: 'epic' },
+    { id: 'volcano', name: '烈焰熔岩', type: 'smoking', css: 'background: linear-gradient(160deg, #1a0000 0%, #300800 35%, #1a0500 70%, #0a0000 100%)', rarity: 'epic' },
+    { id: 'sakura', name: '樱花月夜', type: 'smoking', css: 'background: linear-gradient(160deg, #1a0a1e 0%, #2d1030 35%, #1a0820 70%, #0f0515 100%)', rarity: 'legendary' },
+    { id: 'zen', name: '禅境枯山水', type: 'smoking', css: 'background: linear-gradient(160deg, #18180f 0%, #252518 40%, #1a1a10 70%, #0e0e08 100%)', rarity: 'legendary' }
+  ]
+}
+
+export function getBackgrounds() {
+  return _read(KEYS.backgrounds, { unlocked: { brand: ['default'], smoking: ['default'] }, selected: { brand: 'default', smoking: 'default' } })
+}
+
+export function saveBackgrounds(bgs) {
+  _write(KEYS.backgrounds, bgs)
+}
+
+export function getBackgroundList(type) {
+  const bgs = getBackgrounds()
+  const list = BG_LIST[type] || []
+  return list.map(bg => ({
+    ...bg,
+    unlocked: (bgs.unlocked[type] || []).includes(bg.id),
+    selected: bgs.selected[type] === bg.id
+  }))
+}
+
+export function getActiveBackground(type) {
+  const bgs = getBackgrounds()
+  const selectedId = bgs.selected[type] || 'default'
+  const list = BG_LIST[type] || []
+  return list.find(bg => bg.id === selectedId) || list[0]
+}
+
+// 解锁指定背景
+export function unlockBackground(type, bgId) {
+  const bgs = getBackgrounds()
+  if (!bgs.unlocked[type]) bgs.unlocked[type] = ['default']
+  if (bgs.unlocked[type].includes(bgId)) return { success: false, msg: '已解锁' }
+  const list = BG_LIST[type] || []
+  const bg = list.find(b => b.id === bgId)
+  if (!bg) return { success: false, msg: '背景不存在' }
+  bgs.unlocked[type].push(bgId)
+  saveBackgrounds(bgs)
+  return { success: true, bg }
+}
+
+// 随机解锁一个背景（保留兼容）
+export function unlockRandomBackground(type) {
+  const bgs = getBackgrounds()
+  if (!bgs.unlocked[type]) bgs.unlocked[type] = ['default']
+  const list = BG_LIST[type] || []
+  const locked = list.filter(bg => !bgs.unlocked[type].includes(bg.id))
+  if (locked.length === 0) return { success: false, msg: '已解锁全部背景' }
+  const bg = locked[Math.floor(Math.random() * locked.length)]
+  bgs.unlocked[type].push(bg.id)
+  saveBackgrounds(bgs)
+  return { success: true, bg }
+}
+
+export function selectBackground(type, bgId) {
+  const bgs = getBackgrounds()
+  if (!bgs.unlocked[type] || !bgs.unlocked[type].includes(bgId)) return false
+  if (!bgs.selected) bgs.selected = {}
+  bgs.selected[type] = bgId
+  saveBackgrounds(bgs)
+  return true
+}
+
+export function getAllBackgrounds() {
+  return BG_LIST
+}
+
+
+// ---- 吐烟样式解锁 ----
+const SMOKE_STYLE_NAMES = ['烟圈', '爱心形', '龙卷风', '星形', '蘑菇云', '双螺旋', '烟花扩散', '蛇形蜿蜒', '水母状', '文字烟雾', '瀑布流', '分散飘散']
+const SMOKE_STYLE_ICONS = ['🌀', '❤️', '🌪️', '⭐', '🍄', '🧬', '🎆', '🐍', '🪼', '✨', '🌊', '💨']
+
+function getSmokeStyles() {
+  const fallback = { unlocked: [0], selected: 0 }
+  return { ...fallback, ..._read(KEYS.smokeStyles, fallback) }
+}
+
+function saveSmokeStyles(data) {
+  _write(KEYS.smokeStyles, data)
+}
+
+export function unlockSmokeStyle(idx) {
+  const styles = getSmokeStyles()
+  if (styles.unlocked.includes(idx)) return { success: false, msg: '已解锁' }
+  if (idx < 0 || idx >= SMOKE_STYLE_NAMES.length) return { success: false, msg: '样式不存在' }
+  styles.unlocked.push(idx)
+  saveSmokeStyles(styles)
+  return { success: true, name: SMOKE_STYLE_NAMES[idx], icon: SMOKE_STYLE_ICONS[idx] }
+}
+
+export function selectSmokeStyle(idx) {
+  const styles = getSmokeStyles()
+  styles.selected = idx
+  saveSmokeStyles(styles)
+}
+
+export function getSmokeStyleList() {
+  const styles = getSmokeStyles()
+  return SMOKE_STYLE_NAMES.map((name, idx) => ({
+    idx,
+    name,
+    icon: SMOKE_STYLE_ICONS[idx],
+    unlocked: styles.unlocked.includes(idx),
+    selected: styles.selected === idx
+  }))
+}
+
+export function getSelectedSmokeStyle() {
+  const styles = getSmokeStyles()
+  return styles.selected || 0
+}
+
+
+// ---- 宠物装扮系统 ----
+const PET_ACCESSORY_LIST = [
+  // 头部装扮
+  { id: 'crown', name: '皇冠', slot: 'head', type: 'crown', rarity: 'legendary', icon: '👑' },
+  { id: 'top-hat', name: '礼帽', slot: 'head', type: 'tophat', rarity: 'epic', icon: '🎩' },
+  { id: 'bow', name: '蝴蝶结', slot: 'head', type: 'bow', rarity: 'rare', icon: '🎀' },
+  { id: 'flower', name: '花朵', slot: 'head', type: 'flower', rarity: 'common', icon: '🌸' },
+  
+  // 眼睛装扮
+  { id: 'glasses', name: '眼镜', slot: 'eyes', type: 'glasses', rarity: 'common', icon: '👓' },
+  { id: 'sunglasses', name: '墨镜', slot: 'eyes', type: 'sunglasses', rarity: 'rare', icon: '🕶️' },
+  { id: 'monocle', name: '单片眼镜', slot: 'eyes', type: 'monocle', rarity: 'epic', icon: '🧐' },
+  
+  // 颈部装扮
+  { id: 'bowtie', name: '领结', slot: 'neck', type: 'bowtie', rarity: 'common', icon: '🎀' },
+  { id: 'necklace', name: '项链', slot: 'neck', type: 'necklace', rarity: 'rare', icon: '📿' },
+  { id: 'scarf', name: '围巾', slot: 'neck', type: 'scarf', rarity: 'epic', icon: '🧣' },
+  { id: 'collar', name: '项圈', slot: 'neck', type: 'collar', rarity: 'common', icon: '⭕' }
+]
+
+export function getPetAccessories() {
+  return _read(KEYS.petAccessories, { unlocked: ['flower', 'glasses', 'bowtie'], equipped: {} })
+}
+
+export function savePetAccessories(data) {
+  _write(KEYS.petAccessories, data)
+}
+
+export function getPetAccessoryList() {
+  const data = getPetAccessories()
+  return PET_ACCESSORY_LIST.map(item => ({
+    ...item,
+    unlocked: data.unlocked.includes(item.id),
+    equipped: data.equipped[item.slot] === item.id
+  }))
+}
+
+export function unlockPetAccessory(accessoryId) {
+  const data = getPetAccessories()
+  if (data.unlocked.includes(accessoryId)) return { success: false, msg: '已解锁' }
+  const accessory = PET_ACCESSORY_LIST.find(a => a.id === accessoryId)
+  if (!accessory) return { success: false, msg: '装扮不存在' }
+  data.unlocked.push(accessoryId)
+  savePetAccessories(data)
+  return { success: true, accessory }
+}
+
+export function equipPetAccessory(accessoryId) {
+  const data = getPetAccessories()
+  const accessory = PET_ACCESSORY_LIST.find(a => a.id === accessoryId)
+  if (!accessory) return false
+  if (!data.unlocked.includes(accessoryId)) return false
+  
+  // 装备到对应槽位
+  data.equipped[accessory.slot] = accessoryId
+  savePetAccessories(data)
+  return true
+}
+
+export function unequipPetAccessory(slot) {
+  const data = getPetAccessories()
+  delete data.equipped[slot]
+  savePetAccessories(data)
+  return true
+}
+
+export function getEquippedAccessories() {
+  const data = getPetAccessories()
+  const equipped = {}
+  for (const [slot, id] of Object.entries(data.equipped)) {
+    const accessory = PET_ACCESSORY_LIST.find(a => a.id === id)
+    if (accessory) {
+      equipped[slot] = accessory
+    }
+  }
+  return equipped
+}
+
+
 export default {
   getSettings, saveSettings,
   getToday, saveToday,
@@ -508,5 +873,12 @@ export default {
   getSavingsGoals, addSavingsGoal, updateSavingsGoal,
   getTimeCapsules, addTimeCapsule,
   getPet, savePet, updatePetHealth,
+  getAdRewards, getExtraQuota, addExtraQuota, getEffectiveQuota,
+  unlockRandomSticker, unlockSticker, selectSticker, getStickerList, getActiveSticker, getActiveSkin,
+  petAccelerate,
+  getBackgrounds, saveBackgrounds, getBackgroundList, getActiveBackground,
+  unlockRandomBackground, unlockBackground, selectBackground, getAllBackgrounds,
+  getSmokeStyles, saveSmokeStyles, unlockSmokeStyle, selectSmokeStyle, getSmokeStyleList, getSelectedSmokeStyle,
+  getPetAccessories, savePetAccessories, getPetAccessoryList, unlockPetAccessory, equipPetAccessory, unequipPetAccessory, getEquippedAccessories,
   resetAll
 }

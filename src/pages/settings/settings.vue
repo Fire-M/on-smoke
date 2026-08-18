@@ -227,4 +227,5 @@ export default {
 .text-gray-300 { color: #d1d5db; }
 .text-gray-600 { color: #4b5563; }
 .text-gray-700 { color: #374151; }
+
 </style>

@@ -354,7 +354,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ======== 烟盒详情页 - 3D 立体 ======== */
 
-:root {
+:root,
+page {
   --box-w: 250px;
   --box-h: 360px;
   --box-d: 100px;
@@ -1190,7 +1191,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ======== 2D 香烟样式（抽烟场景专用） ======== */
 
-:root {
+:root,
+page {
   --cig-width: 46px;
   --cig-total-h: 520px;
   --cig-filter-h: 160px;

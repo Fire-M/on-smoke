@@ -4,7 +4,7 @@
     <view class="header">
       <view class="header-row">
         <view class="back-btn" @click="goBack">
-          <text class="back-icon">&lt;</text>
+          <text class="back-icon">‹</text>
         </view>
         <text class="page-title">烟瘾追踪</text>
         <view class="back-btn-placeholder"></view>

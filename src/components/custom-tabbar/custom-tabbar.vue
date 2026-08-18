@@ -61,7 +61,9 @@ export default {
   user-select: none;
 }
 
-.custom-tabbar * {
+.custom-tabbar view,
+.custom-tabbar text,
+.custom-tabbar image {
   -webkit-tap-highlight-color: transparent;
   outline: none;
 }

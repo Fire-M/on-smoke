@@ -5,7 +5,7 @@
       <view class="brand-header">
         <view class="brand-header-row">
           <view class="brand-back-btn" @click="goBack">
-            <text class="brand-back-icon">&lt;</text>
+            <text class="brand-back-icon">‹</text>
           </view>
           <text class="brand-header-title">选择香烟</text>
           <view class="brand-back-btn-placeholder"></view>
@@ -15,9 +15,14 @@
 
       <view class="brand-grid">
         <view v-for="(brand, index) in brands" :key="brand.id"
-          class="brand-card" :class="'theme-' + brand.theme"
-          :style="{ animationDelay: index * 0.06 + 's' }"
+          class="brand-card" :class="['theme-' + brand.theme, { 'has-skin': activeSkin && settings.selectedBrand === brand.id }]"
+          :style="[brand.id === settings.selectedBrand && activeSkin ? { borderColor: activeSkin.color, boxShadow: `0 8rpx 24rpx rgba(0,0,0,0.4), 0 0 20rpx ${activeSkin.glow}` } : {}, { animationDelay: index * 0.06 + 's' }]"
           @click="selectBrand(brand)">
+          <!-- 皮肤徽章 -->
+          <view class="skin-badge" v-if="brand.id === settings.selectedBrand && activeSkin">
+            <text class="skin-badge-emoji">{{ activeSkin.emoji }}</text>
+            <text class="skin-badge-name">{{ activeSkin.name }}</text>
+          </view>
           <view class="brand-card-top">
             <text class="brand-price">¥{{ brand.price }}</text>
             <view class="brand-seal"></view>
@@ -63,14 +68,16 @@ export default {
   data() {
     return {
       brands: [],
-      quota: 20
+      quota: 20,
+      settings: { selectedBrand: null },
+      activeSkin: null
     }
   },
 
   onShow() {
-    // 加载配额
-    const settings = Store.getSettings()
-    this.quota = settings.dailyQuota || 20
+    this.settings = Store.getSettings()
+    this.quota = this.settings.dailyQuota || 20
+    this.activeSkin = Store.getActiveSkin()
     
     // 重新加载品牌列表，包含剩余数量
     this.brands = BRANDS.map(brand => ({
@@ -110,6 +117,7 @@ export default {
   color: #e5e7eb;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .brand-scroll {
@@ -272,6 +280,31 @@ export default {
 .brand-card:hover .brand-card-shine {
   transform: rotate(-5deg) translate(5%, 5%);
   opacity: 1.5;
+}
+
+/* 皮肤徽章 */
+.skin-badge {
+  position: absolute;
+  bottom: 12rpx;
+  right: 12rpx;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 14rpx;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 999rpx;
+  backdrop-filter: blur(8rpx);
+}
+
+.skin-badge-emoji {
+  font-size: 22rpx;
+}
+
+.skin-badge-name {
+  font-size: 18rpx;
+  color: #f3f4f6;
+  font-weight: 500;
 }
 
 /* 卡片主题渐变 */

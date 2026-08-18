@@ -2,7 +2,7 @@
   <view class="page-container">
     <view class="header">
       <view class="header-row">
-        <view class="back-btn" @click="goBack"><text class="back-icon">&lt;</text></view>
+        <view class="back-btn" @click="goBack"><text class="back-icon">‹</text></view>
         <text class="page-title">省钱目标</text>
         <view class="back-btn-placeholder"></view>
       </view>

@@ -4,7 +4,7 @@
     <view class="ach-header">
       <view class="ach-header-row">
         <view class="ach-back-btn" @click="goBack">
-          <text class="ach-back-icon">&lt;</text>
+          <text class="ach-back-icon">‹</text>
         </view>
         <text class="ach-title">成就勋章</text>
         <view class="ach-back-btn-placeholder"></view>

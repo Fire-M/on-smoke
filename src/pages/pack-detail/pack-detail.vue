@@ -4,7 +4,7 @@
     <view class="header">
       <view class="header-row">
         <view class="back-btn" @click="changePack">
-          <text class="back-icon">&lt;</text>
+          <text class="back-icon">‹</text>
         </view>
         <view class="header-center">
           <text class="brand-en">{{ brand.en }}</text>

@@ -24,9 +24,14 @@
       <view class="mx-20 mb-16 two-col">
         <view class="card p-16">
           <text class="text-sm text-gray-400 mb-8 block">今日假抽</text>
-          <text class="text-2xl font-bold text-gray-100">{{ todaySmoked }} / {{ quotaTotal }} 根</text>
+          <text class="text-2xl font-bold text-gray-100">{{ todaySmoked }} / {{ effectiveQuota }} 根</text>
           <view class="progress-bar">
             <view class="progress-fill" :style="{ width: quotaPercent + '%' }"></view>
+          </view>
+          <!-- 看广告+1根 -->
+          <view class="ad-quota-btn" @click="watchAdForQuota" v-if="adRewardRemain > 0">
+            <text class="ad-quota-icon">🎬</text>
+            <text class="ad-quota-text">看广告 +1 根</text>
           </view>
         </view>
         <view class="card p-16">
@@ -142,6 +147,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AdManager from '@/utils/ad-manager.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 
 const MILESTONES = [
@@ -160,6 +166,8 @@ export default {
       savedAmount: '0.0',
       todaySmoked: 0,
       quotaTotal: 5,
+      effectiveQuota: 5,
+      adRewardRemain: 10,
       quotaPercent: 0,
       milestoneLabel: '20分钟',
       badgesCount: 0,
@@ -183,6 +191,17 @@ export default {
     this.refreshData()
     this.checkCooldown()
     this.midnightTimer = setInterval(() => this.refreshData(), 30000)
+    
+    // 初始化广告
+    AdManager.initRewardedAd()
+    AdManager.initInterstitialAd()
+    
+    // 每日首次打开插屏广告
+    if (AdManager.checkDailyFirstOpen()) {
+      setTimeout(() => {
+        AdManager.showInterstitialAd('app_open')
+      }, 3000)
+    }
   },
 
   onUnload() {
@@ -203,7 +222,9 @@ export default {
       this.savedAmount = Store.getSavedMoney().toFixed(1)
       this.todaySmoked = today.smokedCount
       this.quotaTotal = settings.dailyQuota
-      this.quotaPercent = settings.dailyQuota > 0 ? Math.min(today.smokedCount / settings.dailyQuota, 1) * 100 : 0
+      this.effectiveQuota = Store.getEffectiveQuota()
+      this.adRewardRemain = AdManager.getRewardRemain()
+      this.quotaPercent = this.effectiveQuota > 0 ? Math.min(today.smokedCount / this.effectiveQuota, 1) * 100 : 0
       this.badgesCount = this.calcBadges()
       this.updateMilestone()
       
@@ -335,6 +356,15 @@ export default {
 
     goToHealthCalc() {
       uni.navigateTo({ url: '/pages/health-calc/health-calc' })
+    },
+
+    watchAdForQuota() {
+      AdManager.showRewardedAd('quota').then(success => {
+        if (success) {
+          Store.addExtraQuota()
+          this.refreshData()
+        }
+      })
     }
   }
 }
@@ -695,5 +725,33 @@ export default {
 .feature-name {
   font-size: 24rpx;
   color: #d1d5db;
+}
+
+/* 看广告+1根按钮 */
+.ad-quota-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  padding: 10rpx 16rpx;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 16rpx;
+}
+
+.ad-quota-btn:active {
+  opacity: 0.7;
+  transform: scale(0.97);
+}
+
+.ad-quota-icon {
+  font-size: 28rpx;
+}
+
+.ad-quota-text {
+  font-size: 22rpx;
+  color: #f59e0b;
+  font-weight: 600;
 }
 </style>

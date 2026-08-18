@@ -2,7 +2,7 @@
   <view class="page-container">
     <!-- 返回按钮 -->
     <view class="smoke-back-btn" @click="goBack">
-      <text class="smoke-back-icon">&lt;</text>
+      <text class="smoke-back-icon">‹</text>
     </view>
 
     <!-- 背景火光（由亮渐灭） -->
@@ -26,7 +26,8 @@
 
       <!-- DOM 烟雾层（SVG 滤镜驱动） -->
       <view class="dom-smoke-layer" :class="{ hidden: !domFilterActive }">
-        <view class="dom-smoke-wrap" ref="domSmokeWrap"></view>
+        <view class="dom-smoke-wrap" ref="domSmokeWrap">
+        </view>
       </view>
 
       <!-- 2D 香烟 -->
@@ -165,6 +166,9 @@ import Store from '@/utils/store.js'
 const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
 const MAX_PUFF_DURATION = 8000  // 单次吸烟最长时长（8秒）
+
+const raf = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : (fn) => setTimeout(fn, 16)
+const caf = typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : (id) => clearTimeout(id)
 
 export default {
   data() {
@@ -394,7 +398,6 @@ export default {
     // ============ Canvas 粒子系统 ============
     findCanvasEl() {
       if (!this.$el) return null
-      // uni-app H5 中 canvas 可能嵌套在 uni-canvas 组件内
       return this.$el.querySelector('#smoke-canvas') || this.$el.querySelector('canvas') || null
     },
 
@@ -402,7 +405,6 @@ export default {
       try {
         const canvasEl = this.findCanvasEl()
         if (!canvasEl) {
-          // 延迟重试一次（DOM 可能还未渲染完成）
           setTimeout(() => this.initCanvas(), 100)
           return
         }
@@ -444,7 +446,7 @@ export default {
       const loop = () => {
         this.ringTime += 0.1
         const ctx = this.canvasCtx
-        if (!ctx) { this.animFrame = requestAnimationFrame(loop); return }
+        if (!ctx) { this.animFrame = raf(loop); return }
         ctx.clearRect(0, 0, this.canvasW, this.canvasH)
         this.emitParticles()
         ctx.globalCompositeOperation = 'lighter'
@@ -454,13 +456,13 @@ export default {
           return alive
         })
         ctx.globalCompositeOperation = 'source-over'
-        this.animFrame = requestAnimationFrame(loop)
+        this.animFrame = raf(loop)
       }
-      this.animFrame = requestAnimationFrame(loop)
+      this.animFrame = raf(loop)
     },
 
     stopCanvasLoop() {
-      if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null }
+      if (this.animFrame) { caf(this.animFrame); this.animFrame = null }
       this.particles = []
       if (this.canvasCtx) this.canvasCtx.clearRect(0, 0, this.canvasW, this.canvasH)
     },
@@ -625,7 +627,7 @@ export default {
     },
     stopDomFilter() {
       this.domFilterRunning = false
-      if (this.domFilterRaf) { cancelAnimationFrame(this.domFilterRaf); this.domFilterRaf = null }
+      if (this.domFilterRaf) { caf(this.domFilterRaf); this.domFilterRaf = null }
       setTimeout(() => { if (this.domActivePuffs <= 0) this.domFilterActive = false }, 1500)
     },
     animateDomFilter() {
@@ -638,7 +640,7 @@ export default {
         const turb = this.$refs.turbulenceEl
         if (turb && turb.setAttributeNS) turb.setAttributeNS(null, 'baseFrequency', bfx + ' ' + bfy)
       } catch (e) {}
-      if (this.domFilterRunning) this.domFilterRaf = requestAnimationFrame(() => this.animateDomFilter())
+      if (this.domFilterRunning) this.domFilterRaf = raf(() => this.animateDomFilter())
     },
 
     spawnDomPuff(x, y, opts) {
@@ -647,23 +649,23 @@ export default {
       const container = wrap.$el || wrap
       const doc = container.ownerDocument || document
       const div = doc.createElement('div')
-      const size = opts.size, life = opts.life
+      const size2 = opts.size, life2 = opts.life
       div.className = 'dom-smoke-puff'
-      div.style.width = size + 'px'
-      div.style.height = size + 'px'
-      div.style.left = (x - size / 2) + 'px'
-      div.style.top = (y - size / 2) + 'px'
-      const g1 = 200 + Math.floor(Math.random() * 30), g2 = g1 - 40, g3 = g2 - 20
-      div.style.background = `radial-gradient(ellipse at 50% 40%,rgba(${g1},${g1},${g1},${opts.opacity}) 0%,rgba(${g2},${g2},${g2},${opts.opacity*0.7}) 30%,rgba(${g3},${g3},${g3},${opts.opacity*0.3}) 60%,transparent 100%)`
+      div.style.width = size2 + 'px'
+      div.style.height = size2 + 'px'
+      div.style.left = (x - size2 / 2) + 'px'
+      div.style.top = (y - size2 / 2) + 'px'
+      const g1b = 200 + Math.floor(Math.random() * 30), g2b = g1b - 40, g3b = g2b - 20
+      div.style.background = `radial-gradient(ellipse at 50% 40%,rgba(${g1b},${g1b},${g1b},${opts.opacity}) 0%,rgba(${g2b},${g2b},${g2b},${opts.opacity*0.7}) 30%,rgba(${g3b},${g3b},${g3b},${opts.opacity*0.3}) 60%,transparent 100%)`
       div.style.setProperty('--ds', opts.scale.toFixed(3))
       div.style.setProperty('--do', opts.opacity.toFixed(2))
       div.style.setProperty('--dd', opts.drift.toFixed(1) + 'px')
       div.style.setProperty('--dr', (-opts.rise).toFixed(1) + 'vh')
-      div.style.animationDuration = life + 'ms'
+      div.style.animationDuration = life2 + 'ms'
       div.classList.add('anim')
       container.appendChild(div)
       this.domActivePuffs++
-      setTimeout(() => { div.remove(); this.domActivePuffs--; if (this.domActivePuffs <= 0 && !this.domFilterRunning) this.domFilterActive = false }, life + 200)
+      setTimeout(() => { div.remove(); this.domActivePuffs--; if (this.domActivePuffs <= 0 && !this.domFilterRunning) this.domFilterActive = false }, life2 + 200)
     },
 
     makeDomOpts(preset) {
@@ -1179,9 +1181,9 @@ export default {
       if (!container) return
       
       // 烟灰越多，碎片越多（基础 6 个，最多 20 个）
-      const particleCount = Math.min(20, 6 + Math.floor(ashAmount / 15))
+      const particleCount2 = Math.min(20, 6 + Math.floor(ashAmount / 15))
       
-      for (let i = 0; i < particleCount; i++) {
+      for (let i = 0; i < particleCount2; i++) {
         const particle = document.createElement('div')
         particle.className = 'ash-particle'
         
@@ -1481,10 +1483,10 @@ export default {
           particle.el.style.height = sz + 'px'
           particle.el.style.opacity = alpha * (opacityMul || 0.7)
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 1. 烟圈
@@ -1542,10 +1544,10 @@ export default {
           inner.el.style.width = sz + 'px'; inner.el.style.height = sz + 'px'
           inner.el.style.opacity = alpha * 0.4
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else { ringEls.forEach(e => e.el.remove()); innerEls.forEach(e => e.el.remove()) }
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 2. 爱心形
@@ -1603,10 +1605,10 @@ export default {
           inner.el.style.width = sz+'px'; inner.el.style.height = sz+'px'
           inner.el.style.opacity = alpha * 0.4
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else { heartEls.forEach(e => e.el.remove()); innerEls.forEach(e => e.el.remove()) }
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 3. 龙卷风
@@ -1653,10 +1655,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * (0.7 - pt.layerIdx * 0.04)
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else allEls.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 4. 星形
@@ -1717,10 +1719,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * 0.7
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 6. 双螺旋
@@ -1774,10 +1776,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * 0.7
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 8. 蛇形蜿蜒
@@ -1840,10 +1842,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * 0.65
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 10. 文字烟雾
@@ -1907,10 +1909,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * 0.65
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // 12. 分散飘散
@@ -1949,10 +1951,10 @@ export default {
           pt.el.style.width = sz+'px'; pt.el.style.height = sz+'px'
           pt.el.style.opacity = alpha * 0.7
         }
-        if (p < 1) requestAnimationFrame(tick)
+        if (p < 1) raf(tick)
         else els.forEach(e => e.el.remove())
       }
-      requestAnimationFrame(tick)
+      raf(tick)
     },
 
     // ---- 派烟 ----
