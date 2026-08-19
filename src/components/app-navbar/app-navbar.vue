@@ -48,8 +48,8 @@ export default {
       return { height: this.navBarHeight + 'px' }
     },
     titleStyle() {
-      // 右侧占位 = 胶囊宽度，让标题居中于“左边界~胶囊”之间，避免与胶囊重叠
-      return { marginRight: this.capsuleLeft > 0 ? (this.capsuleWidth + (this.screenRight - this.capsuleLeft)) + 'px' : '0px' }
+      // 标题在「返回按钮」与右侧占位（胶囊宽度）之间居中，避免与胶囊重叠
+      return {}
     },
     rightStyle() {
       return { width: this.capsuleWidth + 'px' }
@@ -134,6 +134,7 @@ function sysSafeRight() {
   align-items: center;
   justify-content: flex-start;
   flex-shrink: 0;
+  position: relative;
   z-index: 2;
 }
 .app-navbar__back-icon {
@@ -142,11 +143,19 @@ function sysSafeRight() {
   line-height: 1;
 }
 .app-navbar__title {
-  flex: 1;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 90rpx;
+  box-sizing: border-box;
   overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
 }
 .app-navbar__title-text {
   font-size: 34rpx;

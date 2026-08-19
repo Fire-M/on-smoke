@@ -36,6 +36,7 @@ npm run dev:app / build:app # App 端
 4. **跨端条件编译**：平台相关代码用 `// #ifdef H5` / `// #ifdef APP-PLUS` / `// #ifdef MP-WEIXIN` 包裹。广告真实逻辑目前被注释，仅 H5 模拟。
 5. **烟雾效果**：H5 使用 `three.js`（`three` 依赖）做完整 3D 烟雾；小程序端烟雾已移除（`test-smoke-svg/`、`test-smoke-2d/`、`test-smoke-css/` 等为实验/测试页面）。新增图形效果优先参考 `pages/smoking/`。
 6. **改动默认面向小程序**：本项目是「小程序兼容 + H5」的跨端应用。**除非用户明确说「改 H5」，否则默认改动必须保持小程序兼容，不得主动修改 H5 专属代码**（如 `// #ifdef H5` 的 three.js 烟雾逻辑、H5 模拟广告等）。涉及平台差异时优先用跨端 API 与条件编译。
+7. **页面头部统一用 `src/components/app-navbar/app-navbar.vue`**：所有页面顶部标题 + 返回按钮都用该组件实现，自动按状态栏高度 + 微信胶囊位置对齐（`title` 标题；`showBack` 默认 `'auto'` 按页面栈自动返回；需要附带清理/停止逻辑的页面用 `:custom-back="true" @back="方法"` 自行处理返回）。不要在每个页面手写返回按钮与状态栏留白。
 6. **样式单位**：使用 `rpx`；全局暗色主题（背景 `#0f0f0f`，主色 `#f59e0b` 琥珀色），公共样式见 `App.vue` 与 `static/custom.css`。
 7. **提交规范**：保持现有中文 `feat/fix/style` 等前缀的提交信息风格。
 
