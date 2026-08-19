@@ -1,8 +1,8 @@
 <template>
   <view class="page-container">
+    <app-navbar title="吸烟记录"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="p-20 pb-100">
-        <text class="page-title">吸烟记录</text>
 
         <!-- 统计切换 -->
         <view class="tab-row">
@@ -63,9 +63,10 @@
 <script>
 import Store from '@/utils/store.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 export default {
-  components: { CustomTabbar },
+  components: { CustomTabbar, AppNavbar },
   data() {
     return {
       tabRange: 'day',
@@ -157,19 +158,13 @@ export default {
   width: 100vw;
   background-color: #0f0f0f;
   color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-scroll {
+  flex: 1;
   height: 100%;
-}
-
-.page-title {
-  display: block;
-  font-size: 40rpx;
-  font-weight: bold;
-  text-align: center;
-  color: #f3f4f6;
-  margin-bottom: 32rpx;
 }
 
 .tab-row {

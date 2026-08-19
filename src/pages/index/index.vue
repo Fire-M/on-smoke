@@ -1,9 +1,10 @@
 <template>
   <view class="page-container">
+    <app-navbar title="就抽一根"></app-navbar>
     <!-- 可滚动仪表盘内容 -->
     <scroll-view scroll-y class="main-scroll">
       <!-- 顶部：戒烟天数 + 激励语 -->
-      <view class="px-20 pt-40 pb-16">
+      <view class="px-20 pt-20 pb-16">
         <text class="text-sm text-gray-400">戒烟 第 <text class="text-amber font-bold text-base">{{ quitDays }}</text> 天</text>
         <text class="text-2xl font-bold text-gray-100 mt-4 block">嘴又痒了?</text>
       </view>
@@ -153,6 +154,7 @@
 import Store from '@/utils/store.js'
 import AdManager from '@/utils/ad-manager.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const MILESTONES = [
   { seconds: 1200, label: '20分钟' },
@@ -163,7 +165,7 @@ const MILESTONES = [
 ]
 
 export default {
-  components: { CustomTabbar },
+  components: { CustomTabbar, AppNavbar },
   data() {
     return {
       quitDays: 1,

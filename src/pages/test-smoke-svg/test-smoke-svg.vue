@@ -1,5 +1,6 @@
 <template>
   <view class="smoke-root">
+    <app-navbar title="烟雾测试"></app-navbar>
     <view class="stage">
       <canvas type="2d" id="smokeCanvas" class="smoke-canvas" @tap="puff"></canvas>
       <canvas type="2d" id="spriteCanvas" class="sprite-canvas"></canvas>
@@ -33,6 +34,8 @@
 </template>
 
 <script>
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+
 const DEFAULTS = {
   dprCap: 2,
   emitPerSec: 120,
@@ -94,6 +97,7 @@ function noise3(x, y, z) {
 
 export default {
   name: 'Smoke',
+  components: { AppNavbar },
   props: {
     autoStart: { type: Boolean, default: true },
   },

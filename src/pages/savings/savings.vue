@@ -1,12 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack"><text class="back-icon">‹</text></view>
-        <text class="page-title">省钱目标</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="省钱目标"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="mx-20 mb-16">
         <view class="card p-20">
@@ -26,7 +20,9 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 export default {
+  components: { AppNavbar },
   data() {
     return { savedMoney: '0', goalAmount: 1000, progress: 0, showSetGoal: false }
   },
@@ -35,13 +31,6 @@ export default {
     const goals = Store.getSavingsGoals()
     if (goals.length > 0) this.goalAmount = goals[goals.length - 1].target
     this.progress = Math.min(100, (this.savedMoney / this.goalAmount) * 100)
-  },
-  methods: {
-    goBack() {
-      const pages = getCurrentPages()
-      if (pages.length > 1) uni.navigateBack()
-      else uni.switchTab({ url: '/pages/index/index' })
-    }
   }
 }
 </script>

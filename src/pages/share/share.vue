@@ -1,5 +1,6 @@
 <template>
   <view class="page-container">
+    <app-navbar title="分享" :show-back="false"></app-navbar>
     <view class="result-content">
       <text class="result-title">恭喜，你抽了一根寂寞</text>
 
@@ -42,8 +43,10 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       brandId: '',
@@ -154,7 +157,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 96rpx 32rpx 0;
+  padding: 0;
 }
 
 .result-content {
@@ -164,6 +167,8 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 40rpx;
+  padding: 40rpx 32rpx 0;
+  box-sizing: border-box;
 }
 
 .result-title {

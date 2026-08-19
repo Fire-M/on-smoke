@@ -1,14 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack">
-          <text class="back-icon">‹</text>
-        </view>
-        <text class="page-title">呼吸引导</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="呼吸引导" :custom-back="true" @back="goBack"></app-navbar>
 
     <view class="main-content">
       <!-- 呼吸圆圈 -->
@@ -53,7 +45,10 @@
 </template>
 
 <script>
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+
 export default {
+  components: { AppNavbar },
   data() {
     return {
       isRunning: false,

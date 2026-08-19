@@ -1,15 +1,9 @@
 <template>
   <view class="page-container">
+    <app-navbar title="选择香烟"></app-navbar>
     <!-- 品牌网格 -->
     <scroll-view scroll-y class="brand-scroll">
       <view class="brand-header">
-        <view class="brand-header-row">
-          <view class="brand-back-btn" @click="goBack">
-            <text class="brand-back-icon">‹</text>
-          </view>
-          <text class="brand-header-title">选择香烟</text>
-          <view class="brand-back-btn-placeholder"></view>
-        </view>
         <text class="brand-header-sub">挑一包解解馋 · 全是假的</text>
       </view>
 
@@ -54,6 +48,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const BRANDS = [
   { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
@@ -65,6 +60,7 @@ const BRANDS = [
 ]
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       brands: [],
@@ -96,13 +92,6 @@ export default {
       // 跳转到烟盒详情页
       uni.navigateTo({
         url: `/pages/pack-detail/pack-detail?brandId=${brand.id}`
-      })
-    },
-
-    goBack() {
-      // 直接返回首页
-      uni.switchTab({
-        url: '/pages/index/index'
       })
     }
   }

@@ -1,14 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack">
-          <text class="back-icon">‹</text>
-        </view>
-        <text class="page-title">情绪日记</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="情绪日记"></app-navbar>
 
     <scroll-view scroll-y class="main-scroll">
       <!-- 情绪统计 -->
@@ -130,6 +122,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const MOOD_OPTIONS = [
   { id: 'happy', name: '开心', emoji: '😊' },
@@ -141,6 +134,7 @@ const MOOD_OPTIONS = [
 ]
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       showRecordModal: false,
@@ -209,15 +203,6 @@ export default {
 
       uni.showToast({ title: '已记录', icon: 'success' })
       this.loadData()
-    },
-
-    goBack() {
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack()
-      } else {
-        uni.switchTab({ url: '/pages/index/index' })
-      }
     }
   }
 }

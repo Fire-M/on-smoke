@@ -1,12 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack"><text class="back-icon">‹</text></view>
-        <text class="page-title">时间胶囊</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="时间胶囊"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="mx-20 mb-16">
         <button class="write-btn" @click="showWrite = true">✍️ 写信给未来的自己</button>
@@ -26,12 +20,13 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 export default {
+  components: { AppNavbar },
   data() { return { capsules: [], showWrite: false } },
   onShow() { this.capsules = Store.getTimeCapsules() },
   methods: {
-    formatDate(ts) { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}` },
-    goBack() { const pages = getCurrentPages(); if (pages.length > 1) uni.navigateBack(); else uni.switchTab({ url: '/pages/index/index' }) }
+    formatDate(ts) { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}` }
   }
 }
 </script>

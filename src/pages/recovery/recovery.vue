@@ -1,14 +1,8 @@
 <template>
   <view class="page-container">
+    <app-navbar title="身体恢复"></app-navbar>
     <!-- 顶部标题 -->
     <view class="recovery-header">
-      <view class="recovery-header-row">
-        <view class="recovery-back-btn" @click="goBack">
-          <text class="recovery-back-icon">‹</text>
-        </view>
-        <text class="recovery-title">身体恢复</text>
-        <view class="recovery-back-btn-placeholder"></view>
-      </view>
       <view class="recovery-subtitle">
         <text class="recovery-days">已戒烟 {{ quitDays }} 天</text>
         <text class="recovery-time">{{ quitTimeStr }}</text>
@@ -66,6 +60,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const MILESTONES_DATA = [
   { seconds: 1200, label: '20分钟', title: '心率恢复正常', desc: '你的心跳和血压开始恢复到正常水平，手脚温度回升' },
@@ -83,6 +78,7 @@ const MILESTONES_DATA = [
 ]
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       quitDays: 0,
@@ -165,15 +161,6 @@ export default {
         }
         this.nextMilestone = null
         this.currentProgress = 100
-      }
-    },
-
-    goBack() {
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack()
-      } else {
-        uni.switchTab({ url: '/pages/index/index' })
       }
     }
   }

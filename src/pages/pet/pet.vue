@@ -1,12 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack"><text class="back-icon">‹</text></view>
-        <text class="page-title">我的宠物</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="我的宠物"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="pet-card mx-20 mb-16">
         <!-- Canvas 宠物 -->
@@ -114,9 +108,10 @@
 import Store from '@/utils/store.js'
 import { showRewardedAd } from '@/utils/ad-manager.js'
 import PetCanvas from '@/components/PetCanvas.vue'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 export default {
-  components: { PetCanvas },
+  components: { PetCanvas, AppNavbar },
   data() { 
     return { 
       pet: { name: '小烟', health: 100, happiness: 100, level: 1, exp: 0 },
@@ -148,11 +143,6 @@ export default {
     this.equippedAccessories = Store.getEquippedAccessories()
   },
   methods: {
-    goBack() { 
-      const pages = getCurrentPages()
-      if (pages.length > 1) uni.navigateBack()
-      else uni.switchTab({ url: '/pages/index/index' }) 
-    },
     watchAdForPet() {
       showRewardedAd('pet_accel').then(success => {
         if (success) {

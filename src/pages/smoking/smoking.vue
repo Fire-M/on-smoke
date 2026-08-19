@@ -1,9 +1,6 @@
 <template>
   <view class="page-container">
-    <!-- 返回按钮 -->
-    <view class="smoke-back-btn" @click="goBack">
-      <text class="smoke-back-icon">‹</text>
-    </view>
+    <app-navbar title="抽烟" :custom-back="true" @back="goBack"></app-navbar>
 
     <!-- 背景火光（由亮渐灭） -->
     <view class="bg-ember-glow" :style="bgGlowStyle"></view>
@@ -162,6 +159,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
@@ -171,6 +169,7 @@ const raf = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame
 const caf = typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : (id) => clearTimeout(id)
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       brandId: '',

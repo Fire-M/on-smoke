@@ -1,18 +1,6 @@
 <template>
   <view id="pack-detail" class="page-container" :class="'theme-' + brand.theme">
-    <!-- 顶栏 -->
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="changePack">
-          <text class="back-icon">‹</text>
-        </view>
-        <view class="header-center">
-          <text class="brand-en">{{ brand.en }}</text>
-          <text class="brand-cn">{{ brand.cn }}</text>
-        </view>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar :title="brand.cn"></app-navbar>
 
     <!-- 烟盒展示区 -->
     <view class="box-area">
@@ -108,6 +96,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const BRANDS = {
   lanhe: { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', theme: 'blue', packSize: 10 },
@@ -119,6 +108,7 @@ const BRANDS = {
 }
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       brand: BRANDS.lanhe,
@@ -204,11 +194,6 @@ export default {
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })
       }, 820)
-    },
-
-    changePack() {
-      // 返回品牌选择页
-      uni.navigateBack()
     },
 
     // 拖拽旋转

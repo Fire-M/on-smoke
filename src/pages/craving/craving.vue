@@ -1,15 +1,6 @@
 <template>
   <view class="page-container">
-    <!-- 顶部标题 -->
-    <view class="header">
-      <view class="header-row">
-        <view class="back-btn" @click="goBack">
-          <text class="back-icon">‹</text>
-        </view>
-        <text class="page-title">烟瘾追踪</text>
-        <view class="back-btn-placeholder"></view>
-      </view>
-    </view>
+    <app-navbar title="烟瘾追踪"></app-navbar>
 
     <scroll-view scroll-y class="main-scroll">
       <!-- 今日统计 -->
@@ -163,6 +154,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const TRIGGER_OPTIONS = [
   { id: 'stress', name: '压力大', icon: '😰' },
@@ -176,6 +168,7 @@ const TRIGGER_OPTIONS = [
 ]
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       showRecordModal: false,
@@ -290,15 +283,6 @@ export default {
 
       uni.showToast({ title: '已记录', icon: 'success' })
       this.loadData()
-    },
-
-    goBack() {
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack()
-      } else {
-        uni.switchTab({ url: '/pages/index/index' })
-      }
     }
   }
 }

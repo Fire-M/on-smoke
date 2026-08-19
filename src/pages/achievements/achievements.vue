@@ -1,14 +1,8 @@
 <template>
   <view class="page-container">
+    <app-navbar title="成就勋章"></app-navbar>
     <!-- 顶部标题 -->
     <view class="ach-header">
-      <view class="ach-header-row">
-        <view class="ach-back-btn" @click="goBack">
-          <text class="ach-back-icon">‹</text>
-        </view>
-        <text class="ach-title">成就勋章</text>
-        <view class="ach-back-btn-placeholder"></view>
-      </view>
       <view class="ach-progress-bar">
         <view class="ach-progress-fill" :style="{ width: progressPercent + '%' }"></view>
       </view>
@@ -69,6 +63,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 
 const BADGES = [
   // 戒烟里程碑
@@ -118,6 +113,7 @@ const CATEGORIES = [
 ]
 
 export default {
+  components: { AppNavbar },
   data() {
     return {
       badges: [],
@@ -186,16 +182,6 @@ export default {
       const month = date.getMonth() + 1
       const day = date.getDate()
       return `${month}月${day}日`
-    },
-
-    goBack() {
-      // 尝试返回上一页，如果没有上一页则跳转到首页
-      const pages = getCurrentPages()
-      if (pages.length > 1) {
-        uni.navigateBack()
-      } else {
-        uni.switchTab({ url: '/pages/index/index' })
-      }
     }
   }
 }
