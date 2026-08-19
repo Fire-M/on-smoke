@@ -115,6 +115,10 @@
             <text class="feature-icon">❤️</text>
             <text class="feature-name">健康计算</text>
           </view>
+          <view class="feature-item" @click="goToTestSmoke">
+            <text class="feature-icon">💨</text>
+            <text class="feature-name">烟雾测试</text>
+          </view>
         </view>
       </view>
 
@@ -356,6 +360,10 @@ export default {
 
     goToHealthCalc() {
       uni.navigateTo({ url: '/pages/health-calc/health-calc' })
+    },
+
+    goToTestSmoke() {
+      uni.navigateTo({ url: '/pages/test-smoke-svg/test-smoke-svg' })
     },
 
     watchAdForQuota() {
