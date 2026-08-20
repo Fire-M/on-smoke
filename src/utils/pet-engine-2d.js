@@ -6,7 +6,7 @@
  */
 export function createPetCanvas2D() {
   let canvas = null, ctx = null, W = 0, H = 0
-  let scale = 1, baseY = 0, topCharY = 0, sx = 1, yaw = 0
+  let scale = 1, baseY = 0, topCharY = 0, sx = 1
   let animId = null, startTime = 0
   let raf = null
   let acc = { head: null, eyes: null, neck: null }
@@ -297,16 +297,12 @@ export function createPetCanvas2D() {
     const t = (now - startTime) / 1000
     ctx.clearRect(0, 0, W, H)
 
-    // 正面呼吸浮动 + 拖动旋转的横向缩放（yaw=0 为正面）
+    // 正面呼吸浮动（不可旋转）
     const bobY = Math.sin(t * 0.8) * (scale * 0.02)
-    const cy = Math.max(0.08, Math.abs(Math.cos(yaw)))
     ctx.save()
     ctx.translate(0, bobY)
-    ctx.translate(W / 2, 0)
-    ctx.scale(cy, 1)
-    ctx.translate(-W / 2, 0)
 
-    // 地面阴影（随转身收窄）
+    // 地面阴影
     ctx.fillStyle = 'rgba(0,0,0,0.18)'
     ctx.beginPath()
     ctx.ellipse(W / 2, baseY + scale * 0.02, sx * 0.5, scale * 0.08, 0, 0, Math.PI * 2)
@@ -334,8 +330,8 @@ export function createPetCanvas2D() {
     ctx = context
     W = w
     H = h
-    baseY = H * 0.90
-    topCharY = H * 0.22
+    baseY = H * 0.83
+    topCharY = H * 0.15
     scale = (baseY - topCharY) / 3.12
     sx = scale * 1.3
   }
@@ -349,9 +345,6 @@ export function createPetCanvas2D() {
   }
 
   function setMood(m) { /* 2D 复刻保持与 H5 一致的微笑表情 */ }
-
-  function setYaw(a) { yaw = a }
-  function getYaw() { return yaw }
 
   function start() {
     if (animId || !canvas || !ctx) return
@@ -374,5 +367,5 @@ export function createPetCanvas2D() {
     ctx = null
   }
 
-  return { attach, start, stop, destroy, updateAccessories, setMood, setYaw, getYaw }
+  return { attach, start, stop, destroy, updateAccessories, setMood }
 }

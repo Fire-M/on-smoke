@@ -6,8 +6,7 @@
   <!-- #endif -->
   <!-- #ifdef MP-WEIXIN -->
   <view class="pet-3d-wrap">
-    <canvas type="2d" id="pet-canvas" class="pet-2d-canvas"
-      @touchstart="onPetTouchStart" @touchmove="onPetTouchMove" @touchend="onPetTouchEnd" @touchcancel="onPetTouchEnd"></canvas>
+    <canvas type="2d" id="pet-canvas" class="pet-2d-canvas"></canvas>
   </view>
   <!-- #endif -->
 </template>
@@ -79,20 +78,6 @@ export default {
           this._engine2d.setMood(this.mood)
           this._engine2d.start()
         })
-    },
-    onPetTouchStart(e) {
-      const p = e.touches ? e.touches[0] : e
-      this._petTouchX = p.clientX
-      this._petYaw0 = this._engine2d ? this._engine2d.getYaw() : 0
-    },
-    onPetTouchMove(e) {
-      if (this._petTouchX == null || !this._engine2d) return
-      const p = e.touches ? e.touches[0] : e
-      const dx = p.clientX - this._petTouchX
-      this._engine2d.setYaw(this._petYaw0 + dx * 0.01)
-    },
-    onPetTouchEnd() {
-      this._petTouchX = null
     }
     // #endif
   },
