@@ -81,7 +81,7 @@
               <text class="text-sm text-gray-500 mt-4 block">{{ challengeTitle }}</text>
             </view>
             <text v-if="challengeCompleted" class="challenge-badge">✅ 已完成</text>
-            <text v-else class="challenge-streak" v-if="challengeStreak > 0">🔥 {{ challengeStreak }}天</text>
+            <text v-if="!challengeCompleted && challengeStreak > 0" class="challenge-streak">🔥 {{ challengeStreak }}天</text>
           </view>
           <view class="challenge-progress-bar" v-if="!challengeCompleted">
             <view class="challenge-progress-fill" :style="{ width: challengeProgress + '%' }"></view>
@@ -115,10 +115,6 @@
           <view class="feature-item" @click="goToHealthCalc">
             <text class="feature-icon">❤️</text>
             <text class="feature-name">健康计算</text>
-          </view>
-          <view class="feature-item" @click="goToTestSmoke">
-            <text class="feature-icon">💨</text>
-            <text class="feature-name">烟雾测试</text>
           </view>
         </view>
       </view>
@@ -363,10 +359,6 @@ export default {
 
     goToHealthCalc() {
       uni.navigateTo({ url: '/pages/health-calc/health-calc' })
-    },
-
-    goToTestSmoke() {
-      uni.navigateTo({ url: '/pages/test-smoke-svg/test-smoke-svg' })
     },
 
     watchAdForQuota() {

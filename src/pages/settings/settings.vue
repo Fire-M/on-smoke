@@ -65,6 +65,15 @@
         <!-- 保存按钮 -->
         <button class="save-btn" @click="saveSettings">保存设置</button>
 
+        <!-- 实验功能 -->
+        <view style="margin-top: 64rpx;">
+          <text class="section-title mb-16 block">实验功能</text>
+          <view class="setting-row" @click="goToTestSmoke">
+            <text class="text-sm text-gray-300">烟雾测试</text>
+            <text class="text-gray-600">›</text>
+          </view>
+        </view>
+
         <!-- 关于 -->
         <view class="about-section">
           <text class="text-xs text-gray-600 text-center block">就抽一根 v1.0</text>
@@ -134,6 +143,10 @@ export default {
     saveSettings() {
       Store.saveSettings(this.settings)
       uni.showToast({ title: '已保存', icon: 'success' })
+    },
+
+    goToTestSmoke() {
+      uni.navigateTo({ url: '/pages/test-smoke-svg/test-smoke-svg' })
     }
   }
 }
