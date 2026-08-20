@@ -312,6 +312,7 @@ export default {
 /* 勋章网格 */
 .badge-scroll {
   flex: 1;
+  height: 100%;
   padding: 0 28rpx;
 }
 
