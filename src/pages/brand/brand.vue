@@ -9,13 +9,17 @@
 
       <view class="brand-grid">
         <view v-for="(brand, index) in brands" :key="brand.id"
-          class="brand-card" :class="['theme-' + brand.theme, { 'has-skin': activeSkin && settings.selectedBrand === brand.id }]"
+          class="brand-card" :class="['theme-' + brand.theme, { 'has-skin': activeSkin && settings.selectedBrand === brand.id, 'selected': brand.id === settings.selectedBrand }]"
           :style="[brand.id === settings.selectedBrand && activeSkin ? { borderColor: activeSkin.color, boxShadow: `0 8rpx 24rpx rgba(0,0,0,0.4), 0 0 20rpx ${activeSkin.glow}` } : {}, { animationDelay: index * 0.06 + 's' }]"
           @click="selectBrand(brand)">
           <!-- 皮肤徽章 -->
           <view class="skin-badge" v-if="brand.id === settings.selectedBrand && activeSkin">
             <text class="skin-badge-emoji">{{ activeSkin.emoji }}</text>
             <text class="skin-badge-name">{{ activeSkin.name }}</text>
+          </view>
+          <!-- 已选标记 -->
+          <view class="selected-badge" v-if="brand.id === settings.selectedBrand">
+            <text class="selected-badge-text">✓ 已选</text>
           </view>
           <view class="brand-card-top">
             <text class="brand-price">¥{{ brand.price }}</text>
@@ -73,7 +77,7 @@ export default {
 
   onShow() {
     this.settings = Store.getSettings()
-    this.quota = this.settings.dailyQuota || 20
+    this.quota = this.settings.packSize || 20
     this.activeSkin = Store.getActiveSkin()
     
     // 重新加载品牌列表，包含剩余数量
@@ -102,7 +106,7 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -117,54 +121,6 @@ export default {
 
 .brand-header {
   padding: 40rpx 12rpx 28rpx;
-}
-
-.brand-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.brand-back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.brand-back-btn-placeholder {
-  width: 64rpx;
-  height: 64rpx;
-}
-
-.brand-back-btn:active {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(0.92);
-}
-
-.brand-back-icon {
-  font-size: 48rpx;
-  color: #f3f4f6;
-}
-
-.brand-header-title {
-  font-size: 44rpx;
-  font-weight: bold;
-  color: #f3f4f6;
-}
-
-.brand-header-badge {
-  font-size: 22rpx;
-  color: var(--primary);
-  background: rgba(245, 158, 11, 0.12);
-  padding: 4rpx 16rpx;
-  border-radius: 999rpx;
-  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 .brand-header-sub {
@@ -255,21 +211,6 @@ export default {
 
 .brand-card:active .brand-card-shine {
   transform: rotate(15deg) translate(10%, 10%);
-}
-
-/* 悬浮效果 */
-.brand-card:hover {
-  transform: perspective(1000px) translateY(-12rpx) rotateX(2deg);
-  box-shadow: 
-    0 16rpx 40rpx rgba(0, 0, 0, 0.5),
-    0 6rpx 16rpx rgba(0, 0, 0, 0.4),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.brand-card:hover .brand-card-shine {
-  transform: rotate(-5deg) translate(5%, 5%);
-  opacity: 1.5;
 }
 
 /* 皮肤徽章 */
@@ -396,8 +337,8 @@ export default {
 /* 剩余根数 */
 .brand-remaining {
   position: absolute;
-  top: 16rpx;
-  left: 16rpx;
+  top: 14rpx;
+  right: 80rpx;
   z-index: 10;
 }
 
@@ -405,6 +346,30 @@ export default {
   font-size: 24rpx;
   font-weight: bold;
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* 已选标记 */
+.selected-badge {
+  position: absolute;
+  bottom: 12rpx;
+  left: 12rpx;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  padding: 4rpx 14rpx;
+  background: var(--primary);
+  border-radius: 999rpx;
+}
+
+.selected-badge-text {
+  font-size: 18rpx;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.brand-card.selected {
+  border-color: var(--primary);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 18rpx rgba(245, 158, 11, 0.35);
 }
 
 /* 卡片入场动画 */

@@ -179,10 +179,10 @@ export function getBrandSmokedCount(brandId) {
   return today.brandCounts[brandId]
 }
 
-// 获取某品牌今日剩余数量
+// 获取某品牌今日剩余数量（按一包支数计算）
 export function getBrandRemaining(brandId) {
   const settings = getSettings()
-  const quota = settings.dailyQuota || 20
+  const quota = settings.packSize || 20
   const smoked = getBrandSmokedCount(brandId)
   return Math.max(0, quota - smoked)
 }

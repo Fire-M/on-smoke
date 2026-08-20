@@ -100,12 +100,12 @@ import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
 const BRANDS = {
-  lanhe: { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', theme: 'blue', packSize: 10 },
-  hongta: { id: 'hongta', cn: '太华', en: 'TA·HWA', theme: 'red', packSize: 10 },
-  heiye: { id: 'heiye', cn: '熊猫666', en: 'PANDA', theme: 'black', packSize: 10 },
-  jinsi: { id: 'jinsi', cn: '羊驼', en: 'LLAMA', theme: 'gold', packSize: 10 },
-  qingyun: { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', theme: 'lightblue', packSize: 10 },
-  zimeng: { id: 'zimeng', cn: '紫云', en: 'PURPLE', theme: 'purple', packSize: 10 }
+  lanhe: { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', theme: 'blue', packSize: 20 },
+  hongta: { id: 'hongta', cn: '太华', en: 'TA·HWA', theme: 'red', packSize: 20 },
+  heiye: { id: 'heiye', cn: '熊猫666', en: 'PANDA', theme: 'black', packSize: 20 },
+  jinsi: { id: 'jinsi', cn: '羊驼', en: 'LLAMA', theme: 'gold', packSize: 20 },
+  qingyun: { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', theme: 'lightblue', packSize: 20 },
+  zimeng: { id: 'zimeng', cn: '紫云', en: 'PURPLE', theme: 'purple', packSize: 20 }
 }
 
 export default {
@@ -123,7 +123,7 @@ export default {
       dragStartRotY: 0,
       dragStartRotX: 0,
       dragMoved: false,
-      boxRemainingCigs: 10,
+      boxRemainingCigs: 20,
       isPulling: false,
       faceCount: 48
     }
