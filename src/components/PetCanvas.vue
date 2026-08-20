@@ -6,10 +6,8 @@
   <!-- #endif -->
   <!-- #ifdef MP-WEIXIN -->
   <view class="pet-3d-wrap">
-    <view class="pet-fallback">
-      <text class="pet-fallback-emoji">🚬</text>
-      <text class="pet-fallback-text">香烟小伙伴</text>
-    </view>
+    <canvas type="2d" id="pet-canvas" class="pet-2d-canvas"
+      @touchstart="onPetTouchStart" @touchmove="onPetTouchMove" @touchend="onPetTouchEnd" @touchcancel="onPetTouchEnd"></canvas>
   </view>
   <!-- #endif -->
 </template>
@@ -17,6 +15,9 @@
 <script>
 // #ifdef H5
 import { createPetEngine } from '@/utils/pet-engine.js'
+// #endif
+// #ifdef MP-WEIXIN
+import { createPetCanvas2D } from '@/utils/pet-engine-2d.js'
 // #endif
 
 export default {
@@ -36,6 +37,11 @@ export default {
       }, 300)
     })
     // #endif
+    // #ifdef MP-WEIXIN
+    this.$nextTick(() => {
+      this.initTimer = setTimeout(() => { this.initMpCanvas() }, 200)
+    })
+    // #endif
   },
   created() {
     // #ifdef H5
@@ -47,6 +53,48 @@ export default {
     if (this.initTimer) { clearTimeout(this.initTimer); this.initTimer = null }
     if (this._engine) { this._engine.destroy(); this._engine = null }
     // #endif
+    // #ifdef MP-WEIXIN
+    if (this.initTimer) { clearTimeout(this.initTimer); this.initTimer = null }
+    if (this._engine2d) { this._engine2d.destroy(); this._engine2d = null }
+    // #endif
+  },
+  methods: {
+    // #ifdef MP-WEIXIN
+    initMpCanvas() {
+      uni.createSelectorQuery().in(this).select('#pet-canvas').fields({ node: true, size: true })
+        .exec((res) => {
+          if (!res || !res[0] || !res[0].node) return
+          const canvas = res[0].node
+          const ctx = canvas.getContext('2d')
+          let dpr = 2
+          try {
+            dpr = Math.min((uni.getWindowInfo ? uni.getWindowInfo().pixelRatio : uni.getSystemInfoSync().pixelRatio) || 1, 2)
+          } catch (e) {}
+          canvas.width = res[0].width * dpr
+          canvas.height = res[0].height * dpr
+          ctx.scale(dpr, dpr)
+          this._engine2d = createPetCanvas2D()
+          this._engine2d.attach(canvas, ctx, res[0].width, res[0].height)
+          this._engine2d.updateAccessories(this.accessories || {})
+          this._engine2d.setMood(this.mood)
+          this._engine2d.start()
+        })
+    },
+    onPetTouchStart(e) {
+      const p = e.touches ? e.touches[0] : e
+      this._petTouchX = p.clientX
+      this._petYaw0 = this._engine2d ? this._engine2d.getYaw() : 0
+    },
+    onPetTouchMove(e) {
+      if (this._petTouchX == null || !this._engine2d) return
+      const p = e.touches ? e.touches[0] : e
+      const dx = p.clientX - this._petTouchX
+      this._engine2d.setYaw(this._petYaw0 + dx * 0.01)
+    },
+    onPetTouchEnd() {
+      this._petTouchX = null
+    }
+    // #endif
   },
   watch: {
     accessories: {
@@ -54,9 +102,17 @@ export default {
         // #ifdef H5
         if (this._engine) this._engine.updateAccessories(val)
         // #endif
+        // #ifdef MP-WEIXIN
+        if (this._engine2d) this._engine2d.updateAccessories(val)
+        // #endif
       },
       deep: true
+    },
+    // #ifdef MP-WEIXIN
+    mood(val) {
+      if (this._engine2d) this._engine2d.setMood(val)
     }
+    // #endif
   }
 }
 </script>
@@ -76,6 +132,11 @@ export default {
 .pet-3d-container canvas {
   display: block;
   margin: 0 auto;
+}
+.pet-2d-canvas {
+  width: 100%;
+  height: 540px;
+  display: block;
 }
 .pet-fallback {
   display: flex;
