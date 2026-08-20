@@ -120,7 +120,7 @@ export default {
 }
 .pet-2d-canvas {
   width: 100%;
-  height: 540px;
+  height: 320px;
   display: block;
 }
 .pet-fallback {

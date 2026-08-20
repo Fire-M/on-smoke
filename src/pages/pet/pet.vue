@@ -1,11 +1,9 @@
 <template>
   <view class="page-container" :class="themeClass()">
     <app-navbar title="我的宠物"></app-navbar>
-    <scroll-view scroll-y class="main-scroll">
+    <view class="main-scroll">
       <view class="pet-card mx-20 mb-16">
-        <!-- Canvas 宠物 -->
-        <pet-canvas :accessories="equippedAccessories" :mood="petMood"></pet-canvas>
-        
+        <pet-canvas :accessories="equippedAccessories" :mood="petMood" @tap="petThePet"></pet-canvas>
         <text class="pet-name">{{ pet.name }}</text>
         <text class="pet-level">Lv.{{ pet.level }}</text>
         <view class="stat-row">
@@ -47,7 +45,7 @@
       </view>
       
       <view style="height: 80rpx;"></view>
-    </scroll-view>
+    </view>
     
     <!-- 装扮面板 -->
     <view class="custom-mask" :class="{ show: showAccessoryPanel }" v-if="showAccessoryPanel" @click="showAccessoryPanel = false">
@@ -113,20 +111,21 @@ import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { PetCanvas, AppNavbar },
-  data() { 
-    return { 
-      pet: { name: '小烟', health: 100, happiness: 100, level: 1, exp: 0 },
-      showAccessoryPanel: false,
-      accessoryTab: 'head',
-      accessoryList: [],
-      equippedAccessories: {},
-      showAdModal: false,
-      adModalTarget: null,
-      adModalIcon: '',
-      adModalTitle: '',
-      adModalName: ''
-    } 
-  },
+    data() { 
+      return { 
+        pet: { name: '小烟', health: 100, happiness: 100, level: 1, exp: 0 },
+        _prevLevel: null,
+        showAccessoryPanel: false,
+        accessoryTab: 'head',
+        accessoryList: [],
+        equippedAccessories: {},
+        showAdModal: false,
+        adModalTarget: null,
+        adModalIcon: '',
+        adModalTitle: '',
+        adModalName: ''
+      } 
+    },
   computed: { 
     expPercent() { return (this.pet.exp / (this.pet.level * 100)) * 100 },
     petMood() {
@@ -139,7 +138,12 @@ export default {
     }
   },
   onShow() { 
+    Store.recoverPetDaily()
     this.pet = Store.getPet()
+    if (this._prevLevel != null && this.pet.level > this._prevLevel) {
+      uni.showToast({ title: '🎉 宠物升到 Lv.' + this.pet.level + '，解锁新装扮！', icon: 'none' })
+    }
+    this._prevLevel = this.pet.level
     this.accessoryList = Store.getPetAccessoryList()
     this.equippedAccessories = Store.getEquippedAccessories()
   },
@@ -151,6 +155,11 @@ export default {
           uni.showToast({ title: '🎉 宠物获得加速！', icon: 'none' })
         }
       })
+    },
+    petThePet() {
+      this.pet = Store.petPet()
+      this.equippedAccessories = Store.getEquippedAccessories()
+      uni.showToast({ title: '摸摸小伙伴～', icon: 'none' })
     },
     onAccessoryTap(item) {
       if (!item.unlocked) {
@@ -194,17 +203,18 @@ export default {
 </script>
 
 <style>
-.page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+.page-container { min-height: 100vh; width: 100%; background-color: var(--bg); color: var(--text); }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
 .back-icon { font-size: 48rpx; color: #f3f4f6; }
 .page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
-.main-scroll { flex: 1; height: 100%; }
+.pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
+.main-scroll { flex: 1; height: 100%; padding-bottom: 40rpx; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.pet-card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; padding: 40rpx; text-align: center; }
+.pet-card { padding: 40rpx; text-align: center; }
 .pet-name { font-size: 40rpx; font-weight: bold; color: #f3f4f6; display: block; margin-bottom: 8rpx; }
 .pet-level { font-size: 28rpx; color: var(--primary); display: block; margin-bottom: 32rpx; }
 .stat-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }

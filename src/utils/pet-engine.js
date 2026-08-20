@@ -12,6 +12,9 @@ export function createPetEngine() {
   let clock = null
   let blinkTimer = 0
   let isBlinking = false
+  let mood = 'normal'
+  let mouthMeshes = null
+  let blushMeshes = []
 
   // ===== 构建香烟小人 =====
   let cherryMesh = null  // 燃烧端
@@ -84,17 +87,41 @@ export function createPetEngine() {
     rBlush.scale.set(1.2, 0.7, 0.5)
     rBlush.position.set(0.22, -0.1, 0.25)
     headGroup.add(rBlush)
+    blushMeshes = [lBlush, rBlush]
+    blushMeshes.forEach(b => { b.visible = mood !== 'sad' })
 
-    // 微笑嘴巴
-    const smileCurve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.08, -0.14, 0.30),
-      new THREE.Vector3(0, -0.2, 0.33),
-      new THREE.Vector3(0.08, -0.14, 0.30)
-    )
-    headGroup.add(new THREE.Mesh(
-      new THREE.TubeGeometry(smileCurve, 10, 0.01, 6, false),
-      new THREE.MeshBasicMaterial({ color: 0x5B4335 })
-    ))
+    // 嘴巴（随心情切换：开心/普通/难过）
+    const makeMouth = (type) => {
+      let curve
+      if (type === 'sad') {
+        curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-0.08, -0.14, 0.30),
+          new THREE.Vector3(0, -0.08, 0.33),
+          new THREE.Vector3(0.08, -0.14, 0.30)
+        )
+      } else {
+        const d = type === 'happy' ? -0.22 : -0.17
+        curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(-0.08, -0.14, 0.30),
+          new THREE.Vector3(0, d, 0.33),
+          new THREE.Vector3(0.08, -0.14, 0.30)
+        )
+      }
+      const mesh = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 10, 0.01, 6, false),
+        new THREE.MeshBasicMaterial({ color: 0x5B4335 })
+      )
+      return mesh
+    }
+    mouthMeshes = {
+      happy: makeMouth('happy'),
+      normal: makeMouth('normal'),
+      sad: makeMouth('sad')
+    }
+    mouthMeshes.happy.visible = mood === 'happy'
+    mouthMeshes.normal.visible = mood === 'normal'
+    mouthMeshes.sad.visible = mood === 'sad'
+    headGroup.add(mouthMeshes.happy, mouthMeshes.normal, mouthMeshes.sad)
 
     // ---- 小手臂 ----
     const armMat = skinMat
@@ -381,6 +408,16 @@ export function createPetEngine() {
       if (data.head) attachHead(data.head)
       if (data.eyes) attachEyes(data.eyes)
       if (data.neck) attachNeck(data.neck)
+    },
+
+    setMood(m) {
+      mood = m || 'normal'
+      if (mouthMeshes) {
+        mouthMeshes.happy.visible = mood === 'happy'
+        mouthMeshes.normal.visible = mood === 'normal'
+        mouthMeshes.sad.visible = mood === 'sad'
+      }
+      blushMeshes.forEach(b => { b.visible = mood !== 'sad' })
     }
   }
 }

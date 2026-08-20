@@ -167,6 +167,9 @@ export function recordSmoke(duration, brandId = null) {
   const pricePerCig = settings.cigarettePrice / settings.packSize
   stats.totalSaved = (stats.totalSaved || 0) + pricePerCig
   saveStats(stats)
+
+  // 抽烟会伤害宠物伙伴
+  harmPet(-8, -6)
 }
 
 // 获取某品牌今日吸烟次数
@@ -470,6 +473,8 @@ export function addTimeCapsule(capsule) {
 }
 
 // ---- 虚拟宠物 ----
+const clamp100 = (v) => Math.max(0, Math.min(100, v))
+
 export function getPet() {
   return _read(KEYS.pet, {
     name: '小烟',
@@ -485,15 +490,57 @@ export function savePet(pet) {
   _write(KEYS.pet, pet)
 }
 
+// 增加经验并按需连升多级，返回升级次数
+function addExp(pet, amount) {
+  let levels = 0
+  pet.exp += amount
+  while (pet.exp >= pet.level * 100) {
+    pet.exp -= pet.level * 100
+    pet.level++
+    levels++
+  }
+  return levels
+}
+
+// 抽烟伤害宠物（不掉经验）：把「伤害自己」具象成「伤害伙伴」
+export function harmPet(healthD, happyD) {
+  const pet = getPet()
+  pet.health = clamp100(pet.health + healthD)
+  pet.happiness = clamp100(pet.happiness + happyD)
+  savePet(pet)
+  return pet
+}
+
+// 互动：摸摸宠物，回点血/快乐 + 少量经验
+export function petPet() {
+  const pet = getPet()
+  pet.happiness = clamp100(pet.happiness + 4)
+  pet.health = clamp100(pet.health + 2)
+  addExp(pet, 5)
+  savePet(pet)
+  return pet
+}
+
+// 每日恢复：今天没抽烟则缓慢回血回快乐并获取经验（戒烟的正反馈）
+export function recoverPetDaily() {
+  const pet = getPet()
+  const today = getToday()
+  if (today.smokedCount === 0) {
+    pet.health = clamp100(pet.health + 4)
+    pet.happiness = clamp100(pet.happiness + 4)
+    addExp(pet, 12)
+    pet.lastFed = Date.now()
+    savePet(pet)
+  }
+  return pet
+}
+
+// 兼容旧调用：正向经验与升级
 export function updatePetHealth(delta) {
   const pet = getPet()
-  pet.health = Math.max(0, Math.min(100, pet.health + delta))
-  pet.happiness = Math.max(0, Math.min(100, pet.happiness + delta))
-  pet.exp += 10
-  if (pet.exp >= pet.level * 100) {
-    pet.level++
-    pet.exp = 0
-  }
+  pet.health = clamp100(pet.health + delta)
+  pet.happiness = clamp100(pet.happiness + delta)
+  addExp(pet, 10)
   savePet(pet)
   return pet
 }
@@ -630,12 +677,8 @@ export function getStickerList() {
 // ---- 广告奖励：宠物加速 ----
 export function petAccelerate() {
   const pet = getPet()
-  pet.exp += 50  // 额外 +50 经验
+  addExp(pet, 50)  // 额外 +50 经验
   pet.happiness = Math.min(100, pet.happiness + 10)
-  if (pet.exp >= pet.level * 100) {
-    pet.level++
-    pet.exp = pet.exp - (pet.level - 1) * 100
-  }
   savePet(pet)
   return pet
 }
@@ -790,21 +833,21 @@ export function setTheme(id) {
 // ---- 宠物装扮系统 ----
 const PET_ACCESSORY_LIST = [
   // 头部装扮
-  { id: 'crown', name: '皇冠', slot: 'head', type: 'crown', rarity: 'legendary', icon: '👑' },
-  { id: 'top-hat', name: '礼帽', slot: 'head', type: 'tophat', rarity: 'epic', icon: '🎩' },
-  { id: 'bow', name: '蝴蝶结', slot: 'head', type: 'bow', rarity: 'rare', icon: '🎀' },
+  { id: 'crown', name: '皇冠', slot: 'head', type: 'crown', rarity: 'legendary', icon: '👑', unlockLevel: 4 },
+  { id: 'top-hat', name: '礼帽', slot: 'head', type: 'tophat', rarity: 'epic', icon: '🎩', unlockLevel: 6 },
+  { id: 'bow', name: '蝴蝶结', slot: 'head', type: 'bow', rarity: 'rare', icon: '🎀', unlockLevel: 3 },
   { id: 'flower', name: '花朵', slot: 'head', type: 'flower', rarity: 'common', icon: '🌸' },
   
   // 眼睛装扮
   { id: 'glasses', name: '眼镜', slot: 'eyes', type: 'glasses', rarity: 'common', icon: '👓' },
-  { id: 'sunglasses', name: '墨镜', slot: 'eyes', type: 'sunglasses', rarity: 'rare', icon: '🕶️' },
-  { id: 'monocle', name: '单片眼镜', slot: 'eyes', type: 'monocle', rarity: 'epic', icon: '🧐' },
+  { id: 'sunglasses', name: '墨镜', slot: 'eyes', type: 'sunglasses', rarity: 'rare', icon: '🕶️', unlockLevel: 2 },
+  { id: 'monocle', name: '单片眼镜', slot: 'eyes', type: 'monocle', rarity: 'epic', icon: '🧐', unlockLevel: 5 },
   
   // 颈部装扮
   { id: 'bowtie', name: '领结', slot: 'neck', type: 'bowtie', rarity: 'common', icon: '🎀' },
-  { id: 'necklace', name: '项链', slot: 'neck', type: 'necklace', rarity: 'rare', icon: '📿' },
-  { id: 'scarf', name: '围巾', slot: 'neck', type: 'scarf', rarity: 'epic', icon: '🧣' },
-  { id: 'collar', name: '项圈', slot: 'neck', type: 'collar', rarity: 'common', icon: '⭕' }
+  { id: 'necklace', name: '项链', slot: 'neck', type: 'necklace', rarity: 'rare', icon: '📿', unlockLevel: 7 },
+  { id: 'scarf', name: '围巾', slot: 'neck', type: 'scarf', rarity: 'epic', icon: '🧣', unlockLevel: 8 },
+  { id: 'collar', name: '项圈', slot: 'neck', type: 'collar', rarity: 'common', icon: '⭕', unlockLevel: 9 }
 ]
 
 export function getPetAccessories() {
@@ -817,9 +860,10 @@ export function savePetAccessories(data) {
 
 export function getPetAccessoryList() {
   const data = getPetAccessories()
+  const pet = getPet()
   return PET_ACCESSORY_LIST.map(item => ({
     ...item,
-    unlocked: data.unlocked.includes(item.id),
+    unlocked: data.unlocked.includes(item.id) || (item.unlockLevel && pet.level >= item.unlockLevel),
     equipped: data.equipped[item.slot] === item.id
   }))
 }
@@ -882,7 +926,7 @@ export default {
   getMoods, addMood, getMoodStats,
   getSavingsGoals, addSavingsGoal, updateSavingsGoal,
   getTimeCapsules, addTimeCapsule,
-  getPet, savePet, updatePetHealth,
+  getPet, savePet, updatePetHealth, harmPet, recoverPetDaily, petPet,
   getAdRewards, getExtraQuota, addExtraQuota, getEffectiveQuota,
   unlockRandomSticker, unlockSticker, selectSticker, getStickerList, getActiveSticker, getActiveSkin,
   petAccelerate,

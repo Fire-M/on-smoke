@@ -1,10 +1,13 @@
 <script>
+import Store from '@/utils/store.js'
+
 export default {
   onLaunch() {
     console.log('App Launch')
   },
   onShow() {
-    console.log('App Show')
+    // 回到前台时让宠物每日恢复（无烟日回血回快乐+经验）
+    try { Store.recoverPetDaily() } catch (e) {}
   },
   onHide() {
     console.log('App Hide')

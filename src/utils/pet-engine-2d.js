@@ -6,7 +6,7 @@
  */
 export function createPetCanvas2D() {
   let canvas = null, ctx = null, W = 0, H = 0
-  let scale = 1, baseY = 0, topCharY = 0, sx = 1
+  let scale = 1, baseY = 0, topCharY = 0, sx = 1, mood = 'normal'
   let animId = null, startTime = 0
   let raf = null
   let acc = { head: null, eyes: null, neck: null }
@@ -141,19 +141,31 @@ export function createPetCanvas2D() {
     const bob = Math.sin(t * 0.9) * scale * 0.02
     const lx = PX(-0.14), rx = PX(0.14)
     const eyY = PY(2.2) + bob
-    ctx.fillStyle = 'rgba(255,182,193,0.45)'
-    ellipseFill(PX(-0.22), PY(2.1) + bob, scale * 0.05, scale * 0.035)
-    ellipseFill(PX(0.22), PY(2.1) + bob, scale * 0.05, scale * 0.035)
+    if (mood !== 'sad') {
+      ctx.fillStyle = 'rgba(255,182,193,0.45)'
+      ellipseFill(PX(-0.22), PY(2.1) + bob, scale * 0.05, scale * 0.035)
+      ellipseFill(PX(0.22), PY(2.1) + bob, scale * 0.05, scale * 0.035)
+    }
     const blinking = (t % 4) > 3.6
     drawEye(lx, eyY, blinking)
     drawEye(rx, eyY, blinking)
+    // 嘴部表情随心情变化
     ctx.strokeStyle = '#5B4335'
     ctx.lineWidth = scale * 0.025
     ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(lx + scale * 0.04, eyY + scale * 0.10)
-    ctx.quadraticCurveTo(PX(0), eyY + scale * 0.16, rx - scale * 0.04, eyY + scale * 0.10)
-    ctx.stroke()
+    const mY = eyY + scale * 0.12
+    if (mood === 'sad') {
+      ctx.beginPath()
+      ctx.moveTo(lx + scale * 0.05, mY)
+      ctx.quadraticCurveTo(PX(0), mY - scale * 0.06, rx - scale * 0.05, mY)
+      ctx.stroke()
+    } else {
+      const depth = mood === 'happy' ? scale * 0.18 : scale * 0.13
+      ctx.beginPath()
+      ctx.moveTo(lx + scale * 0.04, mY)
+      ctx.quadraticCurveTo(PX(0), mY + depth, rx - scale * 0.04, mY)
+      ctx.stroke()
+    }
   }
 
   function drawCherry(t) {
@@ -344,7 +356,7 @@ export function createPetCanvas2D() {
     }
   }
 
-  function setMood(m) { /* 2D 复刻保持与 H5 一致的微笑表情 */ }
+  function setMood(m) { mood = m || 'normal' }
 
   function start() {
     if (animId || !canvas || !ctx) return
