@@ -19,7 +19,8 @@ const KEYS = {
   stickers: 'os_stickers',
     petAccessories: 'os_pet_accessories',
   backgrounds: 'os_backgrounds',
-  smokeStyles: 'os_smoke_styles'
+  smokeStyles: 'os_smoke_styles',
+  theme: 'os_theme'
 }
 
 // 默认设置
@@ -777,6 +778,15 @@ export function getSelectedSmokeStyle() {
 }
 
 
+// ---- 主题 ----
+export function getTheme() {
+  return _read(KEYS.theme, 'amber')
+}
+
+export function setTheme(id) {
+  _write(KEYS.theme, id)
+}
+
 // ---- 宠物装扮系统 ----
 const PET_ACCESSORY_LIST = [
   // 头部装扮
@@ -880,5 +890,6 @@ export default {
   unlockRandomBackground, unlockBackground, selectBackground, getAllBackgrounds,
   getSmokeStyles, saveSmokeStyles, unlockSmokeStyle, selectSmokeStyle, getSmokeStyleList, getSelectedSmokeStyle,
   getPetAccessories, savePetAccessories, getPetAccessoryList, unlockPetAccessory, equipPetAccessory, unequipPetAccessory, getEquippedAccessories,
+  getTheme, setTheme,
   resetAll
 }

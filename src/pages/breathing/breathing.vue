@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="呼吸引导" :custom-back="true" @back="goBack"></app-navbar>
 
     <view class="main-content">
@@ -46,6 +46,7 @@
 
 <script>
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { AppNavbar },
@@ -124,8 +125,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -245,7 +246,7 @@ export default {
 }
 
 .stop-btn {
-  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  background: linear-gradient(135deg, #ef4444 0%, var(--primary-2) 100%);
 }
 
 .start-btn:active, .stop-btn:active {
@@ -253,8 +254,8 @@ export default {
 }
 
 .info-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
   width: calc(100% - 80rpx);
@@ -296,12 +297,12 @@ export default {
 
 .step-text {
   font-size: 24rpx;
-  color: #d1d5db;
+  color: var(--text);
 }
 
 .info-desc {
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   line-height: 1.6;
 }
 

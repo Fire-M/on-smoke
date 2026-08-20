@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="选择香烟"></app-navbar>
     <!-- 品牌网格 -->
     <scroll-view scroll-y class="brand-scroll">
@@ -49,6 +49,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const BRANDS = [
   { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
@@ -102,8 +103,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -159,7 +160,7 @@ export default {
 
 .brand-header-badge {
   font-size: 22rpx;
-  color: #f59e0b;
+  color: var(--primary);
   background: rgba(245, 158, 11, 0.12);
   padding: 4rpx 16rpx;
   border-radius: 999rpx;
@@ -169,7 +170,7 @@ export default {
 .brand-header-sub {
   display: block;
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-top: 8rpx;
 }
 
@@ -299,7 +300,7 @@ export default {
 /* 卡片主题渐变 */
 .brand-card.theme-blue   { background: linear-gradient(155deg, #1e3a5f 0%, #0d2240 100%); }
 .brand-card.theme-red    { background: linear-gradient(155deg, #7a1f2b 0%, #4a0f18 100%); }
-.brand-card.theme-black  { background: linear-gradient(155deg, #2a2a2a 0%, #141414 100%); }
+.brand-card.theme-black  { background: linear-gradient(155deg, var(--border) 0%, #141414 100%); }
 .brand-card.theme-gold   { background: linear-gradient(155deg, #8b6914 0%, #5a4510 100%); }
 .brand-card.theme-lightblue { background: linear-gradient(155deg, #2d5a6e 0%, #1a3d4f 100%); }
 .brand-card.theme-purple { background: linear-gradient(155deg, #4a2d6e 0%, #2d1a45 100%); }
@@ -433,6 +434,6 @@ export default {
 
 .disclaimer-text {
   font-size: 22rpx;
-  color: #374151;
+  color: var(--border);
 }
 </style>

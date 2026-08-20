@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="身体恢复"></app-navbar>
     <!-- 顶部标题 -->
     <view class="recovery-header">
@@ -61,6 +61,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const MILESTONES_DATA = [
   { seconds: 1200, label: '20分钟', title: '心率恢复正常', desc: '你的心跳和血压开始恢复到正常水平，手脚温度回升' },
@@ -171,8 +172,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -230,19 +231,19 @@ export default {
 
 .recovery-days {
   font-size: 28rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 
 .recovery-time {
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 /* 当前进度卡片 */
 .current-progress-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
@@ -261,20 +262,20 @@ export default {
 
 .progress-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .progress-title {
   font-size: 36rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
   display: block;
   margin-bottom: 12rpx;
 }
 
 .progress-desc {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   display: block;
   margin-bottom: 24rpx;
   line-height: 1.5;
@@ -294,7 +295,7 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%);
   border-radius: 12rpx;
   transition: width 0.5s ease;
 }
@@ -307,13 +308,13 @@ export default {
 
 .progress-current {
   font-size: 24rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 
 .progress-next {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 /* 时间线 */
@@ -354,27 +355,27 @@ export default {
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background: #1f1f1f;
-  border: 2rpx solid #6b7280;
+  background: var(--surface-1);
+  border: 2rpx solid var(--text-dim);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   z-index: 1;
 }
 
 .timeline-item.achieved .timeline-dot {
   background: #10b981;
   border-color: #10b981;
-  color: #0f0f0f;
+  color: var(--bg);
   box-shadow: 0 0 12rpx rgba(16, 185, 129, 0.4);
 }
 
 .timeline-item.current .timeline-dot {
-  background: #f59e0b;
-  border-color: #f59e0b;
-  color: #0f0f0f;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--bg);
   box-shadow: 0 0 16rpx rgba(245, 158, 11, 0.5);
   animation: dotPulse 2s ease-in-out infinite;
 }
@@ -412,7 +413,7 @@ export default {
 
 .timeline-time {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   font-weight: 600;
 }
 
@@ -421,7 +422,7 @@ export default {
 }
 
 .timeline-item.current .timeline-time {
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .timeline-badge {
@@ -429,7 +430,7 @@ export default {
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
   background: rgba(107, 114, 128, 0.2);
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .timeline-badge.achieved {
@@ -439,7 +440,7 @@ export default {
 
 .timeline-badge.current {
   background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .timeline-title {
@@ -452,7 +453,7 @@ export default {
 
 .timeline-desc {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   display: block;
   line-height: 1.5;
 }
@@ -464,7 +465,7 @@ export default {
 
 .footer-text {
   font-size: 26rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 /* 工具类 */

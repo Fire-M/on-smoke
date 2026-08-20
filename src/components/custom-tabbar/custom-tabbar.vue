@@ -1,5 +1,5 @@
 <template>
-  <view class="custom-tabbar">
+  <view class="custom-tabbar" :class="themeClass()">
     <view class="tabbar-inner">
       <view
         v-for="(item, index) in tabList"
@@ -19,6 +19,8 @@
 </template>
 
 <script>
+import { themeClass } from '@/utils/theme.js'
+
 export default {
   name: 'CustomTabbar',
   props: {
@@ -119,7 +121,7 @@ export default {
 }
 
 .tabbar-item.active .tab-text {
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 500;
 }
 
@@ -131,6 +133,6 @@ export default {
   width: 32rpx;
   height: 4rpx;
   border-radius: 4rpx;
-  background: #f59e0b;
+  background: var(--primary);
 }
 </style>

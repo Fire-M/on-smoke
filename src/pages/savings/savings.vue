@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="省钱目标"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="mx-20 mb-16">
@@ -21,6 +21,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 export default {
   components: { AppNavbar },
   data() {
@@ -36,7 +37,7 @@ export default {
 </script>
 
 <style>
-.page-container { height: 100vh; width: 100vw; background-color: #0f0f0f; color: #e5e7eb; display: flex; flex-direction: column; }
+.page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
@@ -44,14 +45,14 @@ export default {
 .back-icon { font-size: 48rpx; color: #f3f4f6; }
 .page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
 .main-scroll { flex: 1; height: 100%; }
-.card { background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%); border: 1px solid #2a2a2a; border-radius: 32rpx; }
+.card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; }
 .p-20 { padding: 40rpx; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.card-title { font-size: 28rpx; color: #6b7280; display: block; margin-bottom: 16rpx; }
+.card-title { font-size: 28rpx; color: var(--text-dim); display: block; margin-bottom: 16rpx; }
 .saved-amount { font-size: 72rpx; font-weight: bold; color: #10b981; display: block; margin-bottom: 24rpx; }
 .progress-bar { height: 16rpx; background: rgba(255, 255, 255, 0.06); border-radius: 12rpx; overflow: hidden; margin-bottom: 12rpx; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%); border-radius: 12rpx; transition: width 0.3s ease; }
-.progress-text { font-size: 24rpx; color: #6b7280; }
+.progress-text { font-size: 24rpx; color: var(--text-dim); }
 .set-goal-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 32rpx; font-weight: 600; border: none; }
 </style>

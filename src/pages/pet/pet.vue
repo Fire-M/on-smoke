@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="我的宠物"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="pet-card mx-20 mb-16">
@@ -109,6 +109,7 @@ import Store from '@/utils/store.js'
 import { showRewardedAd } from '@/utils/ad-manager.js'
 import PetCanvas from '@/components/PetCanvas.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { PetCanvas, AppNavbar },
@@ -193,7 +194,7 @@ export default {
 </script>
 
 <style>
-.page-container { height: 100vh; width: 100vw; background-color: #0f0f0f; color: #e5e7eb; display: flex; flex-direction: column; }
+.page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
@@ -203,18 +204,18 @@ export default {
 .main-scroll { flex: 1; height: 100%; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.pet-card { background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%); border: 1px solid #2a2a2a; border-radius: 32rpx; padding: 40rpx; text-align: center; }
+.pet-card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; padding: 40rpx; text-align: center; }
 .pet-name { font-size: 40rpx; font-weight: bold; color: #f3f4f6; display: block; margin-bottom: 8rpx; }
-.pet-level { font-size: 28rpx; color: #f59e0b; display: block; margin-bottom: 32rpx; }
+.pet-level { font-size: 28rpx; color: var(--primary); display: block; margin-bottom: 32rpx; }
 .stat-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
-.stat-label { font-size: 24rpx; color: #9ca3af; width: 60rpx; }
+.stat-label { font-size: 24rpx; color: var(--text-dim); width: 60rpx; }
 .stat-bar { flex: 1; height: 16rpx; background: rgba(255, 255, 255, 0.06); border-radius: 12rpx; overflow: hidden; }
 .stat-fill { height: 100%; border-radius: 12rpx; transition: width 0.3s ease; }
 .stat-fill.health { background: linear-gradient(90deg, #10b981 0%, #059669 100%); }
-.stat-fill.happy { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+.stat-fill.happy { background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%); }
 .stat-fill.exp { background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); }
-.stat-value { font-size: 22rpx; color: #6b7280; width: 100rpx; text-align: right; }
-.tip { font-size: 24rpx; color: #6b7280; text-align: center; display: block; }
+.stat-value { font-size: 22rpx; color: var(--text-dim); width: 100rpx; text-align: right; }
+.tip { font-size: 24rpx; color: var(--text-dim); text-align: center; display: block; }
 
 /* 装扮按钮 */
 .dress-btn {
@@ -236,7 +237,7 @@ export default {
 }
 .dress-btn-text {
   font-size: 28rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -269,7 +270,7 @@ export default {
 .ad-action-desc {
   display: block;
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-top: 4rpx;
 }
 
@@ -307,7 +308,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--border);
 }
 .custom-title {
   font-size: 32rpx;
@@ -323,13 +324,13 @@ export default {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 50%;
   font-size: 32rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 .custom-tabs {
   display: flex;
   padding: 16rpx 32rpx;
   gap: 16rpx;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--border);
 }
 .custom-tab {
   flex: 1;
@@ -338,11 +339,11 @@ export default {
   border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.04);
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 .custom-tab.active {
   background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  color: var(--primary);
 }
 .custom-body {
   flex: 1;
@@ -355,15 +356,15 @@ export default {
   gap: 16rpx;
 }
 .custom-item {
-  background: #252525;
-  border: 1px solid #2a2a2a;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 16rpx;
   padding: 20rpx;
   text-align: center;
   position: relative;
 }
 .custom-item.selected {
-  border-color: #f59e0b;
+  border-color: var(--primary);
   background: rgba(245, 158, 11, 0.1);
 }
 .custom-item.locked {
@@ -376,13 +377,13 @@ export default {
 }
 .custom-item-name {
   font-size: 22rpx;
-  color: #d1d5db;
+  color: var(--text);
   display: block;
 }
 .custom-item-ad {
   margin-top: 8rpx;
   font-size: 18rpx;
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 /* 广告弹窗 */
@@ -438,7 +439,7 @@ export default {
 }
 .ad-modal-desc {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   text-align: center;
   margin-bottom: 40rpx;
 }
@@ -452,7 +453,7 @@ export default {
   width: 100%;
   height: 84rpx;
   border-radius: 42rpx;
-  background: linear-gradient(135deg, #f59e0b, #f97316);
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -478,6 +479,6 @@ export default {
 }
 .ad-btn-cancel-text {
   font-size: 26rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 </style>

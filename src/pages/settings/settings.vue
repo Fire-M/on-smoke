@@ -1,8 +1,24 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="设置"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="p-20 pb-100">
+
+        <!-- 主题 -->
+        <view class="theme-section">
+          <text class="section-title mb-16 block">主题</text>
+          <view
+            v-for="t in THEMES"
+            :key="t.id"
+            class="theme-item"
+            :class="{ 'theme-item-active': themeState.current === t.id }"
+            @click="setTheme(t.id)"
+          >
+            <view class="theme-swatch" :style="{ background: t.swatch }"></view>
+            <text class="theme-name">{{ t.name }}</text>
+            <text class="theme-check" v-if="themeState.current === t.id">✓</text>
+          </view>
+        </view>
 
         <!-- 每包价格 -->
         <view class="setting-row">
@@ -64,6 +80,7 @@
 import Store from '@/utils/store.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { THEMES, themeState, setTheme, themeClass } from '@/utils/theme.js'
 
 export default {
   components: { CustomTabbar, AppNavbar },
@@ -126,8 +143,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -142,8 +159,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 24rpx 32rpx;
-  background-color: #1f1f1f;
-  border: 1px solid #2a2a2a;
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 24rpx;
   margin-bottom: 16rpx;
 }
@@ -151,10 +168,10 @@ export default {
 .setting-input {
   width: 200rpx;
   padding: 12rpx 16rpx;
-  background-color: #0f0f0f;
-  border: 1px solid #2a2a2a;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 16rpx;
-  color: #e5e7eb;
+  color: var(--text);
   font-size: 28rpx;
   text-align: right;
 }
@@ -176,8 +193,8 @@ export default {
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background-color: #2a2a2a;
-  color: #e5e7eb;
+  background-color: var(--border);
+  color: var(--text);
   font-size: 32rpx;
   display: flex;
   align-items: center;
@@ -189,7 +206,7 @@ export default {
 .quota-value {
   font-size: 32rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
   min-width: 48rpx;
   text-align: center;
 }
@@ -198,17 +215,64 @@ export default {
   width: 100%;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(to right, #f59e0b, #f97316);
-  color: #0f0f0f;
+  background: linear-gradient(to right, var(--primary), var(--primary-2));
+  color: var(--bg);
   font-weight: bold;
   font-size: 32rpx;
   margin-top: 48rpx;
   border: none;
 }
 
+.theme-section {
+  margin-bottom: 32rpx;
+}
+
+.theme-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 24rpx;
+  margin-bottom: 16rpx;
+  transition: border-color 0.2s ease;
+}
+
+.theme-item-active {
+  border-color: var(--primary);
+}
+
+.theme-swatch {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  margin-right: 24rpx;
+  flex-shrink: 0;
+}
+
+.theme-name {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--text);
+}
+
+.theme-check {
+  font-size: 32rpx;
+  color: var(--primary);
+  font-weight: bold;
+}
+
 .about-section {
   margin-top: 64rpx;
 }
+
+.section-title {
+  font-size: 30rpx;
+  color: var(--text);
+  font-weight: bold;
+}
+
+.mb-16 { margin-bottom: 32rpx; }
 
 .p-20 { padding: 40rpx; }
 .pb-100 { padding-bottom: 200rpx; }
@@ -219,8 +283,8 @@ export default {
 .font-bold { font-weight: bold; }
 .block { display: block; }
 .text-center { text-align: center; }
-.text-gray-300 { color: #d1d5db; }
+.text-gray-300 { color: var(--text); }
 .text-gray-600 { color: #4b5563; }
-.text-gray-700 { color: #374151; }
+.text-gray-700 { color: var(--border); }
 
 </style>

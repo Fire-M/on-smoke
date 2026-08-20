@@ -1,5 +1,5 @@
 <template>
-  <view class="smoke-root">
+  <view class="smoke-root" :class="themeClass()">
     <app-navbar title="烟雾测试"></app-navbar>
     <view class="stage">
       <canvas type="2d" id="smokeCanvas" class="smoke-canvas" @tap="puff"></canvas>
@@ -35,6 +35,7 @@
 
 <script>
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const DEFAULTS = {
   dprCap: 2,

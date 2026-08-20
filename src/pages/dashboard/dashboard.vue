@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="数据中心"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="p-20 pb-100">
@@ -122,6 +122,7 @@
 import Store from '@/utils/store.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { CustomTabbar, AppNavbar },
@@ -345,8 +346,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -371,7 +372,7 @@ export default {
 
 .section-subtitle {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 /* 本周统计 */
@@ -389,13 +390,13 @@ export default {
   display: block;
   font-size: 40rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .week-stat-label {
   display: block;
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-top: 4rpx;
 }
 
@@ -423,14 +424,14 @@ export default {
 .chart-bar {
   width: 40rpx;
   min-height: 8rpx;
-  background: linear-gradient(to top, #4b5563 0%, #6b7280 100%);
+  background: linear-gradient(to top, #4b5563 0%, var(--text-dim) 100%);
   border-radius: 8rpx 8rpx 0 0;
   position: relative;
   transition: height 0.3s ease;
 }
 
 .chart-bar.today {
-  background: linear-gradient(to top, #f59e0b 0%, #fbbf24 100%);
+  background: linear-gradient(to top, var(--primary) 0%, #fbbf24 100%);
 }
 
 .chart-bar-value {
@@ -439,13 +440,13 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   font-size: 18rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
 .chart-label {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 /* 个人记录 */
@@ -473,14 +474,14 @@ export default {
   display: block;
   font-size: 36rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
   margin-bottom: 4rpx;
 }
 
 .record-label {
   display: block;
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 /* 月度对比 */
@@ -499,7 +500,7 @@ export default {
 
 .month-label {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   width: 60rpx;
 }
 
@@ -513,18 +514,18 @@ export default {
 
 .month-bar {
   height: 100%;
-  background: linear-gradient(90deg, #6b7280 0%, #9ca3af 100%);
+  background: linear-gradient(90deg, var(--text-dim) 0%, var(--text-dim) 100%);
   border-radius: 12rpx;
   transition: width 0.5s ease;
 }
 
 .month-bar.current {
-  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%);
 }
 
 .month-value {
   font-size: 24rpx;
-  color: #d1d5db;
+  color: var(--text);
   width: 80rpx;
   text-align: right;
 }
@@ -552,7 +553,7 @@ export default {
 
 .trend-desc {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 /* 日历 */
@@ -584,7 +585,7 @@ export default {
 }
 
 .calendar-day.today {
-  border: 2px solid #f59e0b;
+  border: 2px solid var(--primary);
 }
 
 .calendar-day.future {
@@ -597,12 +598,12 @@ export default {
 
 .calendar-day-num {
   font-size: 22rpx;
-  color: #d1d5db;
+  color: var(--text);
 }
 
 .calendar-day-count {
   font-size: 16rpx;
-  color: #f59e0b;
+  color: var(--primary);
   margin-top: 2rpx;
 }
 
@@ -614,8 +615,8 @@ export default {
 
 /* 工具类 */
 .card { 
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a; 
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border); 
   border-radius: 32rpx;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
 }

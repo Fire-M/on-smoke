@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="就抽一根"></app-navbar>
     <!-- 可滚动仪表盘内容 -->
     <scroll-view scroll-y class="main-scroll">
@@ -155,6 +155,7 @@ import Store from '@/utils/store.js'
 import AdManager from '@/utils/ad-manager.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const MILESTONES = [
   { seconds: 1200, label: '20分钟' },
@@ -384,7 +385,7 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
+  background-color: var(--bg);
   color: #e5e7eb;
   overflow: hidden;
   position: relative;
@@ -401,14 +402,14 @@ export default {
 .saved-card {
   border-radius: 32rpx;
   overflow: hidden;
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border);
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
 }
 
 .saved-bar {
   width: 12rpx;
-  background-color: #f59e0b;
+  background-color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -428,14 +429,14 @@ export default {
 .progress-bar {
   margin-top: 16rpx;
   height: 12rpx;
-  background-color: #2a2a2a;
+  background-color: var(--border);
   border-radius: 999rpx;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background-color: #f59e0b;
+  background-color: var(--primary);
   border-radius: 999rpx;
   transition: width 0.3s;
 }
@@ -537,9 +538,9 @@ export default {
   top: 160rpx;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #2a2a2a;
-  border: 1px solid #374151;
-  color: #e5e7eb;
+  background-color: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 28rpx;
   padding: 16rpx 32rpx;
   border-radius: 24rpx;
@@ -579,11 +580,11 @@ export default {
 .text-gray-300 { color: #d1d5db; }
 .text-gray-500 { color: #6b7280; }
 .text-gray-600 { color: #4b5563; }
-.text-amber { color: #f59e0b; }
-.bg-amber { background-color: #f59e0b; }
+.text-amber { color: var(--primary); }
+.bg-amber { background-color: var(--primary); }
 .card { 
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a; 
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border); 
   border-radius: 32rpx;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
 }
@@ -596,7 +597,7 @@ export default {
 
 .achievement-card:active {
   transform: scale(0.97);
-  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
 }
 
 .achievement-card::after {
@@ -617,7 +618,7 @@ export default {
 
 .recovery-card:active {
   transform: scale(0.97);
-  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
 }
 
 .recovery-card::after {
@@ -638,7 +639,7 @@ export default {
 
 .craving-card:active {
   transform: scale(0.97);
-  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
 }
 
 .craving-card::after {
@@ -653,8 +654,8 @@ export default {
 
 /* 每日挑战卡片 */
 .challenge-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
   position: relative;
@@ -698,7 +699,7 @@ export default {
 
 .challenge-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%);
   border-radius: 8rpx;
   transition: width 0.3s ease;
 }
@@ -711,8 +712,8 @@ export default {
 }
 
 .feature-item {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border);
   border-radius: 20rpx;
   padding: 24rpx 16rpx;
   display: flex;
@@ -725,7 +726,7 @@ export default {
 
 .feature-item:active {
   transform: scale(0.95);
-  background: linear-gradient(135deg, #252525 0%, #2a2a2a 100%);
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
 }
 
 .feature-icon {
@@ -745,8 +746,8 @@ export default {
   gap: 8rpx;
   margin-top: 16rpx;
   padding: 10rpx 16rpx;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--glow);
+  border: 1px solid var(--glow);
   border-radius: 16rpx;
 }
 
@@ -761,7 +762,7 @@ export default {
 
 .ad-quota-text {
   font-size: 22rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 </style>

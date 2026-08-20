@@ -114,7 +114,7 @@ function sysSafeRight() {
 <style scoped>
 .app-navbar {
   width: 100%;
-  background-color: #0f0f0f;
+  background-color: var(--bg);
   box-sizing: border-box;
   flex-shrink: 0;
   position: relative;

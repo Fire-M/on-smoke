@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="成就勋章"></app-navbar>
     <!-- 顶部标题 -->
     <view class="ach-header">
@@ -64,6 +64,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const BADGES = [
   // 戒烟里程碑
@@ -191,8 +192,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -252,14 +253,14 @@ export default {
 
 .ach-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
   border-radius: 8rpx;
   transition: width 0.3s ease;
 }
 
 .ach-progress-text {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 /* 分类标签 */
@@ -285,7 +286,7 @@ export default {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 16rpx;
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   cursor: pointer;
   transition: all 0.25s ease;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -302,7 +303,7 @@ export default {
 
 .category-tab.active {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
-  color: #f59e0b;
+  color: var(--primary);
   border-color: rgba(245, 158, 11, 0.3);
   box-shadow: 0 2rpx 12rpx rgba(245, 158, 11, 0.15);
   font-weight: 600;
@@ -383,28 +384,28 @@ export default {
 .badge-name {
   font-size: 24rpx;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-bottom: 8rpx;
   line-height: 1.3;
 }
 
 .badge-card.unlocked .badge-name {
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .badge-desc {
   font-size: 20rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   line-height: 1.3;
 }
 
 .badge-card.unlocked .badge-desc {
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .badge-time {
   font-size: 18rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-top: 8rpx;
 }
 
@@ -421,8 +422,8 @@ export default {
 }
 
 .badge-modal-card {
-  background: #1f1f1f;
-  border: 1px solid #2a2a2a;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 48rpx;
   width: 100%;
@@ -446,7 +447,7 @@ export default {
 .modal-desc {
   display: block;
   font-size: 28rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-bottom: 24rpx;
   line-height: 1.5;
 }
@@ -462,19 +463,19 @@ export default {
 }
 
 .modal-status.locked {
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .modal-time {
   display: block;
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-bottom: 32rpx;
 }
 
 .modal-close-btn {
-  background: #f59e0b;
-  color: #0f0f0f;
+  background: var(--primary);
+  color: var(--bg);
   font-weight: bold;
   border: none;
   padding: 16rpx;

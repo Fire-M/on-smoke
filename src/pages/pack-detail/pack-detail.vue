@@ -1,5 +1,5 @@
 <template>
-  <view id="pack-detail" class="page-container" :class="'theme-' + brand.theme">
+  <view id="pack-detail" class="page-container" :class="['theme-' + brand.theme, themeClass()]">
     <app-navbar :title="brand.cn"></app-navbar>
 
     <!-- 烟盒展示区 -->
@@ -97,6 +97,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const BRANDS = {
   lanhe: { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', theme: 'blue', packSize: 10 },
@@ -228,8 +229,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -279,7 +280,7 @@ export default {
   display: block;
   font-size: 28rpx;
   letter-spacing: 6rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   font-weight: 500;
 }
 

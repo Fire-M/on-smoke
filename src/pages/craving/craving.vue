@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="烟瘾追踪"></app-navbar>
 
     <scroll-view scroll-y class="main-scroll">
@@ -155,6 +155,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const TRIGGER_OPTIONS = [
   { id: 'stress', name: '压力大', icon: '😰' },
@@ -292,8 +293,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -347,8 +348,8 @@ export default {
 
 /* 统计卡片 */
 .stats-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
 }
@@ -374,13 +375,13 @@ export default {
   display: block;
   font-size: 48rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .stat-label {
   display: block;
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-top: 8rpx;
 }
 
@@ -389,7 +390,7 @@ export default {
   width: 100%;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #ef4444 0%, var(--primary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -413,8 +414,8 @@ export default {
 
 /* 卡片 */
 .card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
 }
 
@@ -449,7 +450,7 @@ export default {
 
 .pattern-name {
   font-size: 24rpx;
-  color: #d1d5db;
+  color: var(--text);
 }
 
 .pattern-bar-wrap {
@@ -462,14 +463,14 @@ export default {
 
 .pattern-bar {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
   border-radius: 10rpx;
   transition: width 0.3s ease;
 }
 
 .pattern-count {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   width: 60rpx;
   text-align: right;
 }
@@ -501,8 +502,8 @@ export default {
 
 .intensity-bar.level-1 { background: #10b981; }
 .intensity-bar.level-2 { background: #84cc16; }
-.intensity-bar.level-3 { background: #f59e0b; }
-.intensity-bar.level-4 { background: #f97316; }
+.intensity-bar.level-3 { background: var(--primary); }
+.intensity-bar.level-4 { background: var(--primary-2); }
 .intensity-bar.level-5 { background: #ef4444; }
 
 .intensity-value {
@@ -511,12 +512,12 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   font-size: 20rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .intensity-label {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 /* 历史记录 */
@@ -543,12 +544,12 @@ export default {
 
 .history-date {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .history-hour {
   font-size: 24rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -568,12 +569,12 @@ export default {
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
   background: rgba(255, 255, 255, 0.06);
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .history-tag.intensity {
   background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .history-tag.trigger {
@@ -588,13 +589,13 @@ export default {
 
 .history-note {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .empty-hint {
   text-align: center;
   padding: 32rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   font-size: 24rpx;
 }
 
@@ -615,7 +616,7 @@ export default {
 .modal-card {
   width: 85%;
   max-height: 80vh;
-  background: #1f1f1f;
+  background: var(--surface-1);
   border-radius: 32rpx;
   padding: 40rpx;
   overflow-y: auto;
@@ -636,7 +637,7 @@ export default {
 
 .form-label {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   display: block;
   margin-bottom: 16rpx;
 }
@@ -659,7 +660,7 @@ export default {
   border: 2rpx solid transparent;
   font-size: 28rpx;
   font-weight: bold;
-  color: #9ca3af;
+  color: var(--text-dim);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -670,8 +671,8 @@ export default {
 
 .intensity-option.level-1.active { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981; }
 .intensity-option.level-2.active { background: rgba(132, 204, 22, 0.2); border-color: #84cc16; color: #84cc16; }
-.intensity-option.level-3.active { background: rgba(245, 158, 11, 0.2); border-color: #f59e0b; color: #f59e0b; }
-.intensity-option.level-4.active { background: rgba(249, 115, 22, 0.2); border-color: #f97316; color: #f97316; }
+.intensity-option.level-3.active { background: rgba(245, 158, 11, 0.2); border-color: var(--primary); color: var(--primary); }
+.intensity-option.level-4.active { background: rgba(249, 115, 22, 0.2); border-color: var(--primary-2); color: var(--primary-2); }
 .intensity-option.level-5.active { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444; }
 
 /* 触发因素 */
@@ -705,7 +706,7 @@ export default {
 
 .trigger-name {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   text-align: center;
 }
 
@@ -729,7 +730,7 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .resist-option.active {
@@ -746,7 +747,7 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16rpx;
   padding: 16rpx;
-  color: #e5e7eb;
+  color: var(--text);
   font-size: 26rpx;
   resize: none;
 }
@@ -769,11 +770,11 @@ export default {
 
 .modal-btn.cancel {
   background: rgba(255, 255, 255, 0.06);
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .modal-btn.confirm {
-  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #ef4444 100%);
   color: white;
 }
 

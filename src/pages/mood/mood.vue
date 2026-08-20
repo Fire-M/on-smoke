@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="情绪日记"></app-navbar>
 
     <scroll-view scroll-y class="main-scroll">
@@ -123,6 +123,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const MOOD_OPTIONS = [
   { id: 'happy', name: '开心', emoji: '😊' },
@@ -212,8 +213,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -266,8 +267,8 @@ export default {
 }
 
 .stats-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
 }
@@ -302,13 +303,13 @@ export default {
 .mood-count {
   font-size: 32rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
   display: block;
 }
 
 .mood-name {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   display: block;
   margin-top: 4rpx;
 }
@@ -340,8 +341,8 @@ export default {
 }
 
 .card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
 }
 
@@ -371,11 +372,11 @@ export default {
 
 .insight-text {
   font-size: 26rpx;
-  color: #d1d5db;
+  color: var(--text);
 }
 
 .highlight {
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: bold;
 }
 
@@ -433,20 +434,20 @@ export default {
 
 .history-note {
   font-size: 24rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   display: block;
   margin-bottom: 8rpx;
 }
 
 .history-time {
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .empty-hint {
   text-align: center;
   padding: 32rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   font-size: 24rpx;
 }
 
@@ -466,7 +467,7 @@ export default {
 .modal-card {
   width: 85%;
   max-height: 80vh;
-  background: #1f1f1f;
+  background: var(--surface-1);
   border-radius: 32rpx;
   padding: 40rpx;
   overflow-y: auto;
@@ -487,7 +488,7 @@ export default {
 
 .form-label {
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   display: block;
   margin-bottom: 16rpx;
 }
@@ -522,7 +523,7 @@ export default {
 
 .mood-option-name {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .mood-option.active .mood-option-name {
@@ -544,7 +545,7 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
   font-size: 26rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .smoke-option.active {
@@ -560,7 +561,7 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16rpx;
   padding: 16rpx;
-  color: #e5e7eb;
+  color: var(--text);
   font-size: 26rpx;
   resize: none;
 }
@@ -582,7 +583,7 @@ export default {
 
 .modal-btn.cancel {
   background: rgba(255, 255, 255, 0.06);
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .modal-btn.confirm {

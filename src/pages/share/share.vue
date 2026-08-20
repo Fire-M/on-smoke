@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="分享" :show-back="false"></app-navbar>
     <view class="result-content">
       <text class="result-title">恭喜，你抽了一根寂寞</text>
@@ -44,6 +44,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { AppNavbar },
@@ -152,8 +153,8 @@ export default {
 .page-container {
   min-height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -196,19 +197,19 @@ export default {
   display: block;
   font-size: 48rpx;
   font-weight: bold;
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 .result-label {
   display: block;
   font-size: 22rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   margin-top: 4rpx;
 }
 
 .result-detail {
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
   text-align: center;
 }
 
@@ -227,8 +228,8 @@ export default {
   width: 100%;
   padding: 32rpx;
   border-radius: 24rpx;
-  background: linear-gradient(to right, #f59e0b, #f97316);
-  color: #0f0f0f;
+  background: linear-gradient(to right, var(--primary), var(--primary-2));
+  color: var(--bg);
   font-weight: bold;
   font-size: 32rpx;
   box-shadow: 0 8rpx 24rpx rgba(245, 158, 11, 0.2);
@@ -237,7 +238,7 @@ export default {
 
 .again-btn {
   font-size: 28rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   background: transparent;
   border: none;
   margin-top: 8rpx;

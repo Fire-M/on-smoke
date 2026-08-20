@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="健康计算器"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="card mx-20 mb-16 p-20">
@@ -35,6 +35,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 export default {
   components: { AppNavbar },
   data() {
@@ -75,7 +76,7 @@ export default {
 </script>
 
 <style>
-.page-container { height: 100vh; width: 100vw; background-color: #0f0f0f; color: #e5e7eb; display: flex; flex-direction: column; }
+.page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
@@ -85,18 +86,18 @@ export default {
 .main-scroll { flex: 1; height: 100%; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.card { background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%); border: 1px solid #2a2a2a; border-radius: 32rpx; }
+.card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; }
 .p-20 { padding: 40rpx; }
 .card-title { font-size: 30rpx; font-weight: 600; color: #f3f4f6; display: block; margin-bottom: 24rpx; }
 .result-item { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .result-item:last-child { border-bottom: none; }
-.result-label { font-size: 26rpx; color: #9ca3af; }
+.result-label { font-size: 26rpx; color: var(--text-dim); }
 .result-value { font-size: 28rpx; color: #f3f4f6; font-weight: 600; }
 .result-value.highlight { color: #10b981; }
 .milestone-item { display: flex; gap: 16rpx; margin-bottom: 20rpx; }
-.milestone-icon { font-size: 28rpx; color: #6b7280; min-width: 40rpx; }
+.milestone-icon { font-size: 28rpx; color: var(--text-dim); min-width: 40rpx; }
 .milestone-icon.done { color: #10b981; }
 .milestone-content { flex: 1; }
 .milestone-title { font-size: 26rpx; color: #f3f4f6; display: block; margin-bottom: 4rpx; }
-.milestone-desc { font-size: 22rpx; color: #6b7280; }
+.milestone-desc { font-size: 22rpx; color: var(--text-dim); }
 </style>

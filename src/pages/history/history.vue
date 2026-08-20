@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="吸烟记录"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="p-20 pb-100">
@@ -64,6 +64,7 @@
 import Store from '@/utils/store.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   components: { CustomTabbar, AppNavbar },
@@ -156,8 +157,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   display: flex;
   flex-direction: column;
 }
@@ -178,23 +179,23 @@ export default {
   padding: 12rpx 32rpx;
   border-radius: 999rpx;
   font-size: 24rpx;
-  color: #6b7280;
-  background-color: #1f1f1f;
-  border: 1px solid #2a2a2a;
+  color: var(--text-dim);
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
   transition: all 0.2s;
 }
 
 .history-tab.active {
-  background-color: #f59e0b;
-  color: #0f0f0f;
-  border-color: #f59e0b;
+  background-color: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
   font-weight: bold;
 }
 
 /* 统计摘要卡片 */
 .summary-card {
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 32rpx;
   margin-bottom: 32rpx;
@@ -222,13 +223,13 @@ export default {
 
 .summary-label {
   font-size: 20rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .summary-divider {
   width: 1px;
   height: 60rpx;
-  background-color: #2a2a2a;
+  background-color: var(--border);
 }
 
 /* 记录列表 */
@@ -292,14 +293,14 @@ export default {
 .text-sm { font-size: 28rpx; }
 .font-bold { font-weight: bold; }
 .block { display: block; }
-.text-gray-200 { color: #e5e7eb; }
-.text-gray-500 { color: #6b7280; }
+.text-gray-200 { color: var(--text); }
+.text-gray-500 { color: var(--text-dim); }
 .text-gray-600 { color: #4b5563; }
-.text-gray-700 { color: #374151; }
-.text-amber { color: #f59e0b; }
+.text-gray-700 { color: var(--border); }
+.text-amber { color: var(--primary); }
 .card { 
-  background: linear-gradient(135deg, #1f1f1f 0%, #252525 100%);
-  border: 1px solid #2a2a2a; 
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border); 
   border-radius: 24rpx;
 }
 </style>

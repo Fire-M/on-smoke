@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container">
+  <view class="page-container" :class="themeClass()">
     <app-navbar title="抽烟" :custom-back="true" @back="goBack"></app-navbar>
 
     <!-- 背景火光（由亮渐灭） -->
@@ -71,7 +71,7 @@
               :style="{ fill: getLungColor(lungFill) }" />
             <!-- 气管 -->
             <path class="lung-trachea" d="M 50 15 L 50 35 M 50 35 Q 45 40 40 45 M 50 35 Q 55 40 60 45"
-              stroke="#9ca3af" stroke-width="2" fill="none" />
+              stroke="var(--text-dim)" stroke-width="2" fill="none" />
           </svg>
           <!-- 填充动画层 -->
           <view class="lung-fill-overlay" :style="{ height: lungFill + '%', background: getLungGradient(lungFill) }"></view>
@@ -160,6 +160,7 @@
 <script>
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
+import { themeClass } from '@/utils/theme.js'
 
 const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
@@ -364,7 +365,7 @@ export default {
     // 根据肺部填充度返回颜色
     getLungColor(fill) {
       if (fill >= 100) return '#ef4444'  // 红色 - 已满
-      if (fill >= 80) return '#f97316'   // 橙色 - 接近满
+      if (fill >= 80) return 'var(--primary-2)'   // 橙色 - 接近满
       if (fill >= 60) return '#eab308'   // 黄色 - 中等
       if (fill >= 40) return '#84cc16'   // 黄绿色 - 较轻
       if (fill >= 20) return '#22c55e'   // 绿色 - 正常
@@ -1981,8 +1982,8 @@ export default {
 .page-container {
   height: 100vh;
   width: 100vw;
-  background-color: #0f0f0f;
-  color: #e5e7eb;
+  background-color: var(--bg);
+  color: var(--text);
   position: relative;
   overflow: hidden;
 }
@@ -2085,7 +2086,7 @@ export default {
 
 .lung-label {
   font-size: 22rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .lung-value {
@@ -2096,7 +2097,7 @@ export default {
 }
 
 .lung-value.lung-warning {
-  color: #f97316;
+  color: var(--primary-2);
   animation: textPulse 1.5s ease-in-out infinite;
 }
 
@@ -2159,7 +2160,7 @@ export default {
 .burn-progress-bar {
   height: 100%;
   border-radius: 8rpx;
-  background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
   transition: width 0.3s ease;
   box-shadow: 0 0 8rpx rgba(245, 158, 11, 0.5);
 }
@@ -2169,7 +2170,7 @@ export default {
   top: -36rpx;
   right: 0;
   font-size: 20rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -2258,7 +2259,7 @@ export default {
 
 .smoke-hint text {
   font-size: 28rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -2284,12 +2285,12 @@ export default {
 
 .sd-label {
   font-size: 24rpx;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 .sd-val {
   font-size: 28rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: bold;
 }
 
@@ -2348,8 +2349,8 @@ export default {
 
 .st-tool.active .st-tool-ic {
   background: rgba(245, 158, 11, 0.15);
-  border-color: #f59e0b;
-  color: #f59e0b;
+  border-color: var(--primary);
+  color: var(--primary);
   box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
 }
 
@@ -2378,7 +2379,7 @@ export default {
 }
 
 .st-tool.active .st-tool-val {
-  color: #f59e0b;
+  color: var(--primary);
 }
 
 /* ---- 派烟弹窗 ---- */
@@ -2394,8 +2395,8 @@ export default {
 }
 
 .pass-card {
-  background-color: #1f1f1f;
-  border: 1px solid #2a2a2a;
+  background-color: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 32rpx;
   padding: 48rpx;
   width: 100%;
@@ -2419,7 +2420,7 @@ export default {
 .pass-desc {
   display: block;
   font-size: 28rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-bottom: 32rpx;
 }
 
@@ -2438,13 +2439,13 @@ export default {
 
 .pass-undo {
   background: transparent;
-  border: 1px solid #2a2a2a;
-  color: #d1d5db;
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
 .pass-confirm {
-  background: #f59e0b;
-  color: #0f0f0f;
+  background: var(--primary);
+  color: var(--bg);
   font-weight: bold;
 }
 
@@ -2453,9 +2454,9 @@ export default {
   position: fixed;
   top: 160rpx; left: 50%;
   transform: translateX(-50%);
-  background-color: #2a2a2a;
-  border: 1px solid #374151;
-  color: #e5e7eb;
+  background-color: var(--border);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-size: 28rpx;
   padding: 16rpx 32rpx;
   border-radius: 24rpx;
@@ -2495,7 +2496,7 @@ export default {
   display: block;
   text-align: center;
   font-size: 32rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: bold;
   margin-bottom: 24rpx;
 }
@@ -2514,7 +2515,7 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #252525;
+  background: var(--surface-2);
   border: 2px solid #333;
   border-radius: 16rpx;
   cursor: pointer;
@@ -2522,7 +2523,7 @@ export default {
 }
 
 .picker-item.active {
-  border-color: #f59e0b;
+  border-color: var(--primary);
   background: rgba(245, 158, 11, 0.1);
   box-shadow: 0 0 12rpx rgba(245, 158, 11, 0.3);
 }
@@ -2538,11 +2539,11 @@ export default {
 
 .picker-name {
   font-size: 20rpx;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-top: 4rpx;
 }
 
 .picker-item.active .picker-name {
-  color: #f59e0b;
+  color: var(--primary);
 }
 </style>
