@@ -9,23 +9,8 @@
     <view class="canvas-wrapper" :style="{ pointerEvents: sceneReady ? 'auto' : 'none' }"
       @touchstart.prevent="onPointerDown" @touchmove.prevent="onPointerMove" @touchend.prevent="onPointerUp"
       @mousedown="onPointerDown" @mousemove="onPointerMove" @mouseup="onPointerUp" @mouseleave="onPointerUp">
-      <canvas canvas-id="smoke-canvas" id="smoke-canvas" class="smoke-canvas"></canvas>
-
-      <!-- SVG 滤镜（Chokcoco 风格 DOM 烟雾） -->
-      <svg class="smoke-svg-filter" width="0" height="0" style="position:absolute">
-        <defs>
-          <filter id="smoke-filter">
-            <feTurbulence ref="turbulenceEl" type="fractalNoise" baseFrequency="0.03 0.03" numOctaves="20" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="70" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
-        </defs>
-      </svg>
-
-      <!-- DOM 烟雾层（SVG 滤镜驱动） -->
-      <view class="dom-smoke-layer" :class="{ hidden: !domFilterActive }">
-        <view class="dom-smoke-wrap" ref="domSmokeWrap">
-        </view>
-      </view>
+      <canvas type="2d" id="smoke-canvas" class="smoke-canvas"></canvas>
+      <canvas type="2d" id="spriteCanvas" class="sprite-canvas"></canvas>
 
       <!-- 2D 香烟 -->
       <view class="cigarette-3d" ref="cigarette3d" :class="cigClass" :style="cigBurnStyle">
@@ -321,6 +306,8 @@ export default {
     this.$nextTick(() => { this.initCanvas() })
   },
 
+  onReady() { this.initCanvas() },
+
   onLoad(options) {
     this.brandId = options.brandId || ''
     this.remaining = parseInt(options.remaining) || 0
@@ -395,512 +382,282 @@ export default {
       this.setSmokeMode('off')
     },
 
-    // ============ Canvas 粒子系统 ============
+    // ============ Canvas 烟雾粒子系统（小程序兼容，参考 test-smoke-svg） ============
     findCanvasEl() {
       if (!this.$el) return null
       return this.$el.querySelector('#smoke-canvas') || this.$el.querySelector('canvas') || null
     },
 
     initCanvas() {
-      try {
-        const canvasEl = this.findCanvasEl()
-        if (!canvasEl) {
-          setTimeout(() => this.initCanvas(), 100)
-          return
-        }
-        this.dpr = window.devicePixelRatio || 1
-        const rect = canvasEl.getBoundingClientRect()
-        this.canvasW = rect.width
-        this.canvasH = rect.height
-        canvasEl.width = rect.width * this.dpr
-        canvasEl.height = rect.height * this.dpr
-        const ctx = canvasEl.getContext('2d')
-        ctx.scale(this.dpr, this.dpr)
-        this.canvasCtx = ctx
-        this.emitterX = rect.width / 2
-        this.emitterY = rect.height * 0.45
-        this.startCanvasLoop()
-      } catch (e) { console.warn('Canvas init failed', e) }
+      uni.createSelectorQuery().in(this)
+        .select('#smoke-canvas').fields({ node: true, size: true })
+        .select('#spriteCanvas').fields({ node: true, size: true })
+        .exec((res) => {
+          if (!res || !res[0] || !res[1]) { setTimeout(() => this.initCanvas(), 120); return }
+          const canvas = res[0].node
+          const ctx = canvas.getContext('2d')
+          let dpr = 2
+          try { dpr = Math.min((uni.getWindowInfo ? uni.getWindowInfo().pixelRatio : uni.getSystemInfoSync().pixelRatio) || 1, 2) } catch (e) {}
+          this.W = res[0].width
+          this.H = res[0].height
+          this.canvasW = this.W
+          this.canvasH = this.H
+          canvas.width = this.W * dpr
+          canvas.height = this.H * dpr
+          ctx.scale(dpr, dpr)
+          this.canvas = canvas
+          this.canvasCtx = ctx
+          const sc = res[1].node
+          sc.width = 128; sc.height = 128
+          const sx = sc.getContext('2d')
+          const g = sx.createRadialGradient(64, 64, 0, 64, 64, 64)
+          g.addColorStop(0.0, 'rgba(255,255,255,1)')
+          g.addColorStop(0.35, 'rgba(245,245,248,0.55)')
+          g.addColorStop(1.0, 'rgba(255,255,255,0)')
+          sx.fillStyle = g
+          sx.fillRect(0, 0, 128, 128)
+          this.sprite = sc
+          this.cfg = {
+            dprCap: 2, emitPerSec: 110, ambientPerSec: 5, buoyancy: 78, drag: 0.42,
+            turbStrength: 64, noiseScale: 0.0036, timeScale: 0.16, octaves: 3,
+            growRate: 34, lifeMin: 3.6, lifeMax: 5.8, rMin: 12, rMax: 24,
+            startSpeed: 130, spread: 22, alphaMax: 0.06, alphaVar: 0.02
+          }
+          this.pool = []
+          this.active = []
+          this.particles = []
+          this.cv = { x: 0, y: 0 }
+          this._c = { x: 0, y: 0 }
+          this.ambient = false
+          this.emitting = false
+          this.puffTimer = 0
+          this.ambientAcc = 0
+          this.last = null
+          this.exhaleEnd = 0
+          this.exhaleIntensity = 1
+          this.updateEmitter()
+          this.startCanvasLoop()
+        })
     },
 
     resizeCanvas() {
       try {
-        const canvasEl = this.findCanvasEl()
-        if (!canvasEl) return
-        const rect = canvasEl.getBoundingClientRect()
-        this.canvasW = rect.width
-        this.canvasH = rect.height
-        canvasEl.width = rect.width * this.dpr
-        canvasEl.height = rect.height * this.dpr
-        if (this.canvasCtx) {
-          this.canvasCtx.setTransform(1, 0, 0, 1, 0, 0)
-          this.canvasCtx.scale(this.dpr, this.dpr)
-        }
-        this.emitterX = rect.width / 2
-        this.emitterY = rect.height * 0.45
+        uni.createSelectorQuery().in(this).select('#smoke-canvas').fields({ node: true, size: true })
+          .exec((res) => {
+            if (!res || !res[0] || !this.canvas) return
+            const rect = res[0]
+            this.W = rect.width; this.H = rect.height
+            this.canvasW = this.W; this.canvasH = this.H
+            let dpr = 2
+            try { dpr = Math.min((uni.getWindowInfo ? uni.getWindowInfo().pixelRatio : uni.getSystemInfoSync().pixelRatio) || 1, 2) } catch (e) {}
+            this.canvas.width = this.W * dpr
+            this.canvas.height = this.H * dpr
+            this.canvasCtx.setTransform(1, 0, 0, 1, 0, 0)
+            this.canvasCtx.scale(dpr, dpr)
+            this.updateEmitter()
+          })
       } catch (e) {}
     },
 
     startCanvasLoop() {
       if (this.animFrame) return
-      const loop = () => {
-        this.ringTime += 0.1
-        const ctx = this.canvasCtx
-        if (!ctx) { this.animFrame = raf(loop); return }
-        ctx.clearRect(0, 0, this.canvasW, this.canvasH)
-        this.emitParticles()
-        ctx.globalCompositeOperation = 'lighter'
-        this.particles = this.particles.filter(p => {
-          const alive = this.updateParticle(p)
-          if (alive) this.drawParticle(ctx, p)
-          return alive
-        })
-        ctx.globalCompositeOperation = 'source-over'
-        this.animFrame = raf(loop)
+      const canvas = this.canvas
+      const rafFn = (canvas && canvas.requestAnimationFrame)
+        ? canvas.requestAnimationFrame.bind(canvas)
+        : (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb) => setTimeout(() => cb(Date.now()), 16))
+      const loop = (now) => {
+        if (this.last == null) this.last = now
+        let dt = (now - this.last) / 1000
+        this.last = now
+        if (dt > 0.05) dt = 0.05
+        this.frame(dt, now)
+        this.animFrame = rafFn(loop)
       }
-      this.animFrame = raf(loop)
+      this.animFrame = rafFn(loop)
     },
 
     stopCanvasLoop() {
       if (this.animFrame) { caf(this.animFrame); this.animFrame = null }
-      this.particles = []
+      this.active = []
       if (this.canvasCtx) this.canvasCtx.clearRect(0, 0, this.canvasW, this.canvasH)
     },
 
-    setSmokeMode(m) { this.smokeMode = m; if (m === 'exhale-rise') this.exhaleRiseStart = Date.now() },
+    setSmokeMode(m) {
+      this.smokeMode = m
+      if (m === 'exhale-rise') this.exhaleEnd = Date.now() + 1500
+    },
 
-    createParticle(x, y, type, extras) {
-      extras = extras || {}
-      const p = { x, y, type, life: 0, maxLife: 0, vx: 0, vy: 0, size: 0, maxSize: 0, r: 0, g: 0, b: 0 }
-      if (type === 'spark') {
-        // 火星：更自然的速度和生命周期
-        p.vx = (Math.random() - 0.5) * 2.5
-        p.vy = -Math.random() * 3 - 1.5
-        p.size = Math.random() * 2.5 + 0.8
-        p.life = Math.random() * 40 + 25
-        p.maxLife = p.life
-        // 火星颜色：橙红到金黄
-        p.r = 255
-        p.g = Math.floor(Math.random() * 120 + 100)
-        p.b = Math.random() < 0.3 ? Math.floor(Math.random() * 30) : 0
-      } else if (type === 'ring') {
-        const angle = Math.random() * Math.PI * 2, speed = 1.2 + Math.random() * 0.8, rs = this.ringCurrentStyle
-        if (rs === 0) { p.vx = Math.cos(angle) * speed * 0.6; p.vy = -speed * 0.5 + Math.sin(angle) * 0.8 }
-        else if (rs === 1) { const t = angle; p.vx = 16 * Math.pow(Math.sin(t), 3) * 0.08; p.vy = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.08 }
-        else if (rs === 2) { const r = Math.random() < 0.5 ? 0.4 : 0.9; p.vx = Math.cos(angle) * speed * r; p.vy = -speed * 0.4 * r + Math.sin(angle) * 0.6 }
-        else { p.vx = Math.cos(angle + this.ringTime * 0.2) * speed * 0.8; p.vy = -speed * 0.9 }
-        p.size = 3 + Math.random() * 4; p.maxSize = p.size + Math.random() * 20 + 15
-        p.life = 90 + Math.random() * 40; p.maxLife = p.life
-        const gray = Math.floor(Math.random() * 50 + 170); p.r = gray; p.g = gray; p.b = gray + Math.floor(Math.random() * 15)
-      } else if (type === 'exhale') {
-        const a2 = (Math.random() - 0.5) * Math.PI * 0.3, sp = Math.random() * 1.5 + 0.8
-        p.vx = Math.sin(a2) * sp + (Math.random() - 0.5) * 0.6; p.vy = -Math.random() * 1.5 - 0.8
-        p.size = Math.random() * 14 + 8; p.maxSize = p.size + Math.random() * 30 + 25
-        p.life = Math.random() * 100 + 80; p.maxLife = p.life
-        const gray = Math.floor(Math.random() * 50 + 170); p.r = gray; p.g = gray; p.b = gray + Math.floor(Math.random() * 15)
-      } else if (type === 'exhale-rise') {
-        const spread = extras.spread || 280, power = extras.power || 1
-        p.x = extras.originX !== undefined ? extras.originX : this.emitterX + (Math.random() - 0.5) * spread
-        p.y = extras.originY !== undefined ? extras.originY : this.canvasH + 10
-        // 先沉后升：初始 vy 可能为正（下沉），之后减速再反向上升
-        p.vx = (Math.random() - 0.5) * 0.8; p.vy = (Math.random() * 1.2 + 0.3) * power
-        p.size = Math.random() * 10 + 6; p.maxSize = p.size + Math.random() * 70 + 50
-        p.life = Math.random() * 180 + 160; p.maxLife = p.life
-        const g = Math.floor(Math.random() * 30 + 200); p.r = g; p.g = g; p.b = g + Math.floor(Math.random() * 12)
-        p.wobblePhase = Math.random() * Math.PI * 2; p.wobbleAmp = Math.random() * 1.5 + 0.6
-        p.wobbleSpeed = 0.04 + Math.random() * 0.05; p.decel = 0.985 + Math.random() * 0.01
-        // 分层：前 30% 粒子更浓更大
-        p.layer = extras.layer || 1
-      } else if (type === 'idle-wisp') {
-        // 空闲时烟头自然冒出的细烟丝
-        p.vx = (Math.random() - 0.5) * 0.15
-        p.vy = -(Math.random() * 0.6 + 0.3)
-        p.size = Math.random() * 3 + 1.5; p.maxSize = p.size + Math.random() * 8 + 5
-        p.life = Math.random() * 60 + 40; p.maxLife = p.life
-        const g = Math.floor(Math.random() * 20 + 190); p.r = g; p.g = g; p.b = g + Math.floor(Math.random() * 8)
-        p.wobblePhase = Math.random() * Math.PI * 2; p.wobbleAmp = Math.random() * 0.4 + 0.1
-        p.wobbleSpeed = 0.03 + Math.random() * 0.03
-      } else {
-        const a2 = (Math.random() - 0.5) * Math.PI * 0.4, sp = Math.random() * 2 + 1
-        p.vx = Math.sin(a2) * sp; p.vy = -Math.random() * 3 - 2
-        p.size = Math.random() * 8 + 4; p.maxSize = p.size + Math.random() * 30 + 20
-        p.life = Math.random() * 80 + 60; p.maxLife = p.life
-        const gray = Math.floor(Math.random() * 60 + 160); p.r = gray; p.g = gray; p.b = gray + Math.floor(Math.random() * 20)
+    noise3(x, y, z) {
+      const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z)
+      const xf = x - xi, yf = y - yi, zf = z - zi
+      const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf)
+      const r = (i, j, k) => {
+        let n = (i * 374761393 + j * 668265263 + k * 1274126177) | 0
+        n = (n ^ (n >> 13)) * 1274126177
+        n = n ^ (n >> 16)
+        return (n >>> 0) / 4294967295
       }
+      const c000 = r(xi, yi, zi), c100 = r(xi + 1, yi, zi)
+      const c010 = r(xi, yi + 1, zi), c110 = r(xi + 1, yi + 1, zi)
+      const c001 = r(xi, yi, zi + 1), c101 = r(xi + 1, yi, zi + 1)
+      const c011 = r(xi, yi + 1, zi + 1), c111 = r(xi + 1, yi + 1, zi + 1)
+      const x00 = c000 + (c100 - c000) * u, x10 = c010 + (c110 - c010) * u
+      const x01 = c001 + (c101 - c001) * u, x11 = c011 + (c111 - c011) * u
+      return (x00 + (x10 - x00) * v) + ((x01 + (x11 - x01) * v) - (x00 + (x10 - x00) * v)) * w
+    },
+
+    curl(x, y, t, out) {
+      const EPS = 1.0
+      const n1 = this.noise3(x, y + EPS, t), n2 = this.noise3(x, y - EPS, t)
+      const n3 = this.noise3(x + EPS, y, t), n4 = this.noise3(x - EPS, y, t)
+      const dpdx = (n3 - n4) / (2 * EPS)
+      const dpdy = (n1 - n2) / (2 * EPS)
+      out.x = dpdy; out.y = -dpdx
+    },
+
+    fbmCurl(x, y, t, out) {
+      const cfg = this.cfg
+      let amp = 1, freq = 1, sx = 0, sy = 0
+      for (let o = 0; o < cfg.octaves; o++) {
+        this.curl(x * freq, y * freq, t * (1 + o * 0.6), this._c)
+        sx += this._c.x * amp; sy += this._c.y * amp
+        freq *= 2.1; amp *= 0.5
+      }
+      out.x = sx; out.y = sy
+    },
+
+    spawn(x, y, vx, vy, life, r0, phase, alphaMax) {
+      const p = this.pool.pop() || {}
+      p.x = x; p.y = y; p.vx = vx; p.vy = vy
+      p.age = 0; p.life = life; p.r0 = r0
+      p.phase = phase; p.alphaMax = alphaMax
+      p.seedX = Math.random() * 1000
+      p.seedY = Math.random() * 1000
+      p.seedT = Math.random() * 50
+      p.grow = this.cfg.growRate * (0.45 + Math.random() * 1.2)
+      p.depth = Math.random()
+      this.active.push(p)
       return p
     },
 
-    updateParticle(p) {
-      p.life--
-      const progress = 1 - p.life / p.maxLife
-      if (p.type === 'spark') { p.x += p.vx; p.y += p.vy; p.vy -= 0.02; p.size *= 0.98 }
-      else if (p.type === 'ring') { p.x += p.vx; p.y += p.vy; p.vx += Math.cos(this.ringTime * 0.1 + progress * 2) * 0.05; p.vx = Math.max(-2, Math.min(2, p.vx)); p.vy += (Math.random() - 0.5) * 0.1; p.size = p.size + (p.maxSize - p.size) * 0.015 }
-      else if (p.type === 'exhale') { p.x += p.vx + (Math.random() - 0.5) * 0.8; p.y += p.vy; p.vy += 0.02; p.vx *= 0.99; p.size = p.size + (p.maxSize - p.size) * 0.025 }
-      else if (p.type === 'exhale-rise') {
-        // 先沉后升：vy 先正（下沉）再减速到 0 再变负（上升）
-        p.vy -= 0.06 * (p.layer || 1)
-        p.x += p.vx + Math.sin(p.wobblePhase) * p.wobbleAmp * 0.7; p.y += p.vy
-        p.wobblePhase += p.wobbleSpeed; p.wobbleAmp *= 0.998
-        p.vx += (Math.random() - 0.5) * 0.05; p.vx *= 0.995
-        p.size = p.size + (p.maxSize - p.size) * 0.022
-      }
-      else if (p.type === 'idle-wisp') {
-        p.x += p.vx + Math.sin(p.wobblePhase) * p.wobbleAmp
-        p.y += p.vy
-        p.wobblePhase += p.wobbleSpeed
-        p.vy *= 0.995
-        p.size = p.size + (p.maxSize - p.size) * 0.015
-      }
-      else { p.x += p.vx + (Math.random() - 0.5) * 0.5; p.y += p.vy; p.vy *= 0.99; p.vx += (Math.random() - 0.5) * 0.1; p.size = p.size + (p.maxSize - p.size) * 0.02 }
-      return p.life > 0
-    },
-
-    drawParticle(ctx, p) {
-      const alpha = Math.max(0, p.life / p.maxLife)
-      if (p.type === 'spark') {
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`; ctx.fill()
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 2, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha * 0.3})`; ctx.fill()
-      } else {
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        let a = alpha * 0.15
-        if (p.type === 'ring') a = alpha * 0.22
-        else if (p.type === 'exhale') a = alpha * 0.18
-        else if (p.type === 'exhale-rise') a = alpha * 0.14 * (p.layer || 1)
-        else if (p.type === 'idle-wisp') a = alpha * 0.08
-        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${a})`; ctx.fill()
+    emitBottom(dt, intensity) {
+      const cfg = this.cfg
+      let n = Math.floor(cfg.emitPerSec * (0.5 + intensity * 0.9) * dt + Math.random())
+      while (n-- > 0) {
+        if (this.active.length >= 460) break
+        const ang = -Math.PI / 2 + (Math.random() - 0.5) * 0.9
+        const sp = cfg.startSpeed * (0.45 + Math.random() * 1.1) * (0.6 + intensity * 0.6)
+        const sx = this.emitX + (Math.random() - 0.5) * cfg.spread * 1.6 * (0.6 + intensity * 0.8)
+        const sy = this.emitY + (Math.random() - 0.5) * cfg.spread * 0.8
+        const life = cfg.lifeMin + Math.random() * (cfg.lifeMax - cfg.lifeMin)
+        const depth = Math.random()
+        const r0 = (cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin)) * (0.45 + depth * 0.95) * (0.7 + intensity * 0.5)
+        const aMax = (cfg.alphaMax + Math.random() * cfg.alphaVar) * (0.25 + depth * 1.2)
+        this.spawn(sx, sy, Math.cos(ang) * sp * 0.3, Math.sin(ang) * sp, life, r0, Math.random() * 6.28, aMax)
       }
     },
 
-    emitParticles() {
-      const m = this.smokeMode, ex = this.emitterX, ey = this.emitterY
-      if (m === 'off') return
-      if (m === 'idle') {
-        if (Math.random() < 0.3) this.particles.push(this.createParticle(ex, ey, 'spark'))
-        // 空闲时烟头自然冒细烟丝
-        if (Math.random() < 0.25) this.particles.push(this.createParticle(ex + (Math.random() - 0.5) * 4, ey, 'idle-wisp'))
-      }
-      else if (m === 'inhale') {
-        // 吸烟时火星飘出：更频繁、更多样
-        if (Math.random() < 0.6) {
-          const sparkCount = Math.random() < 0.3 ? 2 : 1
-          for (let i = 0; i < sparkCount; i++) {
-            this.particles.push(this.createParticle(
-              ex + (Math.random() - 0.5) * 8,
-              ey + (Math.random() - 0.5) * 4,
-              'spark'
-            ))
-          }
+    emitAmbient(dt) {
+      const cfg = this.cfg
+      this.ambientAcc += cfg.ambientPerSec * dt
+      while (this.ambientAcc >= 1) {
+        this.ambientAcc -= 1
+        if (this.active.length < 460) {
+          const life = cfg.lifeMin + Math.random() * 2
+          const depth = Math.random() * 0.6
+          const r0 = cfg.rMin * (0.4 + depth)
+          const aMax = cfg.alphaMax * (0.2 + depth)
+          this.spawn(this.emitX + (Math.random() - 0.5) * 8, this.emitY + 6,
+            (Math.random() - 0.5) * 14, -30 - Math.random() * 30, life, r0, Math.random() * 6.28, aMax)
         }
       }
-      else if (m === 'burnout') { if (Math.random() < 0.2) this.particles.push(this.createParticle(ex, ey, 'smoke')) }
-      else if (m === 'ring') { for (let i = 0; i < 6; i++) this.particles.push(this.createParticle(ex, ey, 'ring')) }
-      else if (m === 'exhale') { for (let i = 0; i < 5; i++) this.particles.push(this.createParticle(ex, ey, 'exhale')) }
-      else if (m === 'exhale-rise') {
-        const elapsed = Date.now() - this.exhaleRiseStart
-        if (elapsed > 1500) return
-        const phase = Math.min(1, elapsed / 1200)
-        const burstCount = phase < 0.3 ? 10 : (phase < 0.7 ? 6 : 3)
-        const power = phase < 0.3 ? 1.2 : (phase < 0.7 ? 1.0 : 0.7)
-        const spread = this.canvasW * (phase < 0.5 ? 0.25 : 0.5)
-        // 分层：前 30% 粒子更浓更大（先浓后淡）
-        const layer = phase < 0.3 ? 1.5 : (phase < 0.7 ? 1.0 : 0.6)
-        for (let i = 0; i < burstCount; i++) {
-          const r1 = Math.random() * 2 - 1, r2 = Math.random() * 2 - 1
-          const offsetNorm = (r1 + r2) * 0.5
-          const originX = Math.max(20, Math.min(this.canvasW - 20, ex + offsetNorm * spread * 0.5))
-          this.particles.push(this.createParticle(0, 0, 'exhale-rise', { originX, originY: this.canvasH + 10 + Math.random() * 15, spread, power, layer }))
-        }
+    },
+
+    frame(dt, now) {
+      const cfg = this.cfg, ctx = this.canvasCtx
+      if (!ctx) return
+      const t = now * 0.001 * cfg.timeScale
+      if (this.smokeMode === 'idle' || this.smokeMode === 'inhale') {
+        this.emitAmbient(dt)
+      } else if (this.smokeMode === 'exhale-rise') {
+        if (Date.now() < this.exhaleEnd) this.emitBottom(dt, this.exhaleIntensity || 1)
       }
+      ctx.clearRect(0, 0, this.W, this.H)
+      ctx.globalCompositeOperation = 'source-over'
+      for (let i = this.active.length - 1; i >= 0; i--) {
+        const p = this.active[i]
+        p.age += dt
+        if (p.age >= p.life) { this.active.splice(i, 1); this.pool.push(p); continue }
+        this.fbmCurl((p.x + p.seedX) * cfg.noiseScale, (p.y + p.seedY) * cfg.noiseScale, t + p.seedT, this.cv)
+        const turb = cfg.turbStrength * (0.6 + (p.depth || 0.5) * 0.8)
+        p.vx += this.cv.x * turb * dt
+        p.vy += -cfg.buoyancy * dt + this.cv.y * turb * 0.35 * dt
+        const d = 1 - Math.min(cfg.drag * dt, 1)
+        p.vx *= d; p.vy *= d
+        p.x += p.vx * dt; p.y += p.vy * dt
+        const r = p.r0 + p.age * p.grow
+        const k = p.age / p.life
+        let fade
+        if (k < 0.15) fade = k / 0.15
+        else if (k < 0.6) fade = 0.7
+        else fade = 0.7 * (1 - (k - 0.6) / 0.4)
+        const a = Math.max(0, fade) * p.alphaMax
+        const s = r * 2
+        ctx.globalAlpha = a
+        ctx.drawImage(this.sprite, p.x - r, p.y - r, s, s)
+      }
+      ctx.globalAlpha = 1
+    },
+
+    updateEmitter() {
+      this.emitX = this.W * 0.5
+      this.emitY = this.H * 0.92
     },
 
     emitExhaleBurst(count) {
-      const n = count || 8
-      for (let i = 0; i < n; i++) this.particles.push(this.createParticle(this.emitterX + (Math.random() - 0.5) * 10, this.emitterY + (Math.random() - 0.5) * 6, 'exhale'))
+      this.exhaleByIntensity(1.2)
     },
 
-    // ============ DOM 烟雾系统 ============
-    startDomFilter() {
-      this.domFilterActive = true; this.domFilterRunning = true
-      this.animateDomFilter()
-    },
-    stopDomFilter() {
-      this.domFilterRunning = false
-      if (this.domFilterRaf) { caf(this.domFilterRaf); this.domFilterRaf = null }
-      setTimeout(() => { if (this.domActivePuffs <= 0) this.domFilterActive = false }, 1500)
-    },
-    animateDomFilter() {
-      this.domFilterFrames += 0.2
-      const rad = Math.PI / 180
-      let bfx = 0.03 + 0.005 * Math.cos(this.domFilterFrames * rad)
-      let bfy = 0.03 + 0.005 * Math.sin(this.domFilterFrames * rad)
-      // 更新 SVG feTurbulence
-      try {
-        const turb = this.$refs.turbulenceEl
-        if (turb && turb.setAttributeNS) turb.setAttributeNS(null, 'baseFrequency', bfx + ' ' + bfy)
-      } catch (e) {}
-      if (this.domFilterRunning) this.domFilterRaf = raf(() => this.animateDomFilter())
-    },
-
-    spawnDomPuff(x, y, opts) {
-      const wrap = this.$refs.domSmokeWrap
-      if (!wrap) return
-      const container = wrap.$el || wrap
-      const doc = container.ownerDocument || document
-      const div = doc.createElement('div')
-      const size2 = opts.size, life2 = opts.life
-      div.className = 'dom-smoke-puff'
-      div.style.width = size2 + 'px'
-      div.style.height = size2 + 'px'
-      div.style.left = (x - size2 / 2) + 'px'
-      div.style.top = (y - size2 / 2) + 'px'
-      const g1b = 200 + Math.floor(Math.random() * 30), g2b = g1b - 40, g3b = g2b - 20
-      div.style.background = `radial-gradient(ellipse at 50% 40%,rgba(${g1b},${g1b},${g1b},${opts.opacity}) 0%,rgba(${g2b},${g2b},${g2b},${opts.opacity*0.7}) 30%,rgba(${g3b},${g3b},${g3b},${opts.opacity*0.3}) 60%,transparent 100%)`
-      div.style.setProperty('--ds', opts.scale.toFixed(3))
-      div.style.setProperty('--do', opts.opacity.toFixed(2))
-      div.style.setProperty('--dd', opts.drift.toFixed(1) + 'px')
-      div.style.setProperty('--dr', (-opts.rise).toFixed(1) + 'vh')
-      div.style.animationDuration = life2 + 'ms'
-      div.classList.add('anim')
-      container.appendChild(div)
-      this.domActivePuffs++
-      setTimeout(() => { div.remove(); this.domActivePuffs--; if (this.domActivePuffs <= 0 && !this.domFilterRunning) this.domFilterActive = false }, life2 + 200)
-    },
-
-    makeDomOpts(preset) {
-      const p = preset || { sizeMin:80,sizeMax:140,lifeMin:5000,lifeMax:7500,opacityMin:0.2,opacityMax:0.45,scaleMin:0.12,scaleMax:0.2,driftBase:90,driftVar:110,riseMin:60,riseMax:95 }
-      return { size: p.sizeMin + Math.random()*(p.sizeMax-p.sizeMin), life: p.lifeMin + Math.random()*(p.lifeMax-p.lifeMin), opacity: p.opacityMin + Math.random()*(p.opacityMax-p.opacityMin), scale: p.scaleMin + Math.random()*(p.scaleMax-p.scaleMin), drift: (Math.random()-0.5)*(p.driftBase+p.driftVar*Math.random()), rise: p.riseMin + Math.random()*(p.riseMax-p.riseMin) }
-    },
-
-    startInhale(cx, cy) {
-      this.startDomFilter()
-      if (this.inhaleTimer) clearInterval(this.inhaleTimer)
-      const ip = { sizeMin:40,sizeMax:65,lifeMin:2000,lifeMax:3000,opacityMin:0.2,opacityMax:0.4,scaleMin:0.1,scaleMax:0.16,driftBase:25,driftVar:35,riseMin:30,riseMax:50 }
-      this.inhaleTimer = setInterval(() => {
-        if (Math.random() < 0.5) this.spawnDomPuff(cx + (Math.random()-0.5)*10, cy + (Math.random()-0.5)*6, this.makeDomOpts(ip))
-      }, 130)
-    },
-    stopInhale() { if (this.inhaleTimer) { clearInterval(this.inhaleTimer); this.inhaleTimer = null } },
-
-    // ---- 空闲冒烟（lit 状态下烟头持续冒细烟） ----
-    startIdleSmoke() {
-      this.stopIdleSmoke()
-      const pos = this.getBurnPosSync()
-      this.idleSmokeTimer = setInterval(() => {
-        if (this.state !== 'lit') return
-        if (Math.random() < 0.4) {
-          this.spawnDomPuff(
-            pos.x + (Math.random() - 0.5) * 6,
-            pos.y - 5 - Math.random() * 8,
-            this.makeDomOpts({ sizeMin: 15, sizeMax: 30, lifeMin: 2500, lifeMax: 4000, opacityMin: 0.06, opacityMax: 0.12, scaleMin: 0.05, scaleMax: 0.08, driftBase: 8, driftVar: 12, riseMin: 15, riseMax: 30 })
-          )
-        }
-      }, 350)
-    },
-    stopIdleSmoke() {
-      if (this.idleSmokeTimer) { clearInterval(this.idleSmokeTimer); this.idleSmokeTimer = null }
-    },
+    // ============ DOM 烟雾 / 花样（小程序不兼容，暂置为空实现；核心烟雾见 Canvas 引擎） ============
+    startDomFilter() {},
+    stopDomFilter() {},
+    animateDomFilter() {},
+    spawnDomPuff() {},
+    makeDomOpts() { return {} },
+    startInhale() {},
+    stopInhale() {},
+    startIdleSmoke() {},
+    stopIdleSmoke() {},
     getBurnPosSync() {
-      try {
-        const burnEl = this.$el ? this.$el.querySelector('.cig-flat-burn') : null
-        if (burnEl) {
-          const r = burnEl.getBoundingClientRect()
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-        }
-      } catch (e) {}
-      return { x: this.emitterX || 200, y: this.emitterY || 300 }
+      return { x: this.emitX || (this.canvasW / 2) || 200, y: this.emitY || (this.canvasH * 0.92) || 300 }
     },
 
     exhaleBurst(cx, cy, count) {
-      this.startDomFilter()
-      const n = count || 22, spread = 100
-      for (let i = 0; i < n; i++) {
-        setTimeout(() => {
-          const r1 = Math.random()*2-1, r2 = Math.random()*2-1, ox = (r1+r2)*0.5*spread
-          // 分层：前面的 puff 更浓更大，后面的更淡更小（先浓后淡）
-          const progress = i / n
-          let preset
-          if (progress < 0.3) {
-            // 前 30%：浓密大团
-            preset = { sizeMin:100,sizeMax:160,lifeMin:5500,lifeMax:8000,opacityMin:0.3,opacityMax:0.5,scaleMin:0.14,scaleMax:0.22,driftBase:80,driftVar:100,riseMin:50,riseMax:80 }
-          } else if (progress < 0.7) {
-            // 中间：中等
-            preset = { sizeMin:70,sizeMax:120,lifeMin:4500,lifeMax:6500,opacityMin:0.2,opacityMax:0.38,scaleMin:0.1,scaleMax:0.18,driftBase:90,driftVar:110,riseMin:60,riseMax:90 }
-          } else {
-            // 后面：稀薄小团
-            preset = { sizeMin:40,sizeMax:80,lifeMin:3500,lifeMax:5000,opacityMin:0.1,opacityMax:0.25,scaleMin:0.06,scaleMax:0.12,driftBase:100,driftVar:120,riseMin:70,riseMax:100 }
-          }
-          const opts = this.makeDomOpts(preset); opts.drift = ox + (Math.random()-0.5)*60
-          this.spawnDomPuff(cx + ox, cy + (Math.random()-0.5)*15, opts)
-        }, i * 10)
-      }
-      setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, 3500)
+      this.exhaleByIntensity(1.2)
     },
 
-    // 根据强度吐烟：强度越高，烟越多越浓
+    // 根据强度吐烟：强度越高，烟越多越浓（从屏幕底部吐出）
     exhaleByIntensity(intensity) {
-      // intensity: ~0.2 (轻吸) ~ 2.0 (深吸+后期)
-      const pos = this.getBurnPosSync()
-      
-      // 根据强度决定吐烟风格
-      const isDeepExhale = intensity > 1.2  // 深吸后吐烟
-      const isLightPuff = intensity < 0.5   // 轻吸轻吐
-      
-      // Canvas 粒子数：4 ~ 25（强度越高越多）
-      const canvasCount = Math.round(4 + intensity * 10)
-      // DOM puff 数：10 ~ 50
-      const domCount = Math.round(10 + intensity * 20)
-      // 扩散范围：60 ~ 180
-      const spread = 60 + intensity * 60
-
-      // Canvas 粒子爆发 - 从烟头位置向上喷吐
-      for (let i = 0; i < canvasCount; i++) {
-        const p = this.createParticle(
-          this.emitterX + (Math.random() - 0.5) * 15,
-          this.emitterY + (Math.random() - 0.5) * 10,
-          'exhale'
-        )
-        // 深吸时粒子更大更浓
-        if (isDeepExhale) {
-          p.size *= 1.3
-          p.maxSize *= 1.2
-          p.vy *= 1.4  // 更快的上升速度
-        }
-        this.particles.push(p)
-      }
-
-      // DOM 烟雾爆发
-      this.startDomFilter()
-      for (let i = 0; i < domCount; i++) {
-        setTimeout(() => {
-          const r1 = Math.random()*2-1, r2 = Math.random()*2-1
-          const ox = (r1+r2)*0.5*spread
-          const progress = i / domCount
-          
-          let preset
-          if (isDeepExhale) {
-            // 深吸后吐烟：大团浓烟，分三个阶段
-            if (progress < 0.25) {
-              // 第一阶段：最浓的核心烟团
-              preset = {
-                sizeMin: 140, sizeMax: 200,
-                lifeMin: 6000, lifeMax: 9000,
-                opacityMin: 0.4, opacityMax: 0.55,
-                scaleMin: 0.18, scaleMax: 0.28,
-                driftBase: 60, driftVar: 80, riseMin: 40, riseMax: 60
-              }
-            } else if (progress < 0.6) {
-              // 第二阶段：扩散的烟团
-              preset = {
-                sizeMin: 100, sizeMax: 160,
-                lifeMin: 5000, lifeMax: 7500,
-                opacityMin: 0.3, opacityMax: 0.45,
-                scaleMin: 0.14, scaleMax: 0.22,
-                driftBase: 90, driftVar: 120, riseMin: 55, riseMax: 80
-              }
-            } else {
-              // 第三阶段：稀薄扩散的尾烟
-              preset = {
-                sizeMin: 60, sizeMax: 110,
-                lifeMin: 4000, lifeMax: 6000,
-                opacityMin: 0.15, opacityMax: 0.28,
-                scaleMin: 0.08, scaleMax: 0.16,
-                driftBase: 110, driftVar: 140, riseMin: 70, riseMax: 100
-              }
-            }
-          } else if (isLightPuff) {
-            // 轻吸：小团淡烟
-            preset = {
-              sizeMin: 40, sizeMax: 70,
-              lifeMin: 3000, lifeMax: 4500,
-              opacityMin: 0.1, opacityMax: 0.2,
-              scaleMin: 0.06, scaleMax: 0.1,
-              driftBase: 70, driftVar: 90, riseMin: 60, riseMax: 85
-            }
-          } else {
-            // 普通吐烟
-            if (progress < 0.3) {
-              preset = {
-                sizeMin: 90 + intensity * 25, sizeMax: 140 + intensity * 30,
-                lifeMin: 5000, lifeMax: 7500,
-                opacityMin: 0.25 + intensity * 0.06, opacityMax: 0.38 + intensity * 0.08,
-                scaleMin: 0.12, scaleMax: 0.2,
-                driftBase: 80, driftVar: 100, riseMin: 50, riseMax: 75
-              }
-            } else if (progress < 0.7) {
-              preset = {
-                sizeMin: 60 + intensity * 15, sizeMax: 100 + intensity * 20,
-                lifeMin: 4000, lifeMax: 6000,
-                opacityMin: 0.15 + intensity * 0.04, opacityMax: 0.28 + intensity * 0.06,
-                scaleMin: 0.09, scaleMax: 0.16,
-                driftBase: 95, driftVar: 115, riseMin: 60, riseMax: 85
-              }
-            } else {
-              preset = {
-                sizeMin: 35 + intensity * 8, sizeMax: 65 + intensity * 12,
-                lifeMin: 3000, lifeMax: 4500,
-                opacityMin: 0.08 + intensity * 0.03, opacityMax: 0.18 + intensity * 0.04,
-                scaleMin: 0.05, scaleMax: 0.1,
-                driftBase: 105, driftVar: 130, riseMin: 70, riseMax: 95
-              }
-            }
-          }
-          
-          const opts = this.makeDomOpts(preset)
-          opts.drift = ox + (Math.random()-0.5)*50
-          // 深吸时烟从更低的位置升起（像从嘴里吐出）
-          const startY = isDeepExhale ? this.canvasH * 0.92 : this.canvasH * 0.88
-          this.spawnDomPuff(pos.x + ox, startY + (Math.random()-0.5)*12, opts)
-        }, i * 8)  // 稍微加快爆发速度
-      }
-      
-      // 深吸后延长烟雾持续时间
-      const filterDuration = isDeepExhale ? 5000 : 3500
-      setTimeout(() => { if (!this.inhaleTimer) this.stopDomFilter() }, filterDuration)
+      this.ambient = false
+      this.exhaleIntensity = intensity
+      this.setSmokeMode('exhale-rise')
+      this.exhaleEnd = Date.now() + (intensity > 1.2 ? 1800 : 1300)
     },
 
     // ============ 烟雾模式同步 ============
     syncSmokeMode(newVal, oldVal) {
-      // 同步获取烟头位置（使用原生 DOM 查询）
-      const getBurnPos = () => {
-        try {
-          const burnEl = this.$el ? this.$el.querySelector('.cig-flat-burn') : null
-          if (burnEl) {
-            const r = burnEl.getBoundingClientRect()
-            return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-          }
-        } catch (e) {}
-        return { x: this.emitterX || 200, y: this.emitterY || 300 }
-      }
-
       if (newVal === 'ready' || newVal === 'igniting') {
-        this.setSmokeMode('off')
-        this.stopDomFilter(); this.stopInhale()
+        this.setSmokeMode('off'); this.ambient = false
       } else if (newVal === 'lit') {
-        this.setSmokeMode('idle')
-        this.stopDomFilter(); this.stopInhale()
-        this.startIdleSmoke()
+        this.setSmokeMode('idle'); this.ambient = true
       } else if (newVal === 'smoking') {
-        this.setSmokeMode('inhale')
-        this.stopIdleSmoke()
-        const pos = getBurnPos()
-        this.emitterX = pos.x; this.emitterY = pos.y
-        this.startInhale(pos.x, pos.y)
+        this.setSmokeMode('inhale'); this.ambient = true
       } else if (newVal === 'exhaling') {
-        this.stopInhale()
-        this.setSmokeMode('exhale-rise')
-        // 吐烟已由 onPointerUp 中的 exhaleByIntensity 触发
-        setTimeout(() => {
-          if (this.state === 'exhaling') this.setSmokeMode('idle')
-        }, 2200)
+        this.setSmokeMode('exhale-rise'); this.ambient = false
       } else if (newVal === 'burnout') {
-        this.setSmokeMode('burnout')
-        this.stopDomFilter(); this.stopInhale(); this.stopIdleSmoke()
-        this.domActivePuffs = 0; this.domFilterActive = false
+        this.setSmokeMode('off'); this.ambient = false
       } else if (newVal === 'cooldown') {
-        this.setSmokeMode('off')
-        this.stopDomFilter(); this.stopInhale(); this.stopIdleSmoke()
+        this.setSmokeMode('off'); this.ambient = false
       }
     },
 
@@ -918,17 +675,50 @@ export default {
         this.hintText = ''
         this.showHint = true
         this.pressTimer = setTimeout(() => {
-          if (this.cigDragMoved) {
-            this.state = 'ready'
-            this.hintText = '长按点火'
-            this.isPressing = false
-            return
-          }
           this.state = 'lit'
           this.showHint = true
           this.hintText = '长按吸烟'
           if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
           this.playFire()  // 点火音效
+          // 仍在按住：点火后自动进入吸烟，使单次长按即可「点燃→吸烟」
+          this.state = 'smoking'
+          this.smokeStartTime = Date.now()
+          this.currentPuffStart = Date.now()
+          this.startSmokeProgress()
+          this.showHint = false
+          this.startBurnSound()
+          // 单次吸烟最长时长，到时自动吐烟
+          this.puffTimer = setTimeout(() => {
+            if (this.state === 'smoking') {
+              this.isPressing = false
+              clearInterval(this.smokeTimer)
+              this.smokeTimer = null
+              this.stopBurnSound()
+              const puffDuration = MAX_PUFF_DURATION
+              const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
+              const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
+              const intensity = progressFactor * puffFactor
+              this.state = 'exhaling'
+              this.sessionExhaleCount++
+              if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
+              this.exhaleByIntensity(intensity)
+              this.playExhale(intensity)
+              const exhaleDuration = 2000
+              const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
+              const exhaleTimer = setInterval(() => {
+                this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
+              }, 50)
+              setTimeout(() => {
+                clearInterval(exhaleTimer)
+                this.lungFill = 0
+                if (this.state === 'exhaling') {
+                  this.state = 'lit'
+                  this.showHint = true
+                  this.hintText = '长按吸烟'
+                }
+              }, exhaleDuration)
+            }
+          }, MAX_PUFF_DURATION)
         }, IGNITE_DELAY)
       } else if (this.state === 'lit' || this.state === 'exhaling') {
         // 肺部已满，禁止吸烟
@@ -999,14 +789,6 @@ export default {
       const dx = point.clientX - this.dragStartX
       const dy = point.clientY - this.dragStartY
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.cigDragMoved = true
-
-      if (this.cigDragMoved && this.state === 'igniting') {
-        clearTimeout(this.pressTimer)
-        this.pressTimer = null
-        this.state = 'ready'
-        this.showHint = true
-        this.hintText = '长按点火'
-      }
     },
 
     onPointerUp() {
@@ -1023,7 +805,7 @@ export default {
         }
       }
       
-      if (this.cigDragMoved) { this.cigDragMoved = false; this.isDragging = false; return }
+      this.cigDragMoved = false
       this.isDragging = false
 
       if (this.state === 'igniting') {
@@ -2184,6 +1966,7 @@ export default {
   top: 0; left: 0;
   width: 100%; height: 100%;
 }
+    .sprite-canvas { position: absolute; left: -9999px; top: 0; width: 128px; height: 128px; }
 
 /* ---- SVG 滤镜 ---- */
 .smoke-svg-filter {
