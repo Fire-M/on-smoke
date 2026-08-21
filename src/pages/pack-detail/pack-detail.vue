@@ -56,24 +56,31 @@
             <!-- 香烟排 -->
             <view class="box-cigs" :class="{ 'lid-open': lidOpen, 'pulling-others': isPulling }" @click="pullCigarette">
               <view
-                v-for="cig in boxCigs"
-                :key="cig.index"
-                class="box-cig-3d"
-                :class="{ 'is-active': cig.active, pulling: cig.active && isPulling }"
-                :style="{ '--cig-rot': cig.rot + 'deg' }"
+                v-for="(row, ri) in boxCigs"
+                :key="ri"
+                class="box-cig-row"
+                :class="{ 'is-back': ri === 1 }"
               >
                 <view
-                  v-for="face in cigFaces"
-                  :key="face.index"
-                  class="box-cig-face"
-                  :style="face.style"
+                  v-for="cig in row"
+                  :key="cig.index"
+                  class="box-cig-3d"
+                  :class="{ 'is-active': cig.active, pulling: cig.active && isPulling }"
+                  :style="{ '--cig-rot': cig.rot + 'deg' }"
                 >
-                  <view class="bcf-filter"></view>
-                  <view class="bcf-paper"></view>
-                  <view class="bcf-ring"></view>
+                  <view
+                    v-for="face in cigFaces"
+                    :key="face.index"
+                    class="box-cig-face"
+                    :style="face.style"
+                  >
+                    <view class="bcf-filter"></view>
+                    <view class="bcf-paper"></view>
+                    <view class="bcf-ring"></view>
+                  </view>
+                  <view class="box-cig-cap-top"></view>
+                  <view class="box-cig-cap-bottom"></view>
                 </view>
-                <view class="box-cig-cap-top"></view>
-                <view class="box-cig-cap-bottom"></view>
               </view>
             </view>
             <!-- 提示 -->
@@ -125,7 +132,7 @@ export default {
       dragMoved: false,
       boxRemainingCigs: 20,
       isPulling: false,
-      faceCount: 48
+      faceCount: 24
     }
   },
 
@@ -140,15 +147,18 @@ export default {
       if (!this.lidOpen) return []
       const count = Math.max(this.boxRemainingCigs, 0)
       const mid = Math.floor(count / 2)
-      return Array.from({ length: count }, (_, index) => ({
+      const cigs = Array.from({ length: count }, (_, index) => ({
         index,
         active: index === mid,
         rot: -6 + index * 2
       }))
+      const rows = []
+      for (let i = 0; i < cigs.length; i += 10) rows.push(cigs.slice(i, i + 10))
+      return rows
     },
 
     cigFaces() {
-      const radius = 11
+      const radius = 13
       return Array.from({ length: this.faceCount }, (_, index) => {
         const angle = (360 / this.faceCount) * index
         const faceW = (2 * Math.PI * radius / this.faceCount + 2.5)
@@ -235,67 +245,6 @@ export default {
   flex-direction: column;
 }
 
-.header {
-  padding: 48rpx 40rpx 16rpx;
-}
-
-.header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.back-btn-placeholder {
-  width: 64rpx;
-  height: 64rpx;
-}
-
-.back-btn:active {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(0.92);
-}
-
-.back-icon {
-  font-size: 48rpx;
-  color: #f3f4f6;
-}
-
-.header-center {
-  text-align: center;
-}
-
-.brand-en {
-  display: block;
-  font-size: 28rpx;
-  letter-spacing: 6rpx;
-  color: var(--text-dim);
-  font-weight: 500;
-}
-
-.brand-cn {
-  display: block;
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #f3f4f6;
-  margin-top: 4rpx;
-}
-
-.w-64 {
-  width: 64rpx;
-}
-
 .box-area {
   flex: 1;
   display: flex;
@@ -303,6 +252,4 @@ export default {
   justify-content: center;
   padding: 0 64rpx;
 }
-
-.text-xl { font-size: 40rpx; }
 </style>

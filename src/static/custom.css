@@ -356,7 +356,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 :root,
 page {
-  --box-w: 250px;
+  --box-w: 295px;
   --box-h: 360px;
   --box-d: 100px;
   --lid-h: 100px;
@@ -964,7 +964,7 @@ page {
 .box-cigs {
   --cig-expose: 75px;            /* 露出过滤嘴的长度 */
   --cig-w: 18px;                 /* 单支烟宽度 */
-  --box-cig-d: 22px;             /* 盒内香烟3D直径 */
+  --box-cig-d: 26px;             /* 盒内香烟3D直径 */
   --box-cig-total-h: 340px;      /* 盒内香烟总高 */
   --box-cig-filter-ratio: 0.22;  /* 过滤嘴占比 */
   position: absolute;
@@ -973,15 +973,28 @@ page {
   width: var(--box-w);
   height: calc(var(--box-h) + var(--cig-expose));
   transform-style: preserve-3d;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 4px;
-  padding: 0 14px 4px;
   pointer-events: none;
   z-index: 1;
   opacity: 0;
   transition: opacity 0.4s ease-out 0.2s, transform 0.5s ease-out 0.1s;
+}
+
+/* 每排香烟（一排10支）：两排叠放在同一底部，靠深度区分前后排 */
+.box-cig-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  transform-style: preserve-3d;
+}
+
+/* 后排香烟略微上提并后退，模拟烟包内双层叠放（仅露过滤嘴于前排之上） */
+.box-cig-row.is-back {
+  transform: translateY(-26px) translateZ(-22px);
 }
 
 /* 盖子打开后才显示香烟排，并允许点击，同时上移露出过滤嘴 */
@@ -1130,9 +1143,9 @@ page {
   backface-visibility: hidden;
 }
 
-/* 中间那支（将被抽出）加粗 */
+/* 中间那支（将被抽出） */
 .box-cig-3d.is-active {
-  --box-cig-d: 22px;
+  --box-cig-d: 26px;
   z-index: 2;
   transform: rotateY(var(--cig-rot)) translateY(-60px);
 }
