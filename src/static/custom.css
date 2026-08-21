@@ -358,7 +358,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 page {
   --box-w: 295px;
   --box-h: 360px;
-  --box-d: 100px;
+  --box-d: 70px;
   --lid-h: 100px;
 }
 
@@ -600,7 +600,7 @@ page {
 /* 盖子 - 铰链在背面顶部（Y=lid-h, Z=-box-d/2），关闭时向前折叠覆盖顶面 */
 .box-lid {
   width: var(--box-w);
-  height: var(--lid-h);
+  height: var(--box-d);
   top: var(--lid-h);
   left: 0;
   transform: translateZ(calc(var(--box-d) / -2)) rotateX(90deg);
@@ -994,7 +994,7 @@ page {
 
 /* 后排香烟略微上提并后退，模拟烟包内双层叠放（仅露过滤嘴于前排之上） */
 .box-cig-row.is-back {
-  transform: translateY(-26px) translateZ(-22px);
+  transform: translateY(-26px) translateZ(-18px);
 }
 
 /* 盖子打开后才显示香烟排，并允许点击，同时上移露出过滤嘴 */
