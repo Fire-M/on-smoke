@@ -202,11 +202,15 @@ export default {
       this.showPullHint = false
       this.isPulling = true
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
+      const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
 
-      // 调试用：先不跳转 smoking 页，仅播放抽出动画，便于观察闪屏
-      // 动画结束后复位 isPulling，方便重复点击触发，对比闪屏是否消失
+      // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）
+      // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转
       setTimeout(() => {
-        this.isPulling = false
+        this.boxRemainingCigs = remainingAfterPull
+        uni.navigateTo({
+          url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
+        })
       }, 900)
     },
 
