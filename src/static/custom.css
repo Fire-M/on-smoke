@@ -1147,6 +1147,14 @@ page {
    故这里只保留 transform 立起姿态，不设置 z-index 与 --box-cig-d，避免点击瞬间的盒大小闪屏 */
 .box-cig-3d.is-active {
   transform: rotateY(var(--cig-rot)) translateY(-60px);
+  /* 开盖后这支烟“弹起”：延后到盖子快开完时，用带回弹的缓动，强化“就绪”感 */
+  transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s;
+}
+
+/* 选中（待抽）那支的过滤嘴高亮，提示用户点它；纯静态高亮，不触发点击闪屏 */
+.box-cig-3d.is-active .box-cig-cap-top {
+  background: radial-gradient(ellipse at 40% 40%, #ffe6b0 0%, #e8b86a 50%, #c8902f 85%, #7a4f18 100%);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55), inset 0 0 8px rgba(0, 0, 0, 0.25);
 }
 
 /* 抽出动画：向上滑出（保留旋转，纯 transform/scale，不触发 preserve-3d 拍平） */
@@ -1156,8 +1164,8 @@ page {
 
 @keyframes cigPullOut {
   0%   { transform: rotateY(var(--cig-rot)) translateY(-60px) scale(1); }
-  20%  { transform: rotateY(var(--cig-rot)) translateY(-90px) scale(1.04); }
-  100% { transform: rotateY(var(--cig-rot)) translateY(-340px) scale(0.1); }
+  25%  { transform: rotateY(var(--cig-rot)) translateY(-110px) scale(1.05); }
+  100% { transform: rotateY(var(--cig-rot)) rotateZ(6deg) translateY(-360px) scale(0); }
 }
 
 /* 开盖后“向上滑抽出”提示 */

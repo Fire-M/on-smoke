@@ -193,7 +193,7 @@ export default {
       this.lidOpen = true
       setTimeout(() => {
         if (this.lidOpen) this.showPullHint = true
-      }, 550)
+      }, 650)
     },
 
     pullCigarette() {
