@@ -146,7 +146,7 @@ export default {
     boxCigs() {
       if (!this.lidOpen) return []
       const count = Math.max(this.boxRemainingCigs, 0)
-      const mid = Math.floor(count / 2)
+      const mid = count <= 10 ? Math.floor(count / 2) : 4
       const cigs = Array.from({ length: count }, (_, index) => ({
         index,
         active: index === mid,
@@ -193,18 +193,20 @@ export default {
 
     pullCigarette() {
       if (!this.lidOpen || this.dragMoved) return
+      if (this.isPulling) return
       this.showPullHint = false
       this.isPulling = true
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
 
       // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）
+      // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转
       setTimeout(() => {
         this.boxRemainingCigs = remainingAfterPull
         uni.redirectTo({
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })
-      }, 820)
+      }, 900)
     },
 
     // 拖拽旋转
