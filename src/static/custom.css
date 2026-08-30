@@ -406,6 +406,7 @@ page {
 
 /* 正面 */
 .box-front {
+  -webkit-tap-highlight-color: transparent;
   width: var(--box-w);
   height: var(--box-h);
   top: var(--lid-h);
@@ -599,6 +600,7 @@ page {
 
 /* 盖子 - 铰链在背面顶部（Y=lid-h, Z=-box-d/2），关闭时向前折叠覆盖顶面 */
 .box-lid {
+  -webkit-tap-highlight-color: transparent;
   width: var(--box-w);
   height: var(--box-d);
   top: var(--lid-h);
@@ -962,6 +964,7 @@ page {
 /* ======== 烟盒内的香烟排（开盖后露出，向上滑抽出） ======== */
 
 .box-cigs {
+  -webkit-tap-highlight-color: transparent;
   --cig-expose: 75px;            /* 露出过滤嘴的长度 */
   --cig-w: 18px;                 /* 单支烟宽度 */
   --box-cig-d: 26px;             /* 盒内香烟3D直径 */
@@ -975,8 +978,7 @@ page {
   transform-style: preserve-3d;
   pointer-events: none;
   z-index: 1;
-  opacity: 0;
-  transition: opacity 0.4s ease-out 0.2s, transform 0.5s ease-out 0.1s;
+  transition: transform 0.5s ease-out 0.1s;
 }
 
 /* 每排香烟（一排10支）：两排叠放在同一底部，靠深度区分前后排 */
@@ -999,17 +1001,15 @@ page {
 
 /* 盖子打开后才显示香烟排，并允许点击，同时上移露出过滤嘴 */
 .box-3d.lid-open .box-cigs {
-  opacity: 1;
   pointer-events: auto;
   cursor: pointer;
   transform: translateY(-30px);
 }
 
-/* 开盖后隐藏顶面，让香烟过滤嘴可见 */
+/* 开盖后隐藏顶面，让香烟过滤嘴可见（用 display 直接移除，避免 opacity 触发 preserve-3d 拍平闪动） */
 .box-3d.lid-open > .box-top,
 .box-3d.lid-open .box-interior-top {
-  opacity: 0;
-  transition: opacity 0.3s ease-out;
+  display: none;
 }
 
 /* ==== 3D 盒内香烟：多面圆柱结构 ==== */
@@ -1143,28 +1143,21 @@ page {
   backface-visibility: hidden;
 }
 
-/* 中间那支（将被抽出） */
+/* 中间那支（将被抽出）。注意：preserve-3d 子节点上加 z-index / 改几何尺寸都会触发整盒重合成闪动，
+   故这里只保留 transform 立起姿态，不设置 z-index 与 --box-cig-d，避免点击瞬间的盒大小闪屏 */
 .box-cig-3d.is-active {
-  --box-cig-d: 26px;
-  z-index: 2;
   transform: rotateY(var(--cig-rot)) translateY(-60px);
 }
 
-/* 抽出动画：向上滑出（保留旋转） */
+/* 抽出动画：向上滑出（保留旋转，纯 transform/scale，不触发 preserve-3d 拍平） */
 .box-cig-3d.pulling {
   animation: cigPullOut 0.85s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
 }
 
 @keyframes cigPullOut {
-  0%   { transform: rotateY(var(--cig-rot)) translateY(-60px) scale(1); opacity: 1; }
-  20%  { transform: rotateY(var(--cig-rot)) translateY(-90px) scale(1.04); opacity: 1; }
-  100% { transform: rotateY(var(--cig-rot)) translateY(-340px) scale(0.9); opacity: 0; }
-}
-
-/* 抽烟时其余烟支轻微下沉/淡化（保留旋转） */
-.box-cigs.pulling-others .box-cig-3d:not(.is-active) {
-  opacity: 0.5;
-  transform: rotateY(var(--cig-rot)) translateY(6px);
+  0%   { transform: rotateY(var(--cig-rot)) translateY(-60px) scale(1); }
+  20%  { transform: rotateY(var(--cig-rot)) translateY(-90px) scale(1.04); }
+  100% { transform: rotateY(var(--cig-rot)) translateY(-340px) scale(0.1); }
 }
 
 /* 开盖后“向上滑抽出”提示 */
