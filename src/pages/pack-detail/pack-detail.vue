@@ -148,10 +148,13 @@ export default {
     boxCigs() {
       if (!this.lidOpen) return []
       const count = Math.max(this.boxRemainingCigs, 0)
-      const cigs = Array.from({ length: count }, (_, index) => ({
-        index,
-        rot: -6 + index * 2
-      }))
+      const cigs = Array.from({ length: count }, (_, index) => {
+        const colIndex = index % 10
+        return {
+          index,
+          rot: -4 + colIndex * (8 / Math.max(9, 1))
+        }
+      })
       const rows = []
       for (let i = 0; i < cigs.length; i += 10) rows.push(cigs.slice(i, i + 10))
       return rows

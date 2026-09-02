@@ -356,10 +356,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 :root,
 page {
-  --box-w: 295px;
-  --box-h: 360px;
+  --box-w: 280px;
+  --box-h: 340px;
   --box-d: 70px;
-  --lid-h: 100px;
+  --lid-h: 95px;
 }
 
 /* 场景容器 - 透视：绝对居中于页面 */
@@ -965,23 +965,24 @@ page {
 
 .box-cigs {
   -webkit-tap-highlight-color: transparent;
-  --cig-expose: 75px;            /* 露出过滤嘴的长度 */
+  --cig-expose: 10px;             /* 开盖后过滤嘴露出长度 */
   --cig-w: 18px;                 /* 单支烟宽度 */
-  --box-cig-d: 26px;             /* 盒内香烟3D直径 */
-  --box-cig-total-h: 340px;      /* 盒内香烟总高 */
+  --box-cig-d: 24px;             /* 盒内香烟3D直径 */
+  --box-cig-total-h: calc(var(--box-h) + var(--cig-expose)); /* 香烟总高 = 盒高 + 露出 */
   --box-cig-filter-ratio: 0.22;  /* 过滤嘴占比 */
   position: absolute;
-  top: calc(var(--lid-h) - var(--cig-expose));
+  bottom: 0;
   left: 0;
   width: var(--box-w);
   height: calc(var(--box-h) + var(--cig-expose));
   transform-style: preserve-3d;
   pointer-events: none;
   z-index: 1;
+  transform: translateZ(8px);
   transition: transform 0.5s ease-out 0.1s;
 }
 
-/* 每排香烟（一排10支）：两排叠放在同一底部，靠深度区分前后排 */
+/* 每排香烟（一排10支）：两排叠放，靠深度区分前后排，间距加宽避免遮挡 */
 .box-cig-row {
   position: absolute;
   left: 0;
@@ -990,20 +991,32 @@ page {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: 2px;
+  gap: 3px;
   transform-style: preserve-3d;
 }
 
-/* 后排香烟略微上提并后退，模拟烟包内双层叠放（仅露过滤嘴于前排之上） */
-.box-cig-row.is-back {
-  transform: translateY(-26px) translateZ(-18px);
+/* 前排烟略高，模拟真实烟盒前排更靠近开口的视觉效果 */
+.box-cig-row:not(.is-back) {
+  transform: translateY(-38px) translateZ(0);
 }
 
-/* 盖子打开后才显示香烟排，并允许点击，同时上移露出过滤嘴 */
+/* 后排往后（整体前移后收窄偏移，确保不超出盒背） */
+.box-cig-row.is-back {
+  transform: translateZ(-20px);
+}
+
+/* 关盖时烟排下移，将烟头藏到正面背后（盒顶开口以下） */
+.box-3d:not(.lid-open) .box-cig-row:not(.is-back) {
+  transform: translateY(calc(var(--cig-expose) + 32px)) translateZ(0);
+}
+.box-3d:not(.lid-open) .box-cig-row.is-back {
+  transform: translateY(calc(var(--cig-expose) + 32px)) translateZ(-20px);
+}
+
+/* 盖子打开后取消下移，烟头从盒顶开口自然露出 */
 .box-3d.lid-open .box-cigs {
   pointer-events: auto;
   cursor: pointer;
-  transform: translateY(-30px);
 }
 
 /* 开盖后隐藏顶面，让香烟过滤嘴可见（用 display 直接移除，避免 opacity 触发 preserve-3d 拍平闪动） */
@@ -1064,13 +1077,13 @@ page {
   backface-visibility: hidden;
 }
 
-/* 过滤嘴段（上部 - 暴露在盒口）- 渐变模拟圆柱 */
+/* 过滤嘴段（上部）- 固定高度，不随香烟总高缩放 */
 .box-cig-face .bcf-filter {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: calc(var(--box-cig-total-h) * var(--box-cig-filter-ratio));
+  height: calc(var(--box-h) * var(--box-cig-filter-ratio));
   background: linear-gradient(90deg,
     #a07840 0%,
     #b88850 15%,
@@ -1081,13 +1094,13 @@ page {
     #a07840 100%);
 }
 
-/* 烟身段（下部 - 在盒内）- 渐变模拟圆柱 */
+/* 烟身段（下部）- 固定高度，不随香烟总高缩放 */
 .box-cig-face .bcf-paper {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: calc(var(--box-cig-total-h) * (1 - var(--box-cig-filter-ratio)));
+  height: calc(var(--box-cig-total-h) - var(--box-h) * var(--box-cig-filter-ratio));
   background: linear-gradient(90deg,
     #b8b0a0 0%,
     #d8d0c0 15%,
@@ -1104,7 +1117,7 @@ page {
   left: 0;
   width: 100%;
   height: 2px;
-  top: calc(var(--box-cig-total-h) * var(--box-cig-filter-ratio));
+  top: calc(var(--box-h) * var(--box-cig-filter-ratio));
   background: linear-gradient(180deg, #b8884a 0%, #d4a86a 50%, #8a6430 100%);
 }
 
