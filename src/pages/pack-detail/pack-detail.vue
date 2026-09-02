@@ -54,7 +54,7 @@
               <view class="box-interior-face box-interior-top"></view>
             </view>
             <!-- 香烟排 -->
-            <view class="box-cigs" :class="{ 'lid-open': lidOpen }" @click="pullCigarette">
+            <view class="box-cigs" :class="{ 'lid-open': lidOpen }">
               <view
                 v-for="(row, ri) in boxCigs"
                 :key="ri"
@@ -65,8 +65,9 @@
                   v-for="cig in row"
                   :key="cig.index"
                   class="box-cig-3d"
-                  :class="{ 'is-active': cig.active, pulling: cig.active && isPulling }"
+                  :class="{ 'is-active': cig.index === activeIndex, pulling: cig.index === activeIndex && isPulling }"
                   :style="{ '--cig-rot': cig.rot + 'deg' }"
+                  @click="pullCig(cig.index)"
                 >
                   <view
                     v-for="face in cigFaces"
@@ -94,7 +95,7 @@
           </view>
         </view>
         <view class="box-pull-hint" :class="{ show: showPullHint }">
-          <text>点击香烟抽出</text>
+          <text>点击任意一支抽出</text>
         </view>
       </view>
     </view>
@@ -132,6 +133,7 @@ export default {
       dragMoved: false,
       boxRemainingCigs: 20,
       isPulling: false,
+      activeIndex: null,
       faceCount: 24
     }
   },
@@ -146,10 +148,8 @@ export default {
     boxCigs() {
       if (!this.lidOpen) return []
       const count = Math.max(this.boxRemainingCigs, 0)
-      const mid = count <= 10 ? Math.floor(count / 2) : 4
       const cigs = Array.from({ length: count }, (_, index) => ({
         index,
-        active: index === mid,
         rot: -6 + index * 2
       }))
       const rows = []
@@ -183,6 +183,7 @@ export default {
   onShow() {
     // 从抽烟页 navigateBack 回来时复位，避免 isPulling 卡死导致抽不出
     this.isPulling = false
+    this.activeIndex = null
   },
 
   methods: {
@@ -196,10 +197,11 @@ export default {
       }, 650)
     },
 
-    pullCigarette() {
+    pullCig(index) {
       if (!this.lidOpen || this.dragMoved) return
       if (this.isPulling) return
       this.showPullHint = false
+      this.activeIndex = index
       this.isPulling = true
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
