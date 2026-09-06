@@ -339,9 +339,17 @@ export default {
 
   methods: {
     goBack() {
-      // 标记为取消，不记录抽烟
-      this.cancelled = true
-      // 恢复包剩余（抽出前未持久化，此处也无需恢复存储）
+      // 只有未点火时返回才算取消，点了火就算中途返回也记录
+      if (!this.smokeStartTime) {
+        this.cancelled = true
+      } else {
+        // 已点火，返回前记录抽了一根
+        const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
+        Store.recordSmoke(duration, this.brandId)
+        if (this.brandId) {
+          Store.savePackRemaining(this.brandId, this.remaining)
+        }
+      }
       // 清理资源
       this.cleanup()
       // 返回首页
