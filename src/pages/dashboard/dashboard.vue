@@ -215,8 +215,8 @@ export default {
       this.totalSmoked = stats.totalSmoked || 0
       this.totalSaved = Store.getSavedMoney().toFixed(1)
       
-      // 最长连续天数
-      this.bestStreak = this.calcBestStreak(history)
+      // 最长连续天数（统一使用 stats.maxStreak，与成就页一致）
+      this.bestStreak = stats.maxStreak || 0
       
       // 最少一天
       const dailyCounts = {}

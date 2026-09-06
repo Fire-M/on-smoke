@@ -46,7 +46,8 @@ const DEFAULT_TODAY = {
 const DEFAULT_STATS = {
   totalSmoked: 0,
   totalSaved: 0,
-  longestSmokeFree: 0
+  longestSmokeFree: 0,
+  maxStreak: 0
 }
 
 function _todayStr() {
@@ -167,6 +168,11 @@ export function recordSmoke(duration, brandId = null) {
   stats.totalSmoked += 1
   const pricePerCig = settings.cigarettePrice / settings.packSize
   stats.totalSaved = (stats.totalSaved || 0) + pricePerCig
+  // 更新最大连续打卡天数
+  const currentStreak = getChallengeStreak()
+  if (currentStreak > (stats.maxStreak || 0)) {
+    stats.maxStreak = currentStreak
+  }
   saveStats(stats)
 
   // 抽烟会伤害宠物伙伴
