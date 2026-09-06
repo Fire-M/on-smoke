@@ -172,39 +172,4 @@ button::after {
   color: var(--bg) !important;
 }
 
-/* 工具按钮 */
-.st-tool {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 12rpx;
-  background: transparent;
-  border: none;
-  color: #9ca3af;
-}
-
-.st-tool-ic {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background-color: rgba(31, 31, 31, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.st-tool-lbl {
-  display: flex;
-  flex-direction: column;
-}
-
-.st-tool-name {
-  font-size: 22rpx;
-  color: #9ca3af;
-}
-
-.st-tool-val {
-  font-size: 18rpx;
-  color: #6b7280;
-}
 </style>

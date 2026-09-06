@@ -45,22 +45,6 @@ button:focus-visible,
   color: #07130b !important;
 }
 
-/* 卡片基础样式 */
-.card {
-  background: #1f1f1f;
-  border: 1px solid #2a2a2a;
-  border-radius: 16px;
-}
-
-/* Tab 按钮 */
-.tab-btn {
-  color: #737373;
-  transition: color 0.2s;
-}
-.tab-btn.active {
-  color: #f59e0b;
-}
-
 /* 隐藏滚动条但保持可滚动 */
 .view::-webkit-scrollbar {
   display: none;
