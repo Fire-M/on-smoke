@@ -209,14 +209,11 @@ export default {
 
     loadRecords() {
       const history = Store.getHistory()
-      const settings = Store.getSettings()
-      const pricePerCig = settings.cigarettePrice / settings.packSize
+      const stats = Store.getStats()
       
-      // 总吸烟数
-      this.totalSmoked = history.length
-      
-      // 累计省钱
-      this.totalSaved = (history.length * pricePerCig).toFixed(1)
+      // 总吸烟数 & 累计省钱（统一使用 stats，与 index.vue 一致）
+      this.totalSmoked = stats.totalSmoked || 0
+      this.totalSaved = Store.getSavedMoney().toFixed(1)
       
       // 最长连续天数
       this.bestStreak = this.calcBestStreak(history)

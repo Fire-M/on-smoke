@@ -180,7 +180,8 @@ export default {
   onLoad(options) {
     const brandId = options.brandId || 'lanhe'
     this.brand = BRANDS[brandId] || BRANDS.lanhe
-    this.boxRemainingCigs = this.brand.packSize || 20
+    // 从持久化存储读取包剩余（跨天不重置）
+    this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
   },
 
   onShow() {
@@ -213,6 +214,8 @@ export default {
       // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转
       setTimeout(() => {
         this.boxRemainingCigs = remainingAfterPull
+        // 持久化包剩余数
+        Store.savePackRemaining(this.brand.id, remainingAfterPull)
         uni.navigateTo({
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })

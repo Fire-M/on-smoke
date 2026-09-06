@@ -20,7 +20,8 @@ const KEYS = {
     petAccessories: 'os_pet_accessories',
   backgrounds: 'os_backgrounds',
   smokeStyles: 'os_smoke_styles',
-  theme: 'os_theme'
+  theme: 'os_theme',
+  packRemaining: 'os_pack_remaining'
 }
 
 // 默认设置
@@ -179,12 +180,23 @@ export function getBrandSmokedCount(brandId) {
   return today.brandCounts[brandId]
 }
 
-// 获取某品牌今日剩余数量（按一包支数计算）
-export function getBrandRemaining(brandId) {
+// ---- 每包烟剩余持久化 ----
+export function getPackRemaining(brandId) {
+  const data = _read(KEYS.packRemaining, {})
   const settings = getSettings()
-  const quota = settings.packSize || 20
-  const smoked = getBrandSmokedCount(brandId)
-  return Math.max(0, quota - smoked)
+  const packSize = settings.packSize || 20
+  return data[brandId] != null ? data[brandId] : packSize
+}
+
+export function savePackRemaining(brandId, count) {
+  const data = _read(KEYS.packRemaining, {})
+  data[brandId] = Math.max(0, count)
+  _write(KEYS.packRemaining, data)
+}
+
+// 获取某品牌剩余数量（基于持久化的包剩余，跨天不重置）
+export function getBrandRemaining(brandId) {
+  return getPackRemaining(brandId)
 }
 
 export function getSmokeFreeDuration() {
@@ -918,6 +930,7 @@ export default {
   canSmoke, getCooldownRemain,
   recordSmoke,
   getBrandSmokedCount, getBrandRemaining,
+  getPackRemaining, savePackRemaining,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
