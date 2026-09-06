@@ -43,28 +43,14 @@
     <!-- 肺部承受力可视化 -->
     <view class="lung-container" v-if="state !== 'ready' && state !== 'burnout' && state !== 'cooldown'">
       <view class="lung-visual">
-        <!-- 肺部图标 -->
+        <!-- 肺部图标（Canvas 绘制，从底部逐渐填充颜色） -->
         <view class="lung-icon">
-          <svg viewBox="0 0 100 100" class="lung-svg">
-            <!-- 左肺 -->
-            <path class="lung-path lung-left" :class="{ 'lung-full': lungFill >= 100 }"
-              d="M 30 20 Q 20 25 18 35 Q 15 50 20 65 Q 25 75 35 75 Q 40 75 42 70 Q 45 60 43 45 Q 42 30 38 22 Z"
-              :style="{ fill: getLungColor(lungFill) }" />
-            <!-- 右肺 -->
-            <path class="lung-path lung-right" :class="{ 'lung-full': lungFill >= 100 }"
-              d="M 70 20 Q 80 25 82 35 Q 85 50 80 65 Q 75 75 65 75 Q 60 75 58 70 Q 55 60 57 45 Q 58 30 62 22 Z"
-              :style="{ fill: getLungColor(lungFill) }" />
-            <!-- 气管 -->
-            <path class="lung-trachea" d="M 50 15 L 50 35 M 50 35 Q 45 40 40 45 M 50 35 Q 55 40 60 45"
-              stroke="var(--text-dim)" stroke-width="2" fill="none" />
-          </svg>
-          <!-- 填充动画层 -->
-          <view class="lung-fill-overlay" :style="{ height: lungFill + '%', background: getLungGradient(lungFill) }"></view>
+          <canvas type="2d" id="lung-canvas" class="lung-canvas"></canvas>
         </view>
         <!-- 数值显示 -->
         <view class="lung-info">
-          <text class="lung-label">🫁 肺部负荷</text>
-          <text class="lung-value" :class="{ 'lung-warning': lungFill > 70 }">{{ Math.round(lungFill) }}%</text>
+          <text class="lung-label">肺部负荷</text>
+          <text class="lung-value" :class="{ 'lung-warning': lungFill > 70 }" :style="{ color: getLungColor(lungFill) }">{{ Math.round(lungFill) }}%</text>
         </view>
       </view>
       <!-- 警告提示 -->
@@ -175,6 +161,9 @@ export default {
       sessionStartTs: 0,
       sessionExhaleCount: 0,
       lungFill: 0,  // 肺部填充度 (0-100)
+      lungCtx: null,  // 肺部 canvas 上下文
+      lungW: 0,       // 肺部 canvas 逻辑宽
+      lungH: 0,       // 肺部 canvas 逻辑高
       // 计时器
       smokeTimer: null,
       pressTimer: null,
@@ -299,6 +288,13 @@ export default {
   watch: {
     state(newVal, oldVal) {
       this.syncSmokeMode(newVal, oldVal)
+      // 肺部容器首次显示时初始化 canvas
+      if (oldVal === 'ready' && newVal !== 'ready') {
+        this.$nextTick(() => { setTimeout(() => this.initLungCanvas(), 80) })
+      }
+    },
+    lungFill() {
+      if (this.lungCtx) this.drawLung()
     }
   },
 
@@ -351,18 +347,156 @@ export default {
 
     // 根据肺部填充度返回颜色
     getLungColor(fill) {
-      if (fill >= 100) return '#ef4444'  // 红色 - 已满
-      if (fill >= 80) return 'var(--primary-2)'   // 橙色 - 接近满
-      if (fill >= 60) return '#eab308'   // 黄色 - 中等
-      if (fill >= 40) return '#84cc16'   // 黄绿色 - 较轻
-      if (fill >= 20) return '#22c55e'   // 绿色 - 正常
-      return '#10b981'                    // 深绿色 - 健康
+      if (fill >= 100) return '#ef4444'
+      if (fill >= 80) return '#f97316'
+      if (fill >= 60) return '#eab308'
+      if (fill >= 40) return '#84cc16'
+      if (fill >= 20) return '#22c55e'
+      return '#10b981'
     },
 
-    // 根据肺部填充度返回渐变
-    getLungGradient(fill) {
-      const color = this.getLungColor(fill)
-      return `linear-gradient(to top, ${color} 0%, ${color}80 100%)`
+    // ---- 肺部 Canvas 绘制 ----
+    initLungCanvas() {
+      uni.createSelectorQuery().in(this)
+        .select('#lung-canvas').fields({ node: true, size: true })
+        .exec((res) => {
+          if (!res || !res[0] || !res[0].node) return
+          const canvas = res[0].node
+          const ctx = canvas.getContext('2d')
+          let dpr = 2
+          try { dpr = Math.min(uni.getSystemInfoSync().pixelRatio || 1, 2) } catch (e) {}
+          const w = res[0].width
+          const h = res[0].height
+          canvas.width = w * dpr
+          canvas.height = h * dpr
+          ctx.scale(dpr, dpr)
+          this.lungCtx = ctx
+          this.lungW = w
+          this.lungH = h
+          this.drawLung()
+        })
+    },
+
+    drawLung() {
+      const ctx = this.lungCtx
+      if (!ctx) return
+      const w = this.lungW
+      const h = this.lungH
+      const fill = this.lungFill
+      ctx.clearRect(0, 0, w, h)
+
+      // 构建左右肺叶路径
+      const buildLungPaths = () => {
+        // 左肺（2叶，有心切迹）
+        ctx.beginPath()
+        ctx.moveTo(w * 0.44, h * 0.16)
+        ctx.bezierCurveTo(w * 0.40, h * 0.10, w * 0.24, h * 0.08, w * 0.16, h * 0.18)
+        ctx.bezierCurveTo(w * 0.06, h * 0.30, w * 0.04, h * 0.50, w * 0.06, h * 0.66)
+        ctx.bezierCurveTo(w * 0.08, h * 0.78, w * 0.16, h * 0.90, w * 0.28, h * 0.92)
+        ctx.bezierCurveTo(w * 0.36, h * 0.93, w * 0.43, h * 0.84, w * 0.45, h * 0.74)
+        ctx.bezierCurveTo(w * 0.47, h * 0.64, w * 0.44, h * 0.50, w * 0.43, h * 0.40)
+        ctx.bezierCurveTo(w * 0.42, h * 0.30, w * 0.44, h * 0.22, w * 0.44, h * 0.16)
+        ctx.closePath()
+        // 右肺（3叶，略大）—— 同一 path 的新子路径
+        ctx.moveTo(w * 0.56, h * 0.16)
+        ctx.bezierCurveTo(w * 0.60, h * 0.10, w * 0.76, h * 0.08, w * 0.84, h * 0.18)
+        ctx.bezierCurveTo(w * 0.94, h * 0.30, w * 0.96, h * 0.50, w * 0.94, h * 0.66)
+        ctx.bezierCurveTo(w * 0.92, h * 0.78, w * 0.84, h * 0.90, w * 0.72, h * 0.92)
+        ctx.bezierCurveTo(w * 0.64, h * 0.93, w * 0.57, h * 0.84, w * 0.55, h * 0.74)
+        ctx.bezierCurveTo(w * 0.53, h * 0.64, w * 0.56, h * 0.50, w * 0.57, h * 0.40)
+        ctx.bezierCurveTo(w * 0.58, h * 0.30, w * 0.56, h * 0.22, w * 0.56, h * 0.16)
+        ctx.closePath()
+      }
+
+      // 填充：从底部向上，clip 到肺形
+      if (fill > 0) {
+        ctx.save()
+        buildLungPaths()
+        ctx.clip()
+        const fillH = h * (fill / 100)
+        ctx.fillStyle = this.getLungColor(fill)
+        ctx.globalAlpha = 0.65
+        ctx.fillRect(0, h - fillH, w, fillH)
+        ctx.globalAlpha = 1
+        ctx.restore()
+      }
+
+      // 肺叶轮廓
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+      ctx.lineWidth = 1.5
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      buildLungPaths()
+      ctx.stroke()
+
+      // 肺叶分界线
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+      ctx.lineWidth = 0.8
+      // 左肺斜裂（2叶）
+      ctx.beginPath()
+      ctx.moveTo(w * 0.43, h * 0.42)
+      ctx.bezierCurveTo(w * 0.34, h * 0.50, w * 0.20, h * 0.62, w * 0.08, h * 0.68)
+      ctx.stroke()
+      // 右肺斜裂
+      ctx.beginPath()
+      ctx.moveTo(w * 0.57, h * 0.42)
+      ctx.bezierCurveTo(w * 0.66, h * 0.50, w * 0.80, h * 0.62, w * 0.92, h * 0.68)
+      ctx.stroke()
+      // 右肺水平裂（3叶分界）
+      ctx.beginPath()
+      ctx.moveTo(w * 0.57, h * 0.36)
+      ctx.bezierCurveTo(w * 0.68, h * 0.34, w * 0.82, h * 0.36, w * 0.94, h * 0.40)
+      ctx.stroke()
+
+      // 气管（有宽度）
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(w * 0.475, h * 0.02)
+      ctx.lineTo(w * 0.475, h * 0.32)
+      ctx.moveTo(w * 0.525, h * 0.02)
+      ctx.lineTo(w * 0.525, h * 0.32)
+      // 气管横纹
+      for (let i = 0; i < 4; i++) {
+        const y = h * (0.06 + i * 0.065)
+        ctx.moveTo(w * 0.475, y)
+        ctx.lineTo(w * 0.525, y)
+      }
+      ctx.stroke()
+
+      // 主支气管分叉
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+      ctx.lineWidth = 1.2
+      ctx.beginPath()
+      ctx.moveTo(w * 0.48, h * 0.32)
+      ctx.bezierCurveTo(w * 0.42, h * 0.38, w * 0.34, h * 0.44, w * 0.26, h * 0.48)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(w * 0.52, h * 0.32)
+      ctx.bezierCurveTo(w * 0.58, h * 0.38, w * 0.66, h * 0.44, w * 0.74, h * 0.48)
+      ctx.stroke()
+
+      // 次级支气管分支
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.lineWidth = 0.8
+      // 左侧分支
+      ctx.beginPath()
+      ctx.moveTo(w * 0.34, h * 0.44)
+      ctx.bezierCurveTo(w * 0.28, h * 0.42, w * 0.22, h * 0.38, w * 0.18, h * 0.36)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(w * 0.26, h * 0.48)
+      ctx.bezierCurveTo(w * 0.22, h * 0.54, w * 0.16, h * 0.58, w * 0.12, h * 0.56)
+      ctx.stroke()
+      // 右侧分支
+      ctx.beginPath()
+      ctx.moveTo(w * 0.66, h * 0.44)
+      ctx.bezierCurveTo(w * 0.72, h * 0.42, w * 0.78, h * 0.38, w * 0.82, h * 0.36)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(w * 0.74, h * 0.48)
+      ctx.bezierCurveTo(w * 0.78, h * 0.54, w * 0.84, h * 0.58, w * 0.88, h * 0.56)
+      ctx.stroke()
     },
 
     cleanup() {
@@ -380,6 +514,7 @@ export default {
       if (this.burnAudio) { try { this.burnAudio.destroy() } catch(e) {}; this.burnAudio = null }
       if (this.exhaleAudio) { try { this.exhaleAudio.destroy() } catch(e) {}; this.exhaleAudio = null }
       this.setSmokeMode('off')
+      this.lungCtx = null
     },
 
     // ============ Canvas 烟雾粒子系统（小程序兼容，参考 test-smoke-svg） ============
@@ -1801,8 +1936,8 @@ export default {
 .lung-container {
   position: absolute;
   top: 160rpx;
-  left: 40rpx;
-  width: 220rpx;
+  left: 30rpx;
+  width: 290rpx;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 24rpx;
   padding: 24rpx;
@@ -1820,43 +1955,13 @@ export default {
 
 .lung-icon {
   position: relative;
-  width: 150rpx;
-  height: 150rpx;
-  overflow: hidden;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.05);
+  width: 240rpx;
+  height: 200rpx;
 }
 
-.lung-svg {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-.lung-path {
-  transition: fill 0.3s ease;
-  stroke: rgba(255, 255, 255, 0.3);
-  stroke-width: 1;
-}
-
-.lung-path.lung-full {
-  animation: lungPulse 1s ease-in-out infinite;
-}
-
-.lung-trachea {
-  opacity: 0.6;
-}
-
-.lung-fill-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  transition: height 0.3s ease;
-  opacity: 0.6;
-  z-index: 1;
-  border-radius: 16rpx;
+.lung-canvas {
+  width: 240rpx;
+  height: 200rpx;
 }
 
 .lung-info {
@@ -1895,11 +2000,6 @@ export default {
   font-size: 20rpx;
   color: #ef4444;
   text-align: center;
-}
-
-@keyframes lungPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
 }
 
 @keyframes textPulse {
