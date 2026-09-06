@@ -15,6 +15,9 @@
       <!-- 2D 香烟 -->
       <view class="cigarette-3d" ref="cigarette3d" :class="cigClass" :style="cigBurnStyle">
         <view class="cig-flat-ash" :class="{ show: ashGrowth > 0, 'ash-falling': ashFalling }" :style="ashStyle"></view>
+        <!-- 烟灰碎片粒子（数据驱动，小程序兼容） -->
+        <view v-for="p in ashParticles" :key="p.id" class="ash-particle"
+          :style="p.style"></view>
         <view class="cig-flat-charring" :class="{ show: ashGrowth > 0 }" :style="{ opacity: ashGrowth > 0 ? (0.4 + Math.min(1, ashGrowth / 80) * 0.6) : 0 }"></view>
         <view class="cig-flat-burn">
           <view class="cig-flat-burn-core"></view>
@@ -155,6 +158,8 @@ export default {
       // 烟灰
       ashGrowth: 0,
       ashFalling: false,
+      ashParticles: [],  // 烟灰碎片粒子（数据驱动，跨端兼容）
+      ashParticleId: 0,  // 粒子自增 id
       // 吸烟进度
       smokeProgress: 0,
       smokeStartTime: 0,
@@ -168,6 +173,8 @@ export default {
       smokeTimer: null,
       pressTimer: null,
       puffTimer: null,  // 单次吸烟自动停止计时器
+      exhaleTimer: null,  // 吐烟时肺部递减计时器
+      exhaleEndTimer: null,  // 吐烟结束延时计时器
       isPressing: false,
       // 拖拽检测
       isDragging: false,
@@ -503,6 +510,8 @@ export default {
       if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
       if (this.pressTimer) { clearTimeout(this.pressTimer); this.pressTimer = null }
       if (this.puffTimer) { clearTimeout(this.puffTimer); this.puffTimer = null }
+      if (this.exhaleTimer) { clearInterval(this.exhaleTimer); this.exhaleTimer = null }
+      if (this.exhaleEndTimer) { clearTimeout(this.exhaleEndTimer); this.exhaleEndTimer = null }
       if (this.ringPressTimer) { clearTimeout(this.ringPressTimer); this.ringPressTimer = null }
       this.stopCanvasLoop()
       this.stopDomFilter()
@@ -515,6 +524,7 @@ export default {
       if (this.exhaleAudio) { try { this.exhaleAudio.destroy() } catch(e) {}; this.exhaleAudio = null }
       this.setSmokeMode('off')
       this.lungCtx = null
+      this.ashParticles = []  // 清空烟灰粒子
     },
 
     // ============ Canvas 烟雾粒子系统（小程序兼容，参考 test-smoke-svg） ============
@@ -796,6 +806,51 @@ export default {
       }
     },
 
+    // ============ 吐烟流程（共享方法，消除重复） ============
+    /**
+     * 统一的吐烟流程：停止吸烟 → 进入吐烟状态 → 肺部递减 → 结束后回调
+     * @param {Object} opts
+     * @param {number} opts.intensity - 吐烟强度（影响烟雾量）
+     * @param {number} opts.duration - 吐烟动画时长 ms
+     * @param {string} opts.vibrateType - 振动类型 'light' | 'medium' | 'heavy'
+     * @param {Function|null} opts.onComplete - 吐烟结束后的回调（不传则根据 progress 自动判断）
+     */
+    startExhale({ intensity, duration, vibrateType = 'light', onComplete = null }) {
+      // 停止吸烟计时
+      if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
+      this.stopBurnSound()
+
+      // 进入吐烟状态
+      this.state = 'exhaling'
+      this.sessionExhaleCount++
+      if (uni.vibrateShort) uni.vibrateShort({ type: vibrateType })
+      this.exhaleByIntensity(intensity)
+      this.playExhale(intensity)
+
+      // 肺部填充度平滑递减
+      if (this.lungFill > 0) {
+        const perTick = this.lungFill / (duration / 50)
+        this.exhaleTimer = setInterval(() => {
+          this.lungFill = Math.max(0, this.lungFill - perTick)
+        }, 50)
+      }
+
+      // 吐烟结束后：重置并进入下一阶段
+      this.exhaleEndTimer = setTimeout(() => {
+        if (this.exhaleTimer) { clearInterval(this.exhaleTimer); this.exhaleTimer = null }
+        this.lungFill = 0
+        if (onComplete) {
+          onComplete()
+        } else if (this.smokeProgress >= 100) {
+          this.finishSmoking()
+        } else {
+          this.state = 'lit'
+          this.showHint = true
+          this.hintText = '长按继续吸'
+        }
+      }, duration)
+    },
+
     // ---- 手势处理 ----
     onPointerDown(e) {
       const point = e.touches ? e.touches[0] : e
@@ -810,12 +865,9 @@ export default {
         this.hintText = ''
         this.showHint = true
         this.pressTimer = setTimeout(() => {
-          this.state = 'lit'
-          this.showHint = true
-          this.hintText = '长按吸烟'
+          // 点火成功，直接进入吸烟状态（跳过无效的 lit 中间态）
           if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
           this.playFire()  // 点火音效
-          // 仍在按住：点火后自动进入吸烟，使单次长按即可「点燃→吸烟」
           this.state = 'smoking'
           this.smokeStartTime = Date.now()
           this.currentPuffStart = Date.now()
@@ -826,32 +878,19 @@ export default {
           this.puffTimer = setTimeout(() => {
             if (this.state === 'smoking') {
               this.isPressing = false
-              clearInterval(this.smokeTimer)
-              this.smokeTimer = null
-              this.stopBurnSound()
-              const puffDuration = MAX_PUFF_DURATION
               const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
-              const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
-              const intensity = progressFactor * puffFactor
-              this.state = 'exhaling'
-              this.sessionExhaleCount++
-              if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
-              this.exhaleByIntensity(intensity)
-              this.playExhale(intensity)
-              const exhaleDuration = 2000
-              const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
-              const exhaleTimer = setInterval(() => {
-                this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
-              }, 50)
-              setTimeout(() => {
-                clearInterval(exhaleTimer)
-                this.lungFill = 0
-                if (this.state === 'exhaling') {
-                  this.state = 'lit'
-                  this.showHint = true
-                  this.hintText = '长按吸烟'
+              const puffFactor = Math.min(2.0, 0.5 + MAX_PUFF_DURATION / 3000)
+              this.startExhale({
+                intensity: progressFactor * puffFactor,
+                duration: 2000,
+                onComplete: () => {
+                  if (this.state === 'exhaling') {
+                    this.state = 'lit'
+                    this.showHint = true
+                    this.hintText = '长按吸烟'
+                  }
                 }
-              }, exhaleDuration)
+              })
             }
           }, MAX_PUFF_DURATION)
         }, IGNITE_DELAY)
@@ -877,42 +916,20 @@ export default {
         // 设置单次吸烟最长时长限制
         this.puffTimer = setTimeout(() => {
           if (this.state === 'smoking') {
-            // 自动停止吸烟
             this.isPressing = false
-            clearInterval(this.smokeTimer)
-            this.smokeTimer = null
-            this.stopBurnSound()
-            
-            // 计算吸入时长
-            const puffDuration = MAX_PUFF_DURATION
             const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
-            const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
-            const intensity = progressFactor * puffFactor
-            
-            this.state = 'exhaling'
-            this.sessionExhaleCount++
-            if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
-            
-            // 触发吐烟
-            this.exhaleByIntensity(intensity)
-            this.playExhale(intensity)
-            
-            // 吐烟过程中平滑减少肺部填充度
-            const exhaleDuration = 2000
-            const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
-            const exhaleTimer = setInterval(() => {
-              this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
-            }, 50)
-            
-            setTimeout(() => {
-              clearInterval(exhaleTimer)
-              this.lungFill = 0  // 确保完全重置
-              if (this.state === 'exhaling') {
-                this.state = 'lit'
-                this.showHint = true
-                this.hintText = '长按吸烟'
+            const puffFactor = Math.min(2.0, 0.5 + MAX_PUFF_DURATION / 3000)
+            this.startExhale({
+              intensity: progressFactor * puffFactor,
+              duration: 2000,
+              onComplete: () => {
+                if (this.state === 'exhaling') {
+                  this.state = 'lit'
+                  this.showHint = true
+                  this.hintText = '长按吸烟'
+                }
               }
-            }, exhaleDuration)
+            })
           }
         }, MAX_PUFF_DURATION)
       }
@@ -953,41 +970,13 @@ export default {
       }
 
       if (this.state === 'smoking') {
-        // 停止燃烧音效
-        this.stopBurnSound()
-        // 计算本次吸入时长，越久吐烟越多
         const puffDuration = this.currentPuffStart ? Date.now() - this.currentPuffStart : 1000
-        // 综合因素：进度越后烟越浓，吸入越久烟越多
-        const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6  // 0.4 ~ 1.0
-        const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)     // 0.5 ~ 2.0
-        const intensity = progressFactor * puffFactor                     // ~0.2 ~ 2.0
-        this.state = 'exhaling'
-        this.sessionExhaleCount++
-        if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
-
-        // 根据强度触发吐烟
-        this.exhaleByIntensity(intensity)
-        // 吐烟音效
-        this.playExhale(intensity)
-        
-        // 吐烟过程中平滑减少肺部填充度
-        const exhaleDuration = 2200  // 吐烟动画时长
-        const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)  // 每 50ms 减少的量
-        const exhaleTimer = setInterval(() => {
-          this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
-        }, 50)
-        
-        setTimeout(() => {
-          clearInterval(exhaleTimer)
-          this.lungFill = 0  // 确保完全重置
-          if (this.smokeProgress >= 100) {
-            this.finishSmoking()
-          } else {
-            this.state = 'lit'
-            this.showHint = true
-            this.hintText = '长按继续吸'
-          }
-        }, exhaleDuration)
+        const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
+        const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
+        this.startExhale({
+          intensity: progressFactor * puffFactor,
+          duration: 2200
+        })
       }
     },
 
@@ -995,53 +984,42 @@ export default {
     startSmokeProgress() {
       let lastAshTick = 0
       this.smokeTimer = setInterval(() => {
-        // 安全检查：只有用户正在按压时才推进进度
+        // 安全检查：用户已松手但 onPointerUp 未触发时，作为后备触发吐烟
         if (!this.isPressing) {
           clearInterval(this.smokeTimer)
           this.smokeTimer = null
+          if (this.state === 'smoking') {
+            const puffDuration = this.currentPuffStart ? Date.now() - this.currentPuffStart : 1000
+            const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
+            const puffFactor = Math.min(2.0, 0.5 + puffDuration / 3000)
+            this.startExhale({ intensity: progressFactor * puffFactor, duration: 2200 })
+          }
           return
         }
         
         const elapsed = Date.now() - this.smokeStartTime
         this.smokeProgress = Math.min(100, (elapsed / SMOKING_DURATION) * 100)
 
-        // 肺部填充度增加：适中速度
-        // 吸烟越久，增加越多
-        const lungIncrease = 0.8 + (this.smokeProgress / 100) * 0.7  // 0.8 ~ 1.5% per tick
+        // 肺部填充度增加：适中速度（0.5~0.9%/tick，约 5.5~10 秒填满）
+        const lungIncrease = 0.5 + (this.smokeProgress / 100) * 0.4
         this.lungFill = Math.min(100, this.lungFill + lungIncrease)
 
         // 肺部已满，强制停止吸烟
         if (this.lungFill >= 100) {
-          clearInterval(this.smokeTimer)
-          this.smokeTimer = null
           this.isPressing = false
-          this.stopBurnSound()
-          
-          // 强制进入吐烟状态
           const intensity = 1.5 + (this.smokeProgress / 100) * 0.5
-          this.state = 'exhaling'
-          this.sessionExhaleCount++
-          if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })
-          
-          this.exhaleByIntensity(intensity)
-          this.playExhale(intensity)
-          
-          // 吐烟过程中平滑减少肺部填充度
-          const exhaleDuration = 2500
-          const lungDecreasePerTick = this.lungFill / (exhaleDuration / 50)
-          const exhaleTimer = setInterval(() => {
-            this.lungFill = Math.max(0, this.lungFill - lungDecreasePerTick)
-          }, 50)
-          
-          setTimeout(() => {
-            clearInterval(exhaleTimer)
-            this.lungFill = 0  // 确保完全重置
-            if (this.state === 'exhaling') {
-              this.state = 'lit'
-              this.showHint = true
-              this.hintText = '长按吸烟'
+          this.startExhale({
+            intensity,
+            duration: 2500,
+            vibrateType: 'heavy',
+            onComplete: () => {
+              if (this.state === 'exhaling') {
+                this.state = 'lit'
+                this.showHint = true
+                this.hintText = '长按吸烟'
+              }
             }
-          }, exhaleDuration)
+          })
           return
         }
 
@@ -1052,7 +1030,19 @@ export default {
         }
 
         if (this.smokeProgress >= 100) {
-          this.finishSmoking()
+          clearInterval(this.smokeTimer)
+          this.smokeTimer = null
+          // 进度满了，先触发吐烟再结束（避免跳过吐烟流程）
+          if (this.state === 'smoking') {
+            this.isPressing = false
+            this.startExhale({
+              intensity: 1.2,
+              duration: 2000,
+              onComplete: () => { this.finishSmoking() }
+            })
+          } else {
+            this.finishSmoking()
+          }
         }
       }, 50)
     },
@@ -1092,58 +1082,36 @@ export default {
       }
     },
 
-    // 创建烟灰掉落粒子，数量与烟灰量成正比
+    // 创建烟灰掉落粒子，数量与烟灰量成正比（数据驱动，小程序兼容）
     createAshParticles(ashAmount) {
-      const container = this.$refs.cigarette3d?.$el || this.$refs.cigarette3d
-      if (!container) return
-      
-      // 烟灰越多，碎片越多（基础 6 个，最多 20 个）
-      const particleCount2 = Math.min(20, 6 + Math.floor(ashAmount / 15))
-      
-      for (let i = 0; i < particleCount2; i++) {
-        const particle = document.createElement('div')
-        particle.className = 'ash-particle'
-        
-        // 随机碎片大小
+      const particleCount = Math.min(20, 6 + Math.floor(ashAmount / 15))
+      for (let i = 0; i < particleCount; i++) {
         const size = 3 + Math.random() * 6
-        particle.style.width = size + 'px'
-        particle.style.height = size * (0.5 + Math.random() * 0.7) + 'px'
-        
-        // 从烟灰两侧不规则落下
-        // 左侧或右侧随机
         const side = Math.random() > 0.5 ? 1 : -1
-        // 水平偏移：从烟身中心向两侧散开
         const startX = side * (5 + Math.random() * 15)
-        // 垂直位置：烟灰顶部区域
         const startY = Math.random() * 15
-        
-        particle.style.left = `calc(50% + ${startX}px)`
-        particle.style.top = `-${startY}px`
-        
-        // 运动方向：向下并向两侧散开
         const angle = (side > 0 ? 20 : -20) + (Math.random() - 0.5) * 40
         const velocity = 60 + Math.random() * 50
         const vx = Math.sin(angle * Math.PI / 180) * velocity * side
         const vy = Math.cos(angle * Math.PI / 180) * velocity
-        
-        // 随机旋转
         const rotation = (Math.random() - 0.5) * 540 * side
-        
-        // 设置动画变量
-        particle.style.setProperty('--vx', vx + 'px')
-        particle.style.setProperty('--vy', vy + 'px')
-        particle.style.setProperty('--rotation', rotation + 'deg')
-        
-        // 随机延迟，让掉落更自然
-        particle.style.animationDelay = (Math.random() * 0.15) + 's'
-        
-        container.appendChild(particle)
-        
+        const id = ++this.ashParticleId
+        this.ashParticles.push({
+          id,
+          style: {
+            width: size + 'px',
+            height: size * (0.5 + Math.random() * 0.7) + 'px',
+            left: `calc(50% + ${startX}px)`,
+            top: `-${startY}px`,
+            '--vx': vx + 'px',
+            '--vy': vy + 'px',
+            '--rotation': rotation + 'deg',
+            animationDelay: (Math.random() * 0.15) + 's'
+          }
+        })
         // 动画结束后移除
         setTimeout(() => {
-          if (particle.parentNode) {
-            particle.parentNode.removeChild(particle)
-          }
+          this.ashParticles = this.ashParticles.filter(p => p.id !== id)
         }, 1300)
       }
     },
