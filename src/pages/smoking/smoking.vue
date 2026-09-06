@@ -341,6 +341,7 @@ export default {
     goBack() {
       // 标记为取消，不记录抽烟
       this.cancelled = true
+      // 恢复包剩余（抽出前未持久化，此处也无需恢复存储）
       // 清理资源
       this.cleanup()
       // 返回首页
@@ -1130,6 +1131,10 @@ export default {
       // 只有未取消时才记录抽烟
       if (!this.cancelled) {
         Store.recordSmoke(duration, this.brandId)
+        // 抽完才持久化扣减包剩余
+        if (this.brandId) {
+          Store.savePackRemaining(this.brandId, this.remaining)
+        }
       }
 
       if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })

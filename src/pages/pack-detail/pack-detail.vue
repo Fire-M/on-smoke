@@ -188,6 +188,8 @@ export default {
     // 从抽烟页 navigateBack 回来时复位，避免 isPulling 卡死导致抽不出
     this.isPulling = false
     this.activeIndex = null
+    // 从存储重新读取包剩余（抽完会扣减，没抽完则不变）
+    this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
   },
 
   methods: {
@@ -214,8 +216,7 @@ export default {
       // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转
       setTimeout(() => {
         this.boxRemainingCigs = remainingAfterPull
-        // 持久化包剩余数
-        Store.savePackRemaining(this.brand.id, remainingAfterPull)
+        // 不在此处持久化，等 smoking.vue 真正抽完才扣减；中途返回则恢复
         uni.navigateTo({
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })
