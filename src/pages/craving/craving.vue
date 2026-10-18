@@ -214,8 +214,12 @@ export default {
         this.avgIntensity = '0'
       }
 
-      // 成功抵抗次数
-      this.resistedCount = cravings.filter(c => c.resisted).length
+      // 成功抵抗次数：这张卡片其它两项都是「今日」，这里原来却统计的是全部历史，
+      // 口径不一致，改为今日（统一用本地日界）
+      const todayStr = Store.todayStr()
+      this.resistedCount = cravings.filter(c => {
+        return c.resisted && Store.todayStr(c.timestamp) === todayStr
+      }).length
 
       // 强度分布
       this.intensityDist = stats.intensityDist

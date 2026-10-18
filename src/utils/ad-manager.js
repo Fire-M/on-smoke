@@ -17,7 +17,7 @@ const AD_UNIT_IDS = {
 }
 
 // 每日广告限制
-const DAILY_REWARD_LIMIT = 100  // 临时调高用于测试
+const DAILY_REWARD_LIMIT = 5
 const DAILY_INTERSTITIAL_LIMIT = 5
 
 // ============ 存储键 ============
@@ -35,8 +35,14 @@ function _saveAdRecords(records) {
   uni.setStorageSync(AD_RECORDS_KEY, JSON.stringify(records))
 }
 
+// 本地日期（与 store.js 保持一致；toISOString 是 UTC 日期，会让每日限额在
+// UTC+8 到早上 8 点才重置）
 function _todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  const t = new Date()
+  const y = t.getFullYear()
+  const m = String(t.getMonth() + 1).padStart(2, '0')
+  const d = String(t.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 // 获取今日某类广告展示次数

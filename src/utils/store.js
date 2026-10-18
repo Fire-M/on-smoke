@@ -21,7 +21,40 @@ const KEYS = {
   backgrounds: 'os_backgrounds',
   smokeStyles: 'os_smoke_styles',
   theme: 'os_theme',
-  packRemaining: 'os_pack_remaining'
+  packRemaining: 'os_pack_remaining',
+  savingsSettle: 'os_savings_settle'
+}
+
+// 存储键（非 KEYS 内、由其它模块维护，resetAll 一并清理）
+const EXTRA_KEYS = [
+  'os_ad_records',
+  'os_last_open_date',
+  'os_sound'
+]
+
+// ---- 品牌单一数据源（页面与剩余计算共用，避免口径分裂）----
+export const BRANDS = [
+  { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
+  { id: 'hongta', cn: '太华', en: 'TA·HWA', price: 88, theme: 'red', tag: '浓郁·想象味', quote: '送礼倍有面（的空气）', packSize: 20 },
+  { id: 'heiye', cn: '熊猫666', en: 'PANDA', price: 100, theme: 'black', tag: '顶配·都是心理味', quote: '国宝都戒了你还抽？', packSize: 20 },
+  { id: 'jinsi', cn: '羊驼', en: 'LLAMA', price: 22, theme: 'gold', tag: '粗犷·沙漠风', quote: '原版是骆驼，这是羊驼', packSize: 20 },
+  { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', price: 35, theme: 'lightblue', tag: '薄荷冰爆·脑瓜疼', quote: '爆珠一捏，感觉良好', packSize: 20 },
+  { id: 'zimeng', cn: '紫云', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 }
+]
+
+// 取品牌每包支数（未命中时回落到用户设置的 packSize）
+export function getBrandPackSize(brandId, fallbackPackSize) {
+  const brand = BRANDS.find(b => b.id === brandId)
+  return (brand && brand.packSize) || fallbackPackSize || 20
+}
+
+// 取品牌每根单价：品牌有价用品牌价，否则用设置价
+export function getBrandPricePerCig(brandId) {
+  const settings = getSettings()
+  const brand = BRANDS.find(b => b.id === brandId)
+  const packPrice = (brand && brand.price) || settings.cigarettePrice
+  const packSize = getBrandPackSize(brandId, settings.packSize)
+  return packPrice / packSize
 }
 
 // 默认设置
@@ -30,7 +63,7 @@ const DEFAULT_SETTINGS = {
   cooldownMinutes: 30,
   cigarettePrice: 30,
   packSize: 20,
-  quitDate: new Date().toISOString().slice(0, 10),
+  quitDate: _todayStr(),
   dailyOriginal: 20,
   selectedBrand: null
 }
@@ -50,8 +83,55 @@ const DEFAULT_STATS = {
   maxStreak: 0
 }
 
-function _todayStr() {
-  return new Date().toISOString().slice(0, 10)
+// 本地日期 YYYY-MM-DD。
+// 不能用 toISOString()：它返回 UTC 日期，在 UTC+8 会导致「今天」到早上 8 点才切换，
+// 配额/挑战/额外配额的跨天重置会整体错位。
+function _todayStr(d) {
+  const t = d ? new Date(d) : new Date()
+  const y = t.getFullYear()
+  const m = String(t.getMonth() + 1).padStart(2, '0')
+  const day = String(t.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// 把 'YYYY-MM-DD' 解析成「本地时间当天 00:00」。
+// new Date('2026-10-18') 会按 UTC 解析，在负时区会少算一天。
+// 导出给页面使用（页面里 quitDate 直接参与减法会得到 NaN）。
+export function parseLocalDate(str) {
+  if (!str) return null
+  const parts = String(str).split('-')
+  if (parts.length !== 3) return null
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  const d = Number(parts[2])
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+
+// 日期字符串加减天数
+function _shiftDays(dateStr, delta) {
+  const d = parseLocalDate(dateStr)
+  if (!d) return _todayStr()
+  d.setDate(d.getDate() + delta)
+  return _todayStr(d)
+}
+
+// 字符串哈希（用于每日挑战取模板，比 parseInt(日期) % N 分布更均匀）
+function _hashString(str) {
+  let h = 0
+  const s = String(str)
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0
+  }
+  return h
+}
+
+// 两个日期字符串相差天数（b - a）
+function _diffDays(a, b) {
+  const da = parseLocalDate(a)
+  const db = parseLocalDate(b)
+  if (!da || !db) return 0
+  return Math.floor((db.getTime() - da.getTime()) / 86400000)
 }
 
 function _read(key, fallback) {
@@ -165,18 +245,64 @@ export function recordSmoke(duration, brandId = null) {
   })
 
   const stats = getStats()
-  stats.totalSmoked += 1
-  const pricePerCig = settings.cigarettePrice / settings.packSize
-  stats.totalSaved = (stats.totalSaved || 0) + pricePerCig
-  // 更新最大连续打卡天数
-  const currentStreak = getChallengeStreak()
-  if (currentStreak > (stats.maxStreak || 0)) {
-    stats.maxStreak = currentStreak
+  stats.totalSmoked = (stats.totalSmoked || 0) + 1
+
+  // 时段统计（供成就判定）：深夜 0-5 点 / 清晨 6-8 点
+  const hour = new Date(now).getHours()
+  if (hour >= 0 && hour < 5) stats.nightSmoked = (stats.nightSmoked || 0) + 1
+  if (hour >= 6 && hour < 8) stats.earlySmoked = (stats.earlySmoked || 0) + 1
+
+  // 最长连续打卡天数：基于历史记录真实计算
+  const streak = getSmokeStreak()
+  if (streak > (stats.maxStreak || 0)) {
+    stats.maxStreak = streak
   }
   saveStats(stats)
 
-  // 抽烟会伤害宠物伙伴
-  harmPet(-8, -6)
+  // 抽烟会伤害宠物伙伴（掉血/掉心情，不掉经验）
+  harmPet(-5, -4)
+}
+
+// 连续打卡天数：从今天（或昨天）往前数，历史里每天至少 1 根的连续天数
+export function getSmokeStreak() {
+  const history = getHistory()
+  if (!history.length) return 0
+
+  const daySet = new Set()
+  history.forEach(r => {
+    if (r && r.timestamp) daySet.add(_todayStr(r.timestamp))
+  })
+
+  const today = _todayStr()
+  // 今天还没抽不算断签，从昨天开始回溯
+  let cursor = daySet.has(today) ? today : _shiftDays(today, -1)
+
+  let streak = 0
+  while (daySet.has(cursor)) {
+    streak++
+    cursor = _shiftDays(cursor, -1)
+  }
+  return streak
+}
+
+// 通用计数器：成就用的 passedCount / ashTapped 等
+export function incrementStat(field, delta = 1) {
+  const stats = getStats()
+  stats[field] = (stats[field] || 0) + delta
+  saveStats(stats)
+  return stats[field]
+}
+
+// 记录使用过的吐烟样式（去重，成就「花样大师」需要 12 种都用过）
+export function markStyleUsed(idx) {
+  const stats = getStats()
+  if (!Array.isArray(stats.usedStyles)) stats.usedStyles = []
+  if (!stats.usedStyles.includes(idx)) {
+    stats.usedStyles.push(idx)
+    stats.stylesUsed = stats.usedStyles.length
+    saveStats(stats)
+  }
+  return stats.stylesUsed
 }
 
 // 获取某品牌今日吸烟次数
@@ -187,11 +313,17 @@ export function getBrandSmokedCount(brandId) {
 }
 
 // ---- 每包烟剩余持久化 ----
+// 每包支数取品牌自身 packSize，不再取全局 settings.packSize，
+// 避免用户改了设置后出现「剩余 15 / 总数 10」这种分子大于分母的情况。
+export function getPackSize(brandId) {
+  const settings = getSettings()
+  return getBrandPackSize(brandId, settings.packSize)
+}
+
 export function getPackRemaining(brandId) {
   const data = _read(KEYS.packRemaining, {})
-  const settings = getSettings()
-  const packSize = settings.packSize || 20
-  return data[brandId] != null ? data[brandId] : packSize
+  if (data[brandId] != null) return Math.max(0, data[brandId])
+  return getPackSize(brandId)
 }
 
 export function savePackRemaining(brandId, count) {
@@ -200,34 +332,103 @@ export function savePackRemaining(brandId, count) {
   _write(KEYS.packRemaining, data)
 }
 
+// 开新的一包（抽空后可继续抽）
+export function refillPack(brandId) {
+  savePackRemaining(brandId, getPackSize(brandId))
+  return getPackRemaining(brandId)
+}
+
 // 获取某品牌剩余数量（基于持久化的包剩余，跨天不重置）
 export function getBrandRemaining(brandId) {
   return getPackRemaining(brandId)
 }
 
+// 距上一次抽烟的秒数（真正的「无烟时长」，用于健康里程碑）
 export function getSmokeFreeDuration() {
   const today = getToday()
   if (today.lastSmokeTime) {
-    return Math.floor((Date.now() - today.lastSmokeTime) / 1000)
+    return Math.max(0, Math.floor((Date.now() - today.lastSmokeTime) / 1000))
   }
   const settings = getSettings()
-  const quitDate = new Date(settings.quitDate)
-  return Math.floor((Date.now() - quitDate.getTime()) / 1000)
+  const quitDate = parseLocalDate(settings.quitDate)
+  if (!quitDate) return 0
+  return Math.max(0, Math.floor((Date.now() - quitDate.getTime()) / 1000))
 }
 
+// 戒烟天数：从戒烟开始日算起的自然天数。
+// 之前用 lastSmokeTime 起算，导致「今天抽一根虚拟烟 → 戒烟天数归零」，
+// 而本产品本就允许每天抽几根虚拟烟，该指标会永远停在 0。
 export function getCleanDays() {
   const settings = getSettings()
-  const today = getToday()
-  let startDate
-  if (today.lastSmokeTime) {
-    startDate = new Date(today.lastSmokeTime)
-  } else {
-    startDate = new Date(settings.quitDate)
+  const start = parseLocalDate(settings.quitDate)
+  if (!start) return 0
+  return Math.max(0, _diffDays(settings.quitDate, _todayStr()))
+}
+
+// ---- 省钱结算 ----
+// 规则：以「原本每天抽 dailyOriginal 根」为基准，
+// 每天省下 (dailyOriginal - 当天实际抽的根数) × 单价。
+// 只在当天结束后结算，避免数字在一天内来回跳。
+export function settleDailySavings() {
+  const settings = getSettings()
+  const today = _todayStr()
+  const settle = _read(KEYS.savingsSettle, null)
+
+  // 首次进入：不做历史补算（旧数据口径不同，避免重复累加），从今天开始记账
+  if (!settle || !settle.lastSettleDate) {
+    _write(KEYS.savingsSettle, { lastSettleDate: today })
+    return getSavedMoney()
   }
-  const now = new Date()
-  startDate.setHours(0, 0, 0, 0)
-  now.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.floor((now - startDate) / 86400000))
+
+  const last = settle.lastSettleDate
+  if (last >= today) return getSavedMoney()
+
+  // 逐日结算 last 之后、today 之前的每一天
+  const history = getHistory()
+  const daily = {}
+  history.forEach(r => {
+    if (!r || !r.timestamp) return
+    const day = _todayStr(r.timestamp)
+    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
+    daily[day].count += 1
+    // 单价按当天实际抽的品牌算（品牌 price 之前完全没参与计算）
+    daily[day].cost += getBrandPricePerCig(r.brandId)
+  })
+
+  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
+  const original = Math.max(0, settings.dailyOriginal || 0)
+
+  let gained = 0
+  let cursor = _shiftDays(last, 1)
+  let guard = 0
+  while (cursor < today && guard < 3650) {
+    const rec = daily[cursor]
+    const smoked = rec ? rec.count : 0
+    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
+    const avoided = Math.max(0, original - smoked)
+    gained += avoided * avgPrice
+    cursor = _shiftDays(cursor, 1)
+    guard++
+  }
+
+  if (gained > 0) {
+    const stats = getStats()
+    stats.totalSaved = (stats.totalSaved || 0) + gained
+    saveStats(stats)
+  }
+
+  _write(KEYS.savingsSettle, { lastSettleDate: _shiftDays(today, -1) })
+  return getSavedMoney()
+}
+
+// 今天到目前为止省下的钱（未结算，仅用于展示「今日」）
+export function getTodaySaved() {
+  const settings = getSettings()
+  const today = getToday()
+  const pricePerCig = settings.cigarettePrice / (settings.packSize || 20)
+  const original = Math.max(0, settings.dailyOriginal || 0)
+  const avoided = Math.max(0, original - (today.smokedCount || 0))
+  return Math.round(avoided * pricePerCig * 10) / 10
 }
 
 export function getSavedMoney() {
@@ -235,9 +436,13 @@ export function getSavedMoney() {
   return Math.round((stats.totalSaved || 0) * 10) / 10
 }
 
+// 少抽的根数：基准量 − 实际抽的量（之前直接返回 totalSmoked，名实相反）
 export function getLessSmoked() {
+  const settings = getSettings()
   const stats = getStats()
-  return stats.totalSmoked || 0
+  const days = Math.max(1, getCleanDays() + 1)
+  const original = Math.max(0, settings.dailyOriginal || 0)
+  return Math.max(0, days * original - (stats.totalSmoked || 0))
 }
 
 // 勋章系统
@@ -260,8 +465,87 @@ export function unlockBadge(badgeId) {
   return false // 已解锁
 }
 
+// ---- 勋章定义（首页与成就页共用同一份数据源）----
+export const BADGE_LIST = [
+  // 戒烟里程碑
+  { id: 'first_air_cig', name: '第一根空气烟', icon: '🚬', category: 0, desc: '首次完成吸烟', condition: (s) => s.totalSmoked >= 1 },
+  { id: 'one_day', name: '坚持一天', icon: '⭐', category: 0, desc: '累计戒烟满 1 天', condition: (s) => s.cleanDays >= 1 },
+  { id: 'three_days', name: '三天小成', icon: '🌟', category: 0, desc: '累计戒烟满 3 天', condition: (s) => s.cleanDays >= 3 },
+  { id: 'one_week', name: '一周达人', icon: '🏅', category: 0, desc: '累计戒烟满 7 天', condition: (s) => s.cleanDays >= 7 },
+  { id: 'half_month', name: '半月勇士', icon: '🎖️', category: 0, desc: '累计戒烟满 15 天', condition: (s) => s.cleanDays >= 15 },
+  { id: 'one_month', name: '月度冠军', icon: '🏆', category: 0, desc: '累计戒烟满 30 天', condition: (s) => s.cleanDays >= 30 },
+  { id: 'hundred_days', name: '百日英雄', icon: '👑', category: 0, desc: '累计戒烟满 100 天', condition: (s) => s.cleanDays >= 100 },
+
+  // 省钱达人
+  { id: 'save_10', name: '首枚硬币', icon: '💰', category: 1, desc: '累计省下 10 元', condition: (s) => s.totalSaved >= 10 },
+  { id: 'save_50', name: '小富即安', icon: '💵', category: 2, desc: '累计省下 50 元', condition: (s) => s.totalSaved >= 50 },
+  { id: 'save_100', name: '百元大关', icon: '💴', category: 1, desc: '累计省下 100 元', condition: (s) => s.totalSaved >= 100 },
+  { id: 'save_1000', name: '千元户', icon: '💶', category: 1, desc: '累计省下 1000 元', condition: (s) => s.totalSaved >= 1000 },
+  { id: 'save_10000', name: '万元户', icon: '💎', category: 1, desc: '累计省下 10000 元', condition: (s) => s.totalSaved >= 10000 },
+
+  // 抽烟次数
+  { id: 'smoke_1', name: '初试啼声', icon: '🎯', category: 2, desc: '首次抽完一根', condition: (s) => s.totalSmoked >= 1 },
+  { id: 'smoke_10', name: '十根老手', icon: '🎪', category: 2, desc: '累计抽完 10 根', condition: (s) => s.totalSmoked >= 10 },
+  { id: 'smoke_100', name: '百根大师', icon: '🎭', category: 2, desc: '累计抽完 100 根', condition: (s) => s.totalSmoked >= 100 },
+  { id: 'smoke_1000', name: '千根传奇', icon: '🌠', category: 2, desc: '累计抽完 1000 根', condition: (s) => s.totalSmoked >= 1000 },
+
+  // 特殊成就
+  { id: 'night_smoker', name: '深夜烟民', icon: '🌙', category: 3, desc: '凌晨 0-5 点抽烟', condition: (s) => s.nightSmoked >= 1 },
+  { id: 'early_bird', name: '早起鸟儿', icon: '🌅', category: 3, desc: '早晨 6-8 点抽烟', condition: (s) => s.earlySmoked >= 1 },
+  { id: 'three_days_streak', name: '连续三天', icon: '🔥', category: 3, desc: '连续 3 天每天抽一根', condition: (s) => s.maxStreak >= 3 },
+  { id: 'all_styles', name: '花样大师', icon: '🎨', category: 3, desc: '使用过所有 12 种吐烟花样', condition: (s) => s.stylesUsed >= 12 },
+  { id: 'pass_10', name: '派烟达人', icon: '🤝', category: 3, desc: '累计派烟 10 次', condition: (s) => s.passedCount >= 10 },
+  { id: 'tap_ash_50', name: '弹烟灰专家', icon: '💨', category: 3, desc: '累计弹烟灰 50 次', condition: (s) => s.ashTapped >= 50 },
+
+  // 健康成就
+  { id: 'lungs_breathing', name: '肺在呼吸', icon: '🫁', category: 4, desc: '累计戒烟满 3 天', condition: (s) => s.cleanDays >= 3 },
+  { id: 'taste_return', name: '味觉回归', icon: '👅', category: 4, desc: '累计戒烟满 7 天', condition: (s) => s.cleanDays >= 7 },
+  { id: 'blood_flow', name: '血液循环', icon: '❤️', category: 4, desc: '累计戒烟满 30 天', condition: (s) => s.cleanDays >= 30 },
+  { id: 'cancer_risk_down', name: '癌症风险降', icon: '🛡️', category: 4, desc: '累计戒烟满 90 天', condition: (s) => s.cleanDays >= 90 }
+]
+
+// 构造勋章判定所需的完整 stats（补齐 cleanDays / 时段 / 计数器等派生字段）
+export function buildBadgeStats() {
+  const s = getStats()
+  return {
+    totalSmoked: s.totalSmoked || 0,
+    totalSaved: getSavedMoney(),
+    cleanDays: getCleanDays(),
+    maxStreak: Math.max(s.maxStreak || 0, getSmokeStreak()),
+    nightSmoked: s.nightSmoked || 0,
+    earlySmoked: s.earlySmoked || 0,
+    stylesUsed: s.stylesUsed || 0,
+    passedCount: s.passedCount || 0,
+    ashTapped: s.ashTapped || 0
+  }
+}
+
+// 按当前数据自动解锁符合条件的勋章，返回本次新解锁的列表
+export function syncBadges() {
+  const stats = buildBadgeStats()
+  const newly = []
+  BADGE_LIST.forEach(b => {
+    let ok = false
+    try { ok = !!b.condition(stats) } catch (e) { ok = false }
+    if (ok && unlockBadge(b.id)) newly.push(b)
+  })
+  return newly
+}
+
+// 带解锁状态的勋章列表
+export function getBadgeList() {
+  const unlocked = getUnlockedBadges()
+  return BADGE_LIST.map(b => ({
+    ...b,
+    unlocked: !!unlocked[b.id],
+    unlockTime: unlocked[b.id + '_time'] || null
+  }))
+}
+
 export function resetAll() {
   Object.values(KEYS).forEach(k => uni.removeStorageSync(k))
+  // 清理由其它模块维护的键（广告记录 / 每日首次打开 / 音效开关）
+  EXTRA_KEYS.forEach(k => uni.removeStorageSync(k))
 }
 
 function _formatTime(sec) {
@@ -349,9 +633,9 @@ export function getDailyChallenge() {
   
   // 如果今天还没有挑战，生成一个新的
   if (!challenges[today] || challenges[today].date !== today) {
-    // 基于日期生成伪随机索引
-    const dateNum = today.split('-').join('')
-    const seed = parseInt(dateNum) % CHALLENGE_TEMPLATES.length
+    // 基于日期的哈希取模（原来用 parseInt(日期) % 10，只会按日期尾号循环，
+    // 每天结果可预测且分布不均）
+    const seed = _hashString(today) % CHALLENGE_TEMPLATES.length
     const template = CHALLENGE_TEMPLATES[seed]
     
     challenges[today] = {
@@ -371,45 +655,96 @@ export function getDailyChallenge() {
   return challenges[today]
 }
 
+/**
+ * 更新今日挑战进度并判定完成。
+ * progress 语义按类型而定：
+ *   limit      → 今日已抽根数
+ *   save       → 今日已省金额
+ *   resist     → 今日成功抵抗次数
+ *   time_range → 该时段内抽烟根数
+ *   delay      → 已坚持分钟数
+ * 注意：limit / time_range 属于「全天达标」型，当天没过完不能提前判定完成，
+ * 由 settlePastChallenges() 在次日结算；超限则立即标记 failed。
+ */
 export function updateChallengeProgress(progress) {
   const today = _todayStr()
   const challenges = _read(KEYS.challenges, {})
-  
-  if (challenges[today]) {
-    challenges[today].progress = progress
-    
-    // 检查是否完成
-    const challenge = challenges[today]
-    if (challenge.type === 'limit' && progress <= challenge.target) {
-      challenge.completed = true
-    } else if (challenge.type === 'save' && progress >= challenge.target) {
-      challenge.completed = true
-    } else if (challenge.type === 'resist' && progress >= challenge.target) {
-      challenge.completed = true
-    }
-    
-    _write(KEYS.challenges, challenges)
+  const challenge = challenges[today]
+  if (!challenge) return null
+
+  challenge.progress = progress
+
+  if (challenge.type === 'limit') {
+    challenge.failed = progress > challenge.target
+    challenge.completed = false
+  } else if (challenge.type === 'save') {
+    challenge.completed = progress >= challenge.target
+  } else if (challenge.type === 'resist') {
+    challenge.completed = progress >= challenge.target
+  } else if (challenge.type === 'time_range') {
+    challenge.failed = progress > 0
+    challenge.completed = false
+  } else if (challenge.type === 'delay') {
+    challenge.completed = progress >= challenge.target
   }
+
+  _write(KEYS.challenges, challenges)
+  return challenge
+}
+
+// 结算已过期日期的挑战（limit / time_range 需等当天结束后才能判定）
+export function settlePastChallenges() {
+  const today = _todayStr()
+  const challenges = _read(KEYS.challenges, {})
+  let changed = false
+
+  Object.keys(challenges).forEach(date => {
+    const c = challenges[date]
+    if (!c || date >= today) return
+    if (c.completed || c.failed) return
+    const progress = c.progress == null ? 0 : c.progress
+
+    if (c.type === 'limit') {
+      c.completed = progress <= c.target
+      changed = true
+    } else if (c.type === 'time_range') {
+      c.completed = progress === 0
+      changed = true
+    }
+  })
+
+  if (changed) _write(KEYS.challenges, challenges)
+  return challenges
 }
 
 export function getChallengeStreak() {
+  settlePastChallenges()
   const challenges = _read(KEYS.challenges, {})
-  const dates = Object.keys(challenges).sort().reverse()
-  
+  const today = _todayStr()
+  // 只保留日期格式的键，按字典序倒序（YYYY-MM-DD 字典序 = 时间序）
+  const dates = Object.keys(challenges)
+    .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort()
+    .reverse()
+
+  // 今天的挑战如果还没结算（limit / time_range 类要等当天过完），
+  // 就跳过今天、从昨天往前数——否则这类挑战当天永远 completed=false，
+  // streak 永远显示 0。
+  const todayDone = !!(challenges[today] && challenges[today].completed)
+  let expectDiff = todayDone ? 0 : 1
+
   let streak = 0
-  const today = new Date()
-  
   for (let i = 0; i < dates.length; i++) {
-    const date = new Date(dates[i])
-    const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24))
-    
-    if (diffDays === i && challenges[dates[i]].completed) {
+    const diffDays = _diffDays(dates[i], today)
+    if (diffDays < expectDiff) continue // 跳过未结算的今天
+    if (diffDays === expectDiff && challenges[dates[i]].completed) {
       streak++
-    } else if (diffDays > i) {
+      expectDiff++
+    } else {
       break
     }
   }
-  
+
   return streak
 }
 
@@ -539,17 +874,37 @@ export function petPet() {
   return pet
 }
 
-// 每日恢复：今天没抽烟则缓慢回血回快乐并获取经验（戒烟的正反馈）
+// 每日恢复：昨天一整天没抽烟才回血回快乐并给经验（戒烟的正反馈）。
+// 之前只判断「今天抽没抽」且没有日期锁，每次进宠物页都会 +12 经验，可无限刷级；
+// 而且今天刚开始抽没抽就判「无烟日」也不合理，改为结算「昨天」。
 export function recoverPetDaily() {
   const pet = getPet()
-  const today = getToday()
-  if (today.smokedCount === 0) {
-    pet.health = clamp100(pet.health + 4)
-    pet.happiness = clamp100(pet.happiness + 4)
-    addExp(pet, 12)
-    pet.lastFed = Date.now()
+  const today = _todayStr()
+  const yesterday = _shiftDays(today, -1)
+
+  // 同一天只结算一次
+  if (pet.lastRecoverDate === yesterday) return pet
+
+  const history = getHistory()
+  const smokedYesterday = history.some(r => r && r.timestamp && _todayStr(r.timestamp) === yesterday)
+
+  // 第一次进入（还没有历史）时不做补算，直接把游标拨到昨天
+  if (!pet.lastRecoverDate && !history.length) {
+    pet.lastRecoverDate = yesterday
     savePet(pet)
+    return pet
   }
+
+  pet.lastRecoverDate = yesterday
+
+  if (!smokedYesterday) {
+    pet.health = clamp100(pet.health + 12)
+    pet.happiness = clamp100(pet.happiness + 10)
+    addExp(pet, 12)
+  }
+
+  pet.lastFed = Date.now()
+  savePet(pet)
   return pet
 }
 
@@ -818,8 +1173,11 @@ export function unlockSmokeStyle(idx) {
 
 export function selectSmokeStyle(idx) {
   const styles = getSmokeStyles()
+  // 未解锁的样式不能选中（之前缺校验，可以直接选中未解锁项）
+  if (!styles.unlocked.includes(idx)) return false
   styles.selected = idx
   saveSmokeStyles(styles)
+  return true
 }
 
 export function getSmokeStyleList() {
@@ -837,6 +1195,11 @@ export function getSelectedSmokeStyle() {
   const styles = getSmokeStyles()
   return styles.selected || 0
 }
+
+// 供页面复用的日期工具（内部用带下划线版本，这里导出别名）
+export const todayStr = _todayStr
+export const shiftDays = _shiftDays
+export const diffDays = _diffDays
 
 
 // ---- 主题 ----
@@ -929,19 +1292,25 @@ export function getEquippedAccessories() {
 
 
 export default {
+  BRANDS,
+  todayStr, parseLocalDate, shiftDays, diffDays,
   getSettings, saveSettings,
   getToday, saveToday,
   getHistory, addHistory,
   getStats, saveStats,
   canSmoke, getCooldownRemain,
-  recordSmoke,
+  recordSmoke, incrementStat, markStyleUsed,
+  getSmokeStreak,
   getBrandSmokedCount, getBrandRemaining,
-  getPackRemaining, savePackRemaining,
+  getBrandPackSize, getBrandPricePerCig,
+  getPackSize, getPackRemaining, savePackRemaining, refillPack,
+  settleDailySavings, getTodaySaved,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
+  BADGE_LIST, getBadgeList, syncBadges, buildBadgeStats,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   getCravings, addCraving, getCravingStats,
-  getDailyChallenge, updateChallengeProgress, getChallengeStreak,
+  getDailyChallenge, updateChallengeProgress, getChallengeStreak, settlePastChallenges,
   getMoods, addMood, getMoodStats,
   getSavingsGoals, addSavingsGoal, updateSavingsGoal,
   getTimeCapsules, addTimeCapsule,

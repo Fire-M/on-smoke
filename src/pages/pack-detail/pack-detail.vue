@@ -97,6 +97,11 @@
         <view class="box-pull-hint" :class="{ show: showPullHint }">
           <text>点击任意一支抽出</text>
         </view>
+        <!-- 抽空后的空盒提示 + 开新包 -->
+        <view class="box-empty-hint" v-if="boxRemainingCigs <= 0">
+          <text class="box-empty-text">这包已经抽完啦</text>
+          <button class="box-refill-btn" @click.stop="refillPack">开新的一包</button>
+        </view>
       </view>
     </view>
   </view>
@@ -107,20 +112,18 @@ import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
-const BRANDS = {
-  lanhe: { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', theme: 'blue', packSize: 20 },
-  hongta: { id: 'hongta', cn: '太华', en: 'TA·HWA', theme: 'red', packSize: 20 },
-  heiye: { id: 'heiye', cn: '熊猫666', en: 'PANDA', theme: 'black', packSize: 20 },
-  jinsi: { id: 'jinsi', cn: '羊驼', en: 'LLAMA', theme: 'gold', packSize: 20 },
-  qingyun: { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', theme: 'lightblue', packSize: 20 },
-  zimeng: { id: 'zimeng', cn: '紫云', en: 'PURPLE', theme: 'purple', packSize: 20 }
+// 品牌数据统一取自 Store.BRANDS（与品牌列表页、剩余计算共用一份）。
+// 必须返回副本：下面的 onLoad 会写 brand.packSize，直接返回引用会污染全局常量。
+function findBrand(brandId) {
+  const found = Store.BRANDS.find(b => b.id === brandId) || Store.BRANDS[0]
+  return { ...found }
 }
 
 export default {
   components: { AppNavbar },
   data() {
     return {
-      brand: BRANDS.lanhe,
+      brand: findBrand('lanhe'),
       lidOpen: false,
       showPullHint: false,
       boxRotY: -14,
@@ -179,9 +182,11 @@ export default {
 
   onLoad(options) {
     const brandId = options.brandId || 'lanhe'
-    this.brand = BRANDS[brandId] || BRANDS.lanhe
+    this.brand = findBrand(brandId)
+    this.brand.packSize = Store.getPackSize(this.brand.id)
     // 从持久化存储读取包剩余（跨天不重置）
     this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+    this.refreshPack()
   },
 
   onShow() {
@@ -189,10 +194,23 @@ export default {
     this.isPulling = false
     this.activeIndex = null
     // 从存储重新读取包剩余（抽完会扣减，没抽完则不变）
-    this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+    this.refreshPack()
   },
 
   methods: {
+    refreshPack() {
+      this.brand.packSize = Store.getPackSize(this.brand.id)
+      this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+    },
+
+    // 抽空后开新的一包（之前抽完 20 根就再也抽不了了）
+    refillPack() {
+      this.boxRemainingCigs = Store.refillPack(this.brand.id)
+      this.isPulling = false
+      this.activeIndex = null
+      if (uni.showToast) uni.showToast({ title: '开了新的一包', icon: 'none' })
+    },
+
     openLid() {
       if (this.dragMoved) { this.dragMoved = false; return }
       if (this.lidOpen) return
@@ -206,6 +224,8 @@ export default {
     pullCig(index) {
       if (!this.lidOpen || this.dragMoved) return
       if (this.isPulling) return
+      // 空盒不能再抽
+      if (this.boxRemainingCigs <= 0) return
       this.showPullHint = false
       this.activeIndex = index
       this.isPulling = true
@@ -267,6 +287,31 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 64rpx;
+}
+
+/* 空盒提示 */
+.box-empty-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 24rpx;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  z-index: 30;
+}
+.box-empty-text {
+  font-size: 26rpx;
+  color: var(--text-dim);
+}
+.box-refill-btn {
+  padding: 16rpx 40rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  color: #111111;
+  font-size: 28rpx;
+  font-weight: 600;
 }
 
 /* ======== 烟盒详情页 - 3D 立体 ======== */

@@ -66,44 +66,8 @@ import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
-const BADGES = [
-  // 戒烟里程碑
-  { id: 'first_air_cig', name: '第一根空气烟', icon: '🚬', category: 0, desc: '首次完成吸烟', condition: (stats) => stats.totalSmoked >= 1 },
-  { id: 'one_day', name: '坚持一天', icon: '⭐', category: 0, desc: '累计戒烟满 1 天', condition: (stats) => stats.cleanDays >= 1 },
-  { id: 'three_days', name: '三天小成', icon: '🌟', category: 0, desc: '累计戒烟满 3 天', condition: (stats) => stats.cleanDays >= 3 },
-  { id: 'one_week', name: '一周达人', icon: '🏅', category: 0, desc: '累计戒烟满 7 天', condition: (stats) => stats.cleanDays >= 7 },
-  { id: 'half_month', name: '半月勇士', icon: '🎖️', category: 0, desc: '累计戒烟满 15 天', condition: (stats) => stats.cleanDays >= 15 },
-  { id: 'one_month', name: '月度冠军', icon: '🏆', category: 0, desc: '累计戒烟满 30 天', condition: (stats) => stats.cleanDays >= 30 },
-  { id: 'hundred_days', name: '百日英雄', icon: '👑', category: 0, desc: '累计戒烟满 100 天', condition: (stats) => stats.cleanDays >= 100 },
-
-  // 省钱达人
-  { id: 'save_10', name: '首枚硬币', icon: '💰', category: 1, desc: '累计省下 10 元', condition: (stats) => stats.totalSaved >= 10 },
-  { id: 'save_50', name: '小富即安', icon: '💵', category: 2, desc: '累计省下 50 元', condition: (stats) => stats.totalSaved >= 50 },
-  { id: 'save_100', name: '百元大关', icon: '💴', category: 1, desc: '累计省下 100 元', condition: (stats) => stats.totalSaved >= 100 },
-  { id: 'save_1000', name: '千元户', icon: '💶', category: 1, desc: '累计省下 1000 元', condition: (stats) => stats.totalSaved >= 1000 },
-  { id: 'save_10000', name: '万元户', icon: '💎', category: 1, desc: '累计省下 10000 元', condition: (stats) => stats.totalSaved >= 10000 },
-
-  // 抽烟次数
-  { id: 'smoke_1', name: '初试啼声', icon: '🎯', category: 2, desc: '首次抽完一根', condition: (stats) => stats.totalSmoked >= 1 },
-  { id: 'smoke_10', name: '十根老手', icon: '🎪', category: 2, desc: '累计抽完 10 根', condition: (stats) => stats.totalSmoked >= 10 },
-  { id: 'smoke_100', name: '百根大师', icon: '🎭', category: 2, desc: '累计抽完 100 根', condition: (stats) => stats.totalSmoked >= 100 },
-  { id: 'smoke_1000', name: '千根传奇', icon: '🌠', category: 2, desc: '累计抽完 1000 根', condition: (stats) => stats.totalSmoked >= 1000 },
-
-  // 特殊成就
-  { id: 'night_smoker', name: '深夜烟民', icon: '🌙', category: 3, desc: '凌晨 0-5 点抽烟', condition: (stats) => stats.nightSmoked >= 1 },
-  { id: 'early_bird', name: '早起鸟儿', icon: '🌅', category: 3, desc: '早晨 6-8 点抽烟', condition: (stats) => stats.earlySmoked >= 1 },
-  { id: 'three_days_streak', name: '连续三天', icon: '🔥', category: 3, desc: '连续 3 天每天抽一根', condition: (stats) => stats.maxStreak >= 3 },
-  { id: 'all_styles', name: '花样大师', icon: '🎨', category: 3, desc: '使用过所有 12 种吐烟花样', condition: (stats) => stats.stylesUsed >= 12 },
-  { id: 'pass_10', name: '派烟达人', icon: '🤝', category: 3, desc: '累计派烟 10 次', condition: (stats) => stats.passedCount >= 10 },
-  { id: 'tap_ash_50', name: '弹烟灰专家', icon: '💨', category: 3, desc: '累计弹烟灰 50 次', condition: (stats) => stats.ashTapped >= 50 },
-
-  // 健康成就
-  { id: 'lungs_breathing', name: '肺在呼吸', icon: '🫁', category: 4, desc: '累计戒烟满 3 天', condition: (stats) => stats.cleanDays >= 3 },
-  { id: 'taste_return', name: '味觉回归', icon: '👅', category: 4, desc: '累计戒烟满 7 天', condition: (stats) => stats.cleanDays >= 7 },
-  { id: 'blood_flow', name: '血液循环', icon: '❤️', category: 4, desc: '累计戒烟满 30 天', condition: (stats) => stats.cleanDays >= 30 },
-  { id: 'cancer_risk_down', name: '癌症风险降', icon: '🛡️', category: 4, desc: '累计戒烟满 90 天', condition: (stats) => stats.cleanDays >= 90 },
-]
-
+// 勋章定义统一放在 store.js（Store.BADGE_LIST），首页与本页面共用同一份数据，
+// 避免出现「首页算一套 / 成就页算一套」的不一致。
 const CATEGORIES = [
   { name: '全部', filter: () => true },
   { name: '戒烟里程碑', filter: (b) => b.category === 0 },
@@ -152,24 +116,11 @@ export default {
 
   methods: {
     loadBadges() {
-      const stats = Store.getStats()
-      const unlockedBadges = Store.getUnlockedBadges() || {}
-      
-      // 测试：解锁前两个勋章
-      const testUnlocked = { ...unlockedBadges }
-      testUnlocked['first_air_cig'] = true
-      testUnlocked['first_air_cig_time'] = Date.now() - 86400000 // 昨天
-      testUnlocked['one_day'] = true
-      testUnlocked['one_day_time'] = Date.now()
-      
-      this.badges = BADGES.map(badge => {
-        const isUnlocked = testUnlocked[badge.id] || false
-        return {
-          ...badge,
-          unlocked: isUnlocked,
-          unlockTime: testUnlocked[badge.id + '_time'] || null
-        }
-      })
+      // 先按当前真实数据结算一次（省钱 / 挑战），再自动解锁符合条件的勋章。
+      // 之前这里硬编码解锁前两枚，且 badge.condition 从未被调用，页面永远显示 2/23。
+      Store.settleDailySavings()
+      Store.syncBadges()
+      this.badges = Store.getBadgeList()
     },
 
     showBadgeDetail(badge) {

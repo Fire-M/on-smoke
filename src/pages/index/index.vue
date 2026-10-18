@@ -37,7 +37,7 @@
         </view>
         <view class="card p-16">
           <text class="text-sm text-gray-400 mb-8 block">连续打卡</text>
-          <text class="text-2xl font-bold text-gray-100">{{ quitDays }} 天</text>
+          <text class="text-2xl font-bold text-gray-100">{{ streakDays }} 天</text>
           <text class="text-sm text-amber mt-8 block">🔥 别破戒</text>
         </view>
       </view>
@@ -55,7 +55,7 @@
           <text class="card-icon">🏆</text>
           <view>
             <text class="text-sm text-gray-300 block">成就徽章</text>
-            <text class="text-sm text-gray-500 mt-4 block">{{ badgesCount }} / 8 已解锁</text>
+            <text class="text-sm text-gray-500 mt-4 block">{{ badgesCount }} / {{ badgesTotal }} 已解锁</text>
           </view>
         </view>
       </view>
@@ -153,12 +153,14 @@ import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
+// 健康恢复里程碑（秒）。注意第 5 项原为 15552000（180 天）却标成「1年」，
+// 1 年应为 31536000 秒，与 recovery.vue / health-calc.vue 保持一致。
 const MILESTONES = [
   { seconds: 1200, label: '20分钟' },
   { seconds: 43200, label: '12小时' },
   { seconds: 1209600, label: '2周' },
   { seconds: 7776000, label: '3月' },
-  { seconds: 15552000, label: '1年' }
+  { seconds: 31536000, label: '1年' }
 ]
 
 export default {
@@ -166,6 +168,7 @@ export default {
   data() {
     return {
       quitDays: 1,
+      streakDays: 0,
       savedAmount: '0.0',
       todaySmoked: 0,
       quotaTotal: 5,
@@ -174,6 +177,7 @@ export default {
       quotaPercent: 0,
       milestoneLabel: '20分钟',
       badgesCount: 0,
+      badgesTotal: 0,
       cooldownRemain: 0,
       cooldownStr: '',
       showToast: false,
@@ -221,68 +225,78 @@ export default {
     refreshData() {
       const settings = Store.getSettings()
       const today = Store.getToday()
-      this.quitDays = Math.max(1, Store.getCleanDays())
+
+      // 先把「昨天及之前」的省钱结算掉，并同步勋章/挑战状态
+      Store.settleDailySavings()
+      Store.syncBadges()
+
+      // 戒烟天数：getCleanDays 是「满 N 天」，展示用「第 N 天」含当天
+      this.quitDays = Store.getCleanDays() + 1
+      // 连续打卡：history 里连续每天至少 1 根的天数
+      this.streakDays = Store.getSmokeStreak()
       this.savedAmount = Store.getSavedMoney().toFixed(1)
       this.todaySmoked = today.smokedCount
       this.quotaTotal = settings.dailyQuota
       this.effectiveQuota = Store.getEffectiveQuota()
       this.adRewardRemain = AdManager.getRewardRemain()
       this.quotaPercent = this.effectiveQuota > 0 ? Math.min(today.smokedCount / this.effectiveQuota, 1) * 100 : 0
-      this.badgesCount = this.calcBadges()
+      this.badgesCount = Store.getBadgeList().filter(b => b.unlocked).length
+      this.badgesTotal = Store.BADGE_LIST.length
       this.updateMilestone()
-      
-      // 烟瘾统计
+
+      // 烟瘾统计（统一用本地日界，与 store 一致）
       const cravingStats = Store.getCravingStats()
       this.todayCravings = cravingStats.today
-      // 统计今天抵抗的次数
-      const todayDate = new Date()
+      const todayStr = Store.todayStr()
       this.resistedCount = Store.getCravings().filter(c => {
-        const d = new Date(c.timestamp)
-        return d.toDateString() === todayDate.toDateString() && c.resisted
+        return c.resisted && Store.todayStr(c.timestamp) === todayStr
       }).length
-      
-      // 每日挑战
+
+      // 每日挑战：计算进度并回写，否则 completed / streak 永远不会更新
       const challenge = Store.getDailyChallenge()
       this.challengeTitle = challenge.title
       this.challengeIcon = challenge.icon
-      this.challengeCompleted = challenge.completed
+      this.challengeProgress = this.calcChallengeProgress(challenge, today)
+      Store.updateChallengeProgress(this.challengeProgress)
+      this.challengeCompleted = !!challenge.completed
       this.challengeStreak = Store.getChallengeStreak()
-      
-      // 计算挑战进度
-      if (challenge.type === 'limit') {
-        // 限制类挑战：已吸烟数越少，进度越高
-        if (today.smokedCount === 0) {
-          this.challengeProgress = 50
-        } else if (today.smokedCount >= challenge.target) {
-          this.challengeProgress = 0
-        } else if (challenge.target === 1) {
-          // 目标是 1 根时，抽了 0 根就是 100%
-          this.challengeProgress = 100
-        } else {
-          // 已抽 target-1 根时，进度为 100%
-          this.challengeProgress = Math.max(0, Math.min(100, (1 - (today.smokedCount - 1) / (challenge.target - 1)) * 100))
-        }
-      } else if (challenge.type === 'save') {
-        const saved = Store.getSavedMoney()
-        this.challengeProgress = Math.min(100, (saved / challenge.target) * 100)
-      } else if (challenge.type === 'resist') {
-        this.challengeProgress = Math.min(100, (this.resistedCount / challenge.target) * 100)
-      }
     },
 
-    calcBadges() {
-      const sec = Store.getSmokeFreeDuration()
-      let c = 0
-      if (sec >= 1200) c++
-      if (sec >= 43200) c++
-      if (sec >= 1209600) c++
-      if (sec >= 7776000) c++
-      if (sec >= 15552000) c++
-      const less = Store.getLessSmoked()
-      if (less >= 10) c++
-      if (less >= 50) c++
-      if (Store.getSavedMoney() >= 100) c++
-      return Math.min(c, 8)
+    // 按挑战类型计算进度，并把「达标判定」交给 store
+    calcChallengeProgress(challenge, today) {
+      if (challenge.type === 'limit') {
+        // 「不超过 N 根」：配额用掉的越少越好，进度 = 剩余额度占比
+        const target = challenge.target || 1
+        const remain = Math.max(0, target - (today.smokedCount || 0))
+        return Math.round(Math.min(100, (remain / target) * 100))
+      }
+      if (challenge.type === 'save') {
+        const saved = Store.getTodaySaved()
+        return Math.round(Math.min(100, (saved / challenge.target) * 100))
+      }
+      if (challenge.type === 'resist') {
+        return Math.round(Math.min(100, (this.resistedCount / challenge.target) * 100))
+      }
+      if (challenge.type === 'time_range') {
+        // 该时段内一根没抽才算达标；时段没过完先按当前结果展示
+        const range = challenge.target || { start: 0, end: 12 }
+        const hour = new Date().getHours()
+        if (hour < range.end) return 0
+        const inRange = Store.getHistory().filter(r => {
+          const d = new Date(r.timestamp)
+          return Store.todayStr(r.timestamp) === Store.todayStr()
+            && d.getHours() >= range.start && d.getHours() < range.end
+        }).length
+        return inRange === 0 ? 100 : 0
+      }
+      if (challenge.type === 'delay') {
+        // 「延迟 1 小时」：距上次抽烟已过去多少分钟
+        const last = today.lastSmokeTime
+        if (!last) return 100
+        const minutes = Math.floor((Date.now() - last) / 60000)
+        return Math.round(Math.min(100, (minutes / challenge.target) * 100))
+      }
+      return 0
     },
 
     updateMilestone() {

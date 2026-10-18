@@ -51,15 +51,18 @@ export default {
     }
   },
   onShow() {
+    Store.settleDailySavings()
     const settings = Store.getSettings()
     const stats = Store.getStats()
     const smokeFreeSec = Store.getSmokeFreeDuration()
-    
+
     // 假设每根烟减少11分钟寿命
     const totalSmoked = stats.totalSmoked || 0
     const originalDaily = settings.dailyOriginal || 20
-    const daysSinceQuit = Store.getCleanDays()
-    const cigarettesAvoided = daysSinceQuit * originalDaily
+    // 展示用天数含当天；少吸的根数要扣掉实际已抽的，
+    // 原来是 daysSinceQuit × originalDaily，完全没考虑实际抽了多少。
+    const daysSinceQuit = Store.getCleanDays() + 1
+    const cigarettesAvoided = Math.max(0, daysSinceQuit * originalDaily - totalSmoked)
     this.cigarettesAvoided = cigarettesAvoided
     this.lifeGained = Math.floor((cigarettesAvoided * 11) / 60 / 24) // 天
     this.savedMoney = Store.getSavedMoney().toFixed(1)

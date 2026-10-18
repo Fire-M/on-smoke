@@ -195,9 +195,15 @@ export default {
 
       this.weekSmoked = weekTotal
       const settings = Store.getSettings()
-      const pricePerCig = settings.cigarettePrice / settings.packSize
-      this.weekSaved = (weekTotal * pricePerCig).toFixed(1)
-      this.weekAvg = (weekTotal / 7).toFixed(1)
+      const pricePerCig = settings.cigarettePrice / (settings.packSize || 20)
+      const original = Math.max(0, settings.dailyOriginal || 0)
+
+      // 省钱 = 本周「原本该抽的量 − 实际抽的量」× 单价。
+      // 原来是 weekTotal × 单价（抽越多省越多），方向反了。
+      // 已过完的天数：周一到今天的天数（含今天），避免用 7 天把日均/省钱摊薄。
+      const elapsedDays = Math.min(7, today.getDay() + 1)
+      this.weekSaved = Math.max(0, (elapsedDays * original - weekTotal) * pricePerCig).toFixed(1)
+      this.weekAvg = (weekTotal / elapsedDays).toFixed(1)
 
       // 计算柱状图高度
       const maxCount = Math.max(...weekDays.map(d => d.count), 1)
@@ -208,24 +214,40 @@ export default {
     },
 
     loadRecords() {
+      Store.settleDailySavings()
       const history = Store.getHistory()
       const stats = Store.getStats()
-      
+
       // 总吸烟数 & 累计省钱（统一使用 stats，与 index.vue 一致）
       this.totalSmoked = stats.totalSmoked || 0
       this.totalSaved = Store.getSavedMoney().toFixed(1)
-      
-      // 最长连续天数（统一使用 stats.maxStreak，与成就页一致）
-      this.bestStreak = stats.maxStreak || 0
-      
-      // 最少一天
+
+      // 最长连续天数：历史峰值与当前连续取大（与成就页口径一致）
+      this.bestStreak = Math.max(stats.maxStreak || 0, Store.getSmokeStreak())
+
+      // 最少一天：从戒烟日起逐日统计（含「一根没抽」的 0 根日）。
+      // 原来只遍历 history，没抽烟的日子根本不在列表里，指标恒 >= 1。
       const dailyCounts = {}
       history.forEach(r => {
-        const dateStr = this.formatDate(new Date(r.timestamp))
+        if (!r || !r.timestamp) return
+        const dateStr = Store.todayStr(r.timestamp)
         dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1
       })
-      const counts = Object.values(dailyCounts)
-      this.leastDay = counts.length > 0 ? Math.min(...counts) : 0
+
+      const settings = Store.getSettings()
+      const quitDay = Store.parseLocalDate(settings.quitDate)
+      const todayStr = Store.todayStr()
+      const startDay = quitDay ? Store.todayStr(quitDay) : todayStr
+
+      let least = Infinity
+      let cursor = startDay
+      let guard = 0
+      while (cursor <= todayStr && guard < 3650) {
+        least = Math.min(least, dailyCounts[cursor] || 0)
+        cursor = Store.shiftDays(cursor, 1)
+        guard++
+      }
+      this.leastDay = least === Infinity ? 0 : least
     },
 
     loadMonthData() {
@@ -304,29 +326,6 @@ export default {
       }
       
       this.calendarDays = days
-    },
-
-    calcBestStreak(history) {
-      if (history.length === 0) return 0
-      
-      const dates = [...new Set(history.map(r => this.formatDate(new Date(r.timestamp))))].sort()
-      let maxStreak = 1
-      let currentStreak = 1
-      
-      for (let i = 1; i < dates.length; i++) {
-        const prev = new Date(dates[i - 1])
-        const curr = new Date(dates[i])
-        const diffDays = (curr - prev) / (1000 * 60 * 60 * 24)
-        
-        if (diffDays === 1) {
-          currentStreak++
-          maxStreak = Math.max(maxStreak, currentStreak)
-        } else {
-          currentStreak = 1
-        }
-      }
-      
-      return maxStreak
     },
 
     formatDate(date) {

@@ -34,6 +34,13 @@
             @input="onPackSizeInput" placeholder="20" />
         </view>
 
+        <!-- 戒烟前每日烟量（省钱计算的基准） -->
+        <view class="setting-row">
+          <text class="text-sm text-gray-300">戒烟前每天抽（根）</text>
+          <input class="setting-input" type="number" :value="settings.dailyOriginal"
+            @input="onOriginalInput" placeholder="20" />
+        </view>
+
         <!-- 每日配额 -->
         <view class="setting-row">
           <text class="text-sm text-gray-300">每日假抽配额</text>
@@ -126,6 +133,11 @@ export default {
 
     onCooldownInput(e) {
       this.settings.cooldownMinutes = parseInt(e.detail.value) || 5
+    },
+
+    onOriginalInput(e) {
+      // 省钱 =（这个值 − 当天实际抽的根数）× 单价，是省钱计算的基准
+      this.settings.dailyOriginal = Math.max(1, parseInt(e.detail.value) || 20)
     },
 
     increaseQuota() {

@@ -3,7 +3,12 @@ import Store from '@/utils/store.js'
 
 export default {
   onLaunch() {
-    console.log('App Launch')
+    // 启动时结算「昨天及之前」的省钱，并同步勋章/挑战状态
+    try {
+      Store.settleDailySavings()
+      Store.settlePastChallenges()
+      Store.syncBadges()
+    } catch (e) {}
   },
   onShow() {
     // 回到前台时让宠物每日恢复（无烟日回血回快乐+经验）

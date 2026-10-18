@@ -150,6 +150,7 @@ export default {
       brandId: '',
       remaining: 0,
       cancelled: false,  // 标记是否取消抽烟
+      settled: false,    // 本次吸烟是否已结算（防止 finishSmoking 后再次返回重复记账）
       // 状态机: ready / igniting / lit / smoking / exhaling / burnout / cooldown
       state: 'ready',
       sceneReady: false,
@@ -342,8 +343,11 @@ export default {
       // 只有未点火时返回才算取消，点了火就算中途返回也记录
       if (!this.smokeStartTime) {
         this.cancelled = true
-      } else {
-        // 已点火，返回前记录抽了一根
+      } else if (!this.settled) {
+        // 已点火且尚未结算，返回前记录抽了一根
+        // settled 保护：finishSmoking() 之后还有一段 reLaunch 延时，
+        // 期间再触发返回会重复 recordSmoke + 重复扣减包剩余。
+        this.settled = true
         const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
         Store.recordSmoke(duration, this.brandId)
         if (this.brandId) {
@@ -1080,6 +1084,8 @@ export default {
     },
 
     tapAsh() {
+      // 弹烟灰计数（成就「弹烟灰专家」）
+      Store.incrementStat('ashTapped', 1)
       if (this.ashGrowth > 0) {
         // 创建烟灰碎片粒子效果，烟灰越多碎片越多
         this.createAshParticles(this.ashGrowth)
@@ -1136,8 +1142,9 @@ export default {
       const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
       const totalDuration = Math.round((Date.now() - this.sessionStartTs) / 1000)
 
-      // 只有未取消时才记录抽烟
-      if (!this.cancelled) {
+      // 只有未取消且未结算过时才记录抽烟
+      if (!this.cancelled && !this.settled) {
+        this.settled = true
         Store.recordSmoke(duration, this.brandId)
         // 抽完才持久化扣减包剩余
         if (this.brandId) {
@@ -1332,6 +1339,8 @@ export default {
       ]
       const idx = this.ringCurrentStyle
       if (emitters[idx]) emitters[idx]()
+      // 记录用过的花样（成就「花样大师」需要 12 种齐全）
+      Store.markStyleUsed(idx)
     },
 
     // 获取形状效果上下文
@@ -1863,6 +1872,8 @@ export default {
 
     confirmPass() {
       this.showPassModal = false
+      // 派烟计数（成就「派烟达人」）
+      Store.incrementStat('passedCount', 1)
     },
 
     // ---- Toast ----

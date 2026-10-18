@@ -35,7 +35,7 @@
           </view>
           <!-- 剩余根数 -->
           <view class="brand-remaining">
-            <text class="brand-remaining-num">{{ brand.remaining }}/{{ quota }}</text>
+            <text class="brand-remaining-num">{{ brand.remaining }}/{{ brand.packSize }}</text>
           </view>
           <view class="brand-card-shine"></view>
         </view>
@@ -55,21 +55,11 @@ import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
-const BRANDS = [
-  { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
-  { id: 'hongta', cn: '太华', en: 'TA·HWA', price: 88, theme: 'red', tag: '浓郁·想象味', quote: '送礼倍有面（的空气）', packSize: 20 },
-  { id: 'heiye', cn: '熊猫666', en: 'PANDA', price: 100, theme: 'black', tag: '顶配·都是心理味', quote: '国宝都戒了你还抽？', packSize: 20 },
-  { id: 'jinsi', cn: '羊驼', en: 'LLAMA', price: 22, theme: 'gold', tag: '粗犷·沙漠风', quote: '原版是骆驼，这是羊驼', packSize: 20 },
-  { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', price: 35, theme: 'lightblue', tag: '薄荷冰爆·脑瓜疼', quote: '爆珠一捏，感觉良好', packSize: 20 },
-  { id: 'zimeng', cn: '紫云', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 }
-]
-
 export default {
   components: { AppNavbar },
   data() {
     return {
       brands: [],
-      quota: 20,
       settings: { selectedBrand: null },
       activeSkin: null
     }
@@ -77,13 +67,15 @@ export default {
 
   onShow() {
     this.settings = Store.getSettings()
-    this.quota = this.settings.packSize || 20
+    Store.settleDailySavings()
     this.activeSkin = Store.getActiveSkin()
-    
-    // 重新加载品牌列表，包含剩余数量
-    this.brands = BRANDS.map(brand => ({
+
+    // 品牌数据与「每包支数」统一取自 Store.BRANDS，
+    // 避免分母用全局设置、分子用品牌口径，出现「剩余 15 / 总数 10」。
+    this.brands = Store.BRANDS.map(brand => ({
       ...brand,
-      remaining: Store.getBrandRemaining(brand.id)
+      packSize: Store.getPackSize(brand.id),
+      remaining: Store.getPackRemaining(brand.id)
     }))
   },
 

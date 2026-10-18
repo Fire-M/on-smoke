@@ -85,25 +85,14 @@ export default {
 
   methods: {
     checkUnlock() {
-      const sec = Store.getSmokeFreeDuration()
-      const badges = this.calcBadges()
+      // 与首页 / 成就页共用同一份勋章数据，不再本地另算一套
+      Store.settleDailySavings()
+      Store.syncBadges()
+      const list = Store.getBadgeList()
+      const badges = list.filter(b => b.unlocked).length
       if (badges > 0) {
-        this.unlockMsg = `已解锁 ${badges}/8 枚成就徽章`
+        this.unlockMsg = `已解锁 ${badges}/${list.length} 枚成就徽章`
       }
-    },
-
-    calcBadges() {
-      const sec = Store.getSmokeFreeDuration()
-      let c = 0
-      if (sec >= 1200) c++
-      if (sec >= 43200) c++
-      if (sec >= 1209600) c++
-      if (sec >= 7776000) c++
-      if (sec >= 15552000) c++
-      if (Store.getLessSmoked() >= 10) c++
-      if (Store.getLessSmoked() >= 50) c++
-      if (Store.getSavedMoney() >= 100) c++
-      return Math.min(c, 8)
     },
 
     onUnlockTap() {

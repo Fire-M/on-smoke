@@ -99,13 +99,16 @@ export default {
   methods: {
     loadData() {
       const settings = Store.getSettings()
-      const quitDate = settings.quitDate || Date.now()
+      // quitDate 是 'YYYY-MM-DD' 字符串，直接参与减法会得到 NaN（整页时长全变 NaN）。
+      // 必须显式解析为本地时间当天的 00:00。
+      const quitDate = Store.parseLocalDate(settings.quitDate) || new Date()
       const now = Date.now()
-      const diffMs = now - quitDate
-      const diffSeconds = Math.floor(diffMs / 1000)
+      const diffMs = now - quitDate.getTime()
+      const diffSeconds = Math.max(0, Math.floor(diffMs / 1000))
       const diffDays = Math.floor(diffSeconds / 86400)
 
-      this.quitDays = Math.max(1, diffDays)
+      // 展示用「第 N 天」含当天，第一天是第 1 天
+      this.quitDays = diffDays + 1
       this.quitSeconds = diffSeconds
 
       // 计算戒烟时间字符串
