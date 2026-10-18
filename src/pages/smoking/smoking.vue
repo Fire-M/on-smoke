@@ -339,20 +339,25 @@ export default {
   },
 
   methods: {
+    // 点火即落账：配额 -1、history +1、统计 +1、烟盒剩余 -1。
+    // settled 保证只结算一次；时长此时还未知，抽完再回填。
+    settleSmoke() {
+      if (this.settled) return
+      this.settled = true
+      Store.recordSmoke(0, this.brandId)
+      if (this.brandId) {
+        Store.savePackRemaining(this.brandId, this.remaining)
+      }
+    },
+
     goBack() {
-      // 只有未点火时返回才算取消，点了火就算中途返回也记录
+      // 未点火 → 取消，不产生任何记录。
+      // 已点火 → 记账在点火瞬间已完成，这里只回填真实时长。
       if (!this.smokeStartTime) {
         this.cancelled = true
-      } else if (!this.settled) {
-        // 已点火且尚未结算，返回前记录抽了一根
-        // settled 保护：finishSmoking() 之后还有一段 reLaunch 延时，
-        // 期间再触发返回会重复 recordSmoke + 重复扣减包剩余。
-        this.settled = true
+      } else if (this.settled) {
         const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
-        Store.recordSmoke(duration, this.brandId)
-        if (this.brandId) {
-          Store.savePackRemaining(this.brandId, this.remaining)
-        }
+        Store.updateLastSmokeDuration(duration)
       }
       // 清理资源
       this.cleanup()
@@ -884,6 +889,11 @@ export default {
           this.state = 'smoking'
           this.smokeStartTime = Date.now()
           this.currentPuffStart = Date.now()
+
+          // 「点火即算抽了一根」：此刻立刻落账（配额 -1、history +1、
+          // 烟盒剩余 -1），之后无论抽完还是中途返回都不再重复记账。
+          this.settleSmoke()
+
           this.startSmokeProgress()
           this.showHint = false
           this.startBurnSound()
@@ -1142,14 +1152,10 @@ export default {
       const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
       const totalDuration = Math.round((Date.now() - this.sessionStartTs) / 1000)
 
-      // 只有未取消且未结算过时才记录抽烟
-      if (!this.cancelled && !this.settled) {
-        this.settled = true
-        Store.recordSmoke(duration, this.brandId)
-        // 抽完才持久化扣减包剩余
-        if (this.brandId) {
-          Store.savePackRemaining(this.brandId, this.remaining)
-        }
+      // 记账已在点火瞬间完成（settleSmoke），这里只回填真实时长。
+      // 抽完/中途返回都走这条，不会重复扣配额或重复扣烟盒。
+      if (!this.cancelled && this.settled) {
+        Store.updateLastSmokeDuration(duration)
       }
 
       if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })

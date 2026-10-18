@@ -226,6 +226,13 @@ export default {
       if (this.isPulling) return
       // 空盒不能再抽
       if (this.boxRemainingCigs <= 0) return
+      // 配额用完不能再抽。canSmoke() 原本只在首页 haveOne() 里调用，
+      // 从烟盒页直接抽会绕过配额限制，而点火即记账会把超额直接写进数据。
+      const check = Store.canSmoke()
+      if (!check.can) {
+        if (uni.showToast) uni.showToast({ title: check.reason, icon: 'none' })
+        return
+      }
       this.showPullHint = false
       this.activeIndex = index
       this.isPulling = true

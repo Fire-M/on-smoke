@@ -184,6 +184,18 @@ export function addHistory(record) {
   _write(KEYS.history, list)
 }
 
+// 回填最后一次抽烟的时长。
+// 现在的规则是「点火即记账」，但点火那一刻还不知道会抽多久，
+// 所以抽完（或中途返回）时用这个函数补写真实时长。
+export function updateLastSmokeDuration(duration) {
+  const list = getHistory()
+  if (!list.length) return null
+  // addHistory 用 unshift，最新一条在开头
+  list[0].duration = duration
+  _write(KEYS.history, list)
+  return list[0]
+}
+
 // ---- 统计 ----
 export function getStats() {
   return { ...DEFAULT_STATS, ..._read(KEYS.stats, DEFAULT_STATS) }
@@ -1296,7 +1308,7 @@ export default {
   todayStr, parseLocalDate, shiftDays, diffDays,
   getSettings, saveSettings,
   getToday, saveToday,
-  getHistory, addHistory,
+  getHistory, addHistory, updateLastSmokeDuration,
   getStats, saveStats,
   canSmoke, getCooldownRemain,
   recordSmoke, incrementStat, markStyleUsed,
