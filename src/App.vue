@@ -3,8 +3,13 @@ import Store from '@/utils/store.js'
 
 export default {
   onLaunch() {
-    // 启动时结算「昨天及之前」的省钱，并同步勋章/挑战状态
     try {
+      // 先迁移旧数据：早期版本存在省钱方向算反、挑战永不完成等问题，
+      // 老用户设备里的数据是错的，需要先修正再展示，否则数字会莫名突变。
+      const migrated = Store.migrateIfNeeded()
+      if (migrated) this.showMigrationNotice(migrated)
+
+      // 启动时结算「昨天及之前」的省钱，并同步勋章/挑战状态
       Store.settleDailySavings()
       Store.settlePastChallenges()
       Store.syncBadges()
@@ -16,6 +21,32 @@ export default {
   },
   onHide() {
     console.log('App Hide')
+  },
+
+  methods: {
+    // 数字突变却不说原因，用户会以为 App 坏了，所以必须告知
+    showMigrationNotice(m) {
+      const parts = []
+      if (m.savedChanged) {
+        parts.push(`· 省钱金额已按真实记录重算（${m.oldSaved} → ${m.newSaved} 元）`)
+      }
+      if (m.challengesReset) {
+        parts.push('· 每日挑战数据已重置')
+      }
+      if (!parts.length) return
+
+      // 延后一点，等首页渲染完再弹，避免和启动流程抢
+      setTimeout(() => {
+        if (uni.showModal) {
+          uni.showModal({
+            title: '数据已校准',
+            content: '我们修复了部分统计的计算规则：\n' + parts.join('\n') + '\n\n你的抽烟记录完整保留。',
+            showCancel: false,
+            confirmText: '知道了'
+          })
+        }
+      }, 1200)
+    }
   }
 }
 </script>

@@ -29,8 +29,14 @@ const KEYS = {
 const EXTRA_KEYS = [
   'os_ad_records',
   'os_last_open_date',
-  'os_sound'
+  'os_sound',
+  'os_data_version',
+  'os_cloud_uid'
 ]
+
+// 数据结构版本。改动计算规则时递增，启动时由 migrateIfNeeded() 自动迁移，
+// 避免老用户带着错误数据（比如旧版反向的省钱金额）继续用。
+const DATA_VERSION = 2
 
 // ---- 品牌单一数据源（页面与剩余计算共用，避免口径分裂）----
 export const BRANDS = [
@@ -490,7 +496,7 @@ export const BADGE_LIST = [
 
   // 省钱达人
   { id: 'save_10', name: '首枚硬币', icon: '💰', category: 1, desc: '累计省下 10 元', condition: (s) => s.totalSaved >= 10 },
-  { id: 'save_50', name: '小富即安', icon: '💵', category: 2, desc: '累计省下 50 元', condition: (s) => s.totalSaved >= 50 },
+  { id: 'save_50', name: '小富即安', icon: '💵', category: 1, desc: '累计省下 50 元', condition: (s) => s.totalSaved >= 50 },
   { id: 'save_100', name: '百元大关', icon: '💴', category: 1, desc: '累计省下 100 元', condition: (s) => s.totalSaved >= 100 },
   { id: 'save_1000', name: '千元户', icon: '💶', category: 1, desc: '累计省下 1000 元', condition: (s) => s.totalSaved >= 1000 },
   { id: 'save_10000', name: '万元户', icon: '💎', category: 1, desc: '累计省下 10000 元', condition: (s) => s.totalSaved >= 10000 },
@@ -509,11 +515,15 @@ export const BADGE_LIST = [
   { id: 'pass_10', name: '派烟达人', icon: '🤝', category: 3, desc: '累计派烟 10 次', condition: (s) => s.passedCount >= 10 },
   { id: 'tap_ash_50', name: '弹烟灰专家', icon: '💨', category: 3, desc: '累计弹烟灰 50 次', condition: (s) => s.ashTapped >= 50 },
 
-  // 健康成就
-  { id: 'lungs_breathing', name: '肺在呼吸', icon: '🫁', category: 4, desc: '累计戒烟满 3 天', condition: (s) => s.cleanDays >= 3 },
-  { id: 'taste_return', name: '味觉回归', icon: '👅', category: 4, desc: '累计戒烟满 7 天', condition: (s) => s.cleanDays >= 7 },
-  { id: 'blood_flow', name: '血液循环', icon: '❤️', category: 4, desc: '累计戒烟满 30 天', condition: (s) => s.cleanDays >= 30 },
-  { id: 'cancer_risk_down', name: '癌症风险降', icon: '🛡️', category: 4, desc: '累计戒烟满 90 天', condition: (s) => s.cleanDays >= 90 }
+  // 健康成就：改用「连续无烟时长」而非「累计戒烟天数」。
+  // 原来这里和「戒烟里程碑」共用 cleanDays（3/7/30 天各撞一枚），
+  // 两枚会同时解锁、条件完全一样，观感就是凑数。
+  // 改用 smokeFreeSeconds 后两者语义分离：里程碑看累计（允许偶尔破戒），
+  // 健康成就看连续（抽一根就重新计时），也更贴合真实的健康恢复规律。
+  { id: 'lungs_breathing', name: '肺在呼吸', icon: '🫁', category: 4, desc: '连续 12 小时不抽烟，血氧恢复', condition: (s) => s.smokeFreeSeconds >= 43200 },
+  { id: 'taste_return', name: '味觉回归', icon: '👅', category: 4, desc: '连续 2 天不抽烟，味觉开始恢复', condition: (s) => s.smokeFreeSeconds >= 172800 },
+  { id: 'blood_flow', name: '血液循环', icon: '❤️', category: 4, desc: '连续 2 周不抽烟，循环改善', condition: (s) => s.smokeFreeSeconds >= 1209600 },
+  { id: 'cancer_risk_down', name: '呼吸顺畅', icon: '🛡️', category: 4, desc: '连续 3 个月不抽烟，咳喘减少', condition: (s) => s.smokeFreeSeconds >= 7776000 }
 ]
 
 // 构造勋章判定所需的完整 stats（补齐 cleanDays / 时段 / 计数器等派生字段）
@@ -528,7 +538,9 @@ export function buildBadgeStats() {
     earlySmoked: s.earlySmoked || 0,
     stylesUsed: s.stylesUsed || 0,
     passedCount: s.passedCount || 0,
-    ashTapped: s.ashTapped || 0
+    ashTapped: s.ashTapped || 0,
+    // 健康成就用「连续无烟时长」（抽一根就重新计时）
+    smokeFreeSeconds: getSmokeFreeDuration()
   }
 }
 
@@ -552,6 +564,99 @@ export function getBadgeList() {
     unlocked: !!unlocked[b.id],
     unlockTime: unlocked[b.id + '_time'] || null
   }))
+}
+
+/**
+ * 用历史记录重算累计省钱。
+ * 旧版算法是「每抽一根 +1 根的钱」，激励方向完全反了，
+ * 老用户设备里存的 totalSaved 是错的，必须基于 history（唯一真实数据）重算。
+ * 口径与 settleDailySavings 一致：只结算「昨天及之前」，今天不结算。
+ */
+export function recomputeSavedFromHistory() {
+  const history = getHistory()
+  const stats = getStats()
+
+  if (!history.length) {
+    stats.totalSaved = 0
+    saveStats(stats)
+    return 0
+  }
+
+  const settings = getSettings()
+  const original = Math.max(0, settings.dailyOriginal || 0)
+  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
+
+  // 按天聚合根数与实付单价
+  const daily = {}
+  let minTs = Infinity
+  history.forEach(r => {
+    if (!r || !r.timestamp) return
+    const day = _todayStr(r.timestamp)
+    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
+    daily[day].count += 1
+    daily[day].cost += getBrandPricePerCig(r.brandId)
+    if (r.timestamp < minTs) minTs = r.timestamp
+  })
+
+  const startDay = _todayStr(minTs)
+  const today = _todayStr()
+
+  let total = 0
+  let cursor = startDay
+  let guard = 0
+  while (cursor < today && guard < 3650) {
+    const rec = daily[cursor]
+    const smoked = rec ? rec.count : 0
+    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
+    total += Math.max(0, original - smoked) * avgPrice
+    cursor = _shiftDays(cursor, 1)
+    guard++
+  }
+
+  total = Math.round(total * 100) / 100
+  stats.totalSaved = total
+  saveStats(stats)
+  return total
+}
+
+/**
+ * 启动时自动迁移旧数据。返回 null 表示无需迁移，否则返回本次变更摘要
+ * （供 App 弹窗告知用户，避免数字突变却不知原因）。
+ */
+export function migrateIfNeeded() {
+  const from = _read('os_data_version', 0)
+  if (from >= DATA_VERSION) return null
+
+  const result = { from, to: DATA_VERSION, changed: false }
+
+  // 省钱金额：旧版方向反了，用历史记录重算
+  const oldSaved = getSavedMoney()
+  const newSaved = recomputeSavedFromHistory()
+  if (Math.abs(oldSaved - newSaved) >= 0.05) {
+    result.savedChanged = true
+    result.oldSaved = oldSaved
+    result.newSaved = newSaved
+    result.changed = true
+  }
+
+  // 每日挑战：旧版 updateChallengeProgress 从未被调用，completed 恒为 false，
+  // 且 limit / time_range 缺少判定分支，历史记录不可信，清空重来
+  const challenges = _read(KEYS.challenges, {})
+  if (challenges && Object.keys(challenges).length) {
+    _write(KEYS.challenges, {})
+    result.challengesReset = true
+    result.changed = true
+  }
+
+  // 结算游标重置，避免与刚重算的结果重复叠加
+  _write(KEYS.savingsSettle, { last: _todayStr() })
+
+  // 勋章：旧版成就页硬编码解锁前两枚，状态不可信，按新规则重算
+  syncBadges()
+  result.badgesResynced = true
+
+  _write('os_data_version', DATA_VERSION)
+  return result.changed ? result : null
 }
 
 export function resetAll() {
@@ -1320,6 +1425,7 @@ export default {
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   BADGE_LIST, getBadgeList, syncBadges, buildBadgeStats,
+  migrateIfNeeded, recomputeSavedFromHistory,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   getCravings, addCraving, getCravingStats,
   getDailyChallenge, updateChallengeProgress, getChallengeStreak, settlePastChallenges,
