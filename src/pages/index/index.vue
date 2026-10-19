@@ -3,71 +3,84 @@
     <app-navbar title="就抽一根"></app-navbar>
     <!-- 可滚动仪表盘内容 -->
     <scroll-view scroll-y class="main-scroll">
-      <!-- 顶部：戒烟天数 + 激励语 -->
-      <view class="px-20 pt-20 pb-16">
-        <text class="text-sm text-gray-400">戒烟 第 <text class="text-amber font-bold text-base">{{ quitDays }}</text> 天</text>
-        <text class="text-2xl font-bold text-gray-100 mt-4 block">嘴又痒了?</text>
+      <!-- Hero：戒烟天数（全页最大字号——这是用户最该看到的成果，
+           原来这里用的 text-sm 却把 text-4xl 给了「省钱」，层级是倒的） -->
+      <view class="mx-20 mt-16 mb-16 hero-card">
+        <text class="text-sm text-gray-400 block">戒烟 第</text>
+        <view class="hero-days-row">
+          <text class="hero-days" :class="{ bump: heroBump }">{{ quitDays }}</text>
+          <text class="hero-unit">天</text>
+        </view>
+        <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天</text>
+        <text class="hero-quote mt-12 block">嘴又痒了?</text>
       </view>
 
-      <!-- 至今已省卡片 -->
+      <!-- 今日已抽：大字给已抽根数，进度条走「已抽 / 配额」，
+           剩余根数放副标题，不用心算 -->
+      <view class="mx-20 mb-16">
+        <view class="card p-20">
+          <text class="text-sm text-gray-400 block">今日已抽</text>
+          <view class="quota-row">
+            <text class="quota-remain" :class="[quotaLevel, { bump: heroBump }]">{{ todaySmoked }}</text>
+            <text class="quota-unit">根</text>
+          </view>
+          <view class="progress-bar">
+            <view class="progress-fill" :class="quotaLevel" :style="{ width: quotaPercent + '%' }"></view>
+          </view>
+          <text class="text-sm text-gray-500 mt-12 block">还能抽 {{ quotaRemain }} 根 · 配额 {{ effectiveQuota }}</text>
+
+          <!-- 还有额度：看广告加一根 -->
+          <view class="ad-quota-btn" @click="watchAdForQuota" v-if="quotaRemain <= 0 && adRewardRemain > 0">
+            <text class="ad-quota-icon">🎬</text>
+            <text class="ad-quota-text">看广告 +1 根</text>
+          </view>
+          <!-- 配额用完：给个出口而不是让用户干瞪眼 -->
+          <view class="quota-empty-tip" v-if="quotaRemain <= 0">
+            <text class="quota-empty-text">今天的额度用完了</text>
+            <button class="quota-alt-btn" @click.stop="goToBreathing">去做个呼吸练习</button>
+          </view>
+        </view>
+      </view>
+
+      <!-- 至今已省（降级为普通尺寸，视觉重心让给 Hero） -->
       <view class="mx-20 mb-16 saved-card">
         <view class="flex">
           <view class="saved-bar"></view>
           <view class="flex-1 p-20">
             <text class="text-sm text-gray-400 mb-8 block">至今已省</text>
-            <text class="text-4xl font-bold text-amber">¥{{ savedAmount }}</text>
-            <text class="text-sm text-gray-500 mt-12 block">约 {{ Math.floor(savedAmount / 5) }} 包辣条 · {{ Math.floor(savedAmount / 15) }} 杯咖啡</text>
+            <text class="text-2xl font-bold text-amber">¥{{ savedAmount }}</text>
+            <!-- 金额还不够一个换算单位时不要显示「0 包辣条」。
+                 用数值字段判断，避免拿字符串去比大小的隐式转换 -->
+            <text class="text-sm text-gray-500 mt-12 block" v-if="savedCups >= 1">
+              约 {{ savedPackages }} 包辣条 · {{ savedCups }} 杯咖啡
+            </text>
+            <text class="text-sm text-gray-500 mt-12 block" v-else-if="savedPackages >= 1">
+              约 {{ savedPackages }} 包辣条
+            </text>
+            <text class="text-sm text-gray-500 mt-12 block" v-else>
+              再忍忍，第一包辣条快到手了 💪
+            </text>
           </view>
         </view>
       </view>
 
-      <!-- 今日假抽 + 连续打卡 -->
-      <view class="mx-20 mb-16 two-col">
-        <view class="card p-16">
-          <text class="text-sm text-gray-400 mb-8 block">今日假抽</text>
-          <text class="text-2xl font-bold text-gray-100">{{ todaySmoked }} / {{ effectiveQuota }} 根</text>
-          <view class="progress-bar">
-            <view class="progress-fill" :style="{ width: quotaPercent + '%' }"></view>
-          </view>
-          <!-- 看广告+1根 -->
-          <view class="ad-quota-btn" @click="watchAdForQuota" v-if="adRewardRemain > 0">
-            <text class="ad-quota-icon">🎬</text>
-            <text class="ad-quota-text">看广告 +1 根</text>
-          </view>
+      <!-- 三列紧凑小卡：原来「烟瘾追踪」单卡 + 两组 two-col 连着排，
+           视觉节奏重复且占地，这里压成一个三列，信息密度更高 -->
+      <view class="mx-20 mb-16 three-col">
+        <view class="mini-card" @click="goToCraving">
+          <text class="mini-icon">📝</text>
+          <text class="mini-value">{{ todayCravings }}</text>
+          <text class="mini-label">今日烟瘾</text>
         </view>
-        <view class="card p-16">
-          <text class="text-sm text-gray-400 mb-8 block">连续打卡</text>
-          <text class="text-2xl font-bold text-gray-100">{{ streakDays }} 天</text>
-          <text class="text-sm text-amber mt-8 block">🔥 别破戒</text>
+        <view class="mini-card" @click="goToAchievements">
+          <text class="mini-icon">🏆</text>
+          <text class="mini-value text-amber">{{ badgesCount }}<text class="mini-sub">/{{ badgesTotal }}</text></text>
+          <text class="mini-label">成就徽章</text>
         </view>
-      </view>
-
-      <!-- 身体恢复 + 成就徽章 -->
-      <view class="mx-20 mb-16 two-col">
-        <view class="card p-16 flex items-center gap-12 recovery-card" @click="goToRecovery">
-          <text class="card-icon">🫁</text>
-          <view>
-            <text class="text-sm text-gray-300 block">身体恢复</text>
-            <text class="text-sm text-gray-500 mt-4 block"><text class="text-amber">{{ milestoneLabel }}</text> <text class="text-amber">里程碑</text></text>
-          </view>
-        </view>
-        <view class="card p-16 flex items-center gap-12 achievement-card" @click="goToAchievements">
-          <text class="card-icon">🏆</text>
-          <view>
-            <text class="text-sm text-gray-300 block">成就徽章</text>
-            <text class="text-sm text-gray-500 mt-4 block">{{ badgesCount }} / {{ badgesTotal }} 已解锁</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 烟瘾追踪 -->
-      <view class="mx-20 mb-16">
-        <view class="card p-16 flex items-center gap-12 craving-card" @click="goToCraving">
-          <text class="card-icon">📝</text>
-          <view class="flex-1">
-            <text class="text-sm text-gray-300 block">烟瘾追踪</text>
-            <text class="text-sm text-gray-500 mt-4 block">今天 {{ todayCravings }} 次烟瘾 · 抵抗 {{ resistedCount }} 次</text>
-          </view>
+        <view class="mini-card" @click="goToRecovery">
+          <text class="mini-icon">🫁</text>
+          <text class="mini-value text-amber milestone-val">{{ milestoneLabel }}</text>
+          <text class="mini-label">下一里程碑</text>
         </view>
       </view>
 
@@ -175,6 +188,17 @@ export default {
       effectiveQuota: 5,
       adRewardRemain: 10,
       quotaPercent: 0,
+      // 已抽根数的语义色由 computed quotaLevel 实时算（避免 dev HMR 漏赋值）
+      // Hero 副标题：已熬过多少小时
+      quitHours: 0,
+      // 「还能抽 N 根」直接显示给用户，避免心算 quota−smoked
+      quotaRemain: 0,
+      // 换算单位（用数值字段判断「0 包辣条」文案）
+      savedPackages: 0,
+      savedCups: 0,
+      // 数字变化时的强调动画（抽完一根烟回来能立刻看到反馈）
+      heroBump: false,
+      lastHeroKey: '',
       milestoneLabel: '20分钟',
       badgesCount: 0,
       badgesTotal: 0,
@@ -191,6 +215,18 @@ export default {
       challengeProgress: 0,
       cooldownTimer: null,
       midnightTimer: null
+    }
+  },
+
+  computed: {
+    // 已抽根数按进度的语义色：good 绿（< 50%）→ warn 琥珀（50%~100%）→ over 红（用完）
+    // 用 computed 而非 data + refreshData：每次渲染都重算，避免任何时序/HMR 漏赋值
+    quotaLevel() {
+      const smoked = Number(this.todaySmoked) || 0
+      const quota = Number(this.effectiveQuota) || 0
+      if (quota <= 0) return 'good'   // 未设配额时没"消耗进度"概念，给中性色
+      const ratio = smoked / quota
+      return ratio < 0.5 ? 'good' : (ratio < 1 ? 'warn' : 'over')
     }
   },
 
@@ -232,14 +268,28 @@ export default {
 
       // 戒烟天数：getCleanDays 是「满 N 天」，展示用「第 N 天」含当天
       this.quitDays = Store.getCleanDays() + 1
+      // Hero 副标题：已熬过多少小时
+      this.quitHours = Math.floor(Store.getSmokeFreeDuration() / 3600)
       // 连续打卡：history 里连续每天至少 1 根的天数
       this.streakDays = Store.getSmokeStreak()
-      this.savedAmount = Store.getSavedMoney().toFixed(1)
-      this.todaySmoked = today.smokedCount
-      this.quotaTotal = settings.dailyQuota
-      this.effectiveQuota = Store.getEffectiveQuota()
+
+      const savedNum = Store.getSavedMoney()
+      this.savedAmount = savedNum.toFixed(1)
+      // 渲染防御：强制转数字，避免 boolean/undefined 被 Vue 当字符串渲染成 "true"/"false"
+      const savedSafe = Number(savedNum) || 0
+      this.savedPackages = Math.max(0, Math.floor(savedSafe / 5))
+      this.savedCups = Math.max(0, Math.floor(savedSafe / 15))
+
+      const smokedSafe = Number(today.smokedCount) || 0
+      const effectiveSafe = Number(Store.getEffectiveQuota()) || 0
+      this.effectiveQuota = effectiveSafe
+      this.quotaTotal = Number(settings.dailyQuota) || 0
+      this.todaySmoked = smokedSafe
+      // 直接给「还能抽几根」，不让用户自己算 quota − smoked
+      this.quotaRemain = Math.max(0, effectiveSafe - smokedSafe)
       this.adRewardRemain = AdManager.getRewardRemain()
-      this.quotaPercent = this.effectiveQuota > 0 ? Math.min(today.smokedCount / this.effectiveQuota, 1) * 100 : 0
+      this.quotaPercent = effectiveSafe > 0 ? Math.min(smokedSafe / effectiveSafe, 1) * 100 : 0
+      // quotaLevel 改由 computed 算，避免 dev HMR 时 data 字段未及时赋值
       this.badgesCount = Store.getBadgeList().filter(b => b.unlocked).length
       this.badgesTotal = Store.BADGE_LIST.length
       this.updateMilestone()
@@ -260,6 +310,27 @@ export default {
       Store.updateChallengeProgress(this.challengeProgress)
       this.challengeCompleted = !!challenge.completed
       this.challengeStreak = Store.getChallengeStreak()
+
+      // 数字变了就闪一下，让「又扛住一天」有即时反馈
+      this.bumpIfChanged()
+    },
+
+    // Hero 数字变化时短暂放大 + 提亮（纯 CSS transition，不引动画库）
+    bumpIfChanged() {
+      // 用 todaySmoked 而不是 quotaRemain：后者被 max(0,…) 夹住，
+      // 配额用完后再抽会停在 0，动画就不再触发了
+      const key = this.quitDays + '_' + this.todaySmoked
+      if (this.lastHeroKey === '') {
+        this.lastHeroKey = key
+        return
+      }
+      if (this.lastHeroKey === key) return
+      this.lastHeroKey = key
+      this.heroBump = false
+      this.$nextTick(() => {
+        this.heroBump = true
+        setTimeout(() => { this.heroBump = false }, 600)
+      })
     },
 
     // 按挑战类型计算进度，并把「达标判定」交给 store
@@ -419,16 +490,165 @@ export default {
   flex-shrink: 0;
 }
 
-/* 卡片图标 */
-.card-icon {
-  font-size: 56rpx;
+/* ===== Hero 区：戒烟天数 ===== */
+/* 沿用 saved-card 的「左侧主色条」语言，不引入新的视觉元素 */
+.hero-card {
+  border-radius: 32rpx;
+  padding: 32rpx 40rpx;
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border);
+  border-left: 12rpx solid var(--primary);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
 }
 
-/* 两列布局 */
-.two-col {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.hero-days-row {
+  display: flex;
+  align-items: baseline;
   gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.hero-days {
+  font-size: 96rpx;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--primary);
+  display: inline-block;
+  transition: transform 0.35s ease, filter 0.35s ease;
+}
+
+.hero-unit {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.hero-quote {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 数字变化时的强调（由 bumpIfChanged 触发） */
+.hero-days.bump,
+.quota-remain.bump {
+  transform: scale(1.18);
+  filter: brightness(1.25);
+}
+
+/* ===== 今天还能抽 ===== */
+.quota-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin: 4rpx 0 0;
+}
+
+.quota-remain {
+  font-size: 80rpx;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text);
+  display: inline-block;
+  transition: transform 0.35s ease, filter 0.35s ease, color 0.3s ease;
+}
+
+/* 已抽根数按进度变色，让数字自己会说话。
+   只沿用项目既有的三个语义变量，不新增颜色，主题换肤自动跟随：
+   good 绿（抽得少）→ warn 主色（过半）→ over 红（额度用完） */
+.quota-remain.good { color: var(--accent) !important; }
+.quota-remain.warn { color: var(--primary) !important; }
+.quota-remain.over { color: var(--danger-1) !important; }
+
+.quota-unit {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* 配额用完的替代引导 */
+.quota-empty-tip {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.quota-empty-text {
+  font-size: 26rpx;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.quota-alt-btn {
+  flex-shrink: 0;
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+  line-height: 1;
+}
+
+.quota-alt-btn:active {
+  background: var(--primary);
+  color: var(--bg);
+}
+
+/* ===== 三列紧凑小卡 ===== */
+.three-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+}
+
+.mini-card {
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  border: 1px solid var(--border);
+  border-radius: 24rpx;
+  padding: 24rpx 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  transition: transform 0.2s ease;
+}
+
+.mini-card:active {
+  transform: scale(0.96);
+}
+
+.mini-icon {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.mini-value {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.mini-sub {
+  font-size: 24rpx;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.mini-label {
+  font-size: 22rpx;
+  color: var(--text-dim);
+}
+
+/* 里程碑文字较长（如「20分钟」），单独压字号避免撑破三列 */
+.milestone-val {
+  font-size: 30rpx;
 }
 
 /* 进度条 */
@@ -446,6 +666,12 @@ export default {
   border-radius: 999rpx;
   transition: width 0.3s;
 }
+
+/* 进度条跟上数字的颜色，保持「数字=进度」是同一件事的观感。
+   App.vue 的 .progress-fill 带 !important，这里必须同样加才能覆盖 */
+.progress-fill.good { background-color: var(--accent) !important; }
+.progress-fill.warn { background-color: var(--primary) !important; }
+.progress-fill.over { background-color: var(--danger-1) !important; }
 
 /* 底部按钮 */
 .btn-container {
@@ -593,69 +819,6 @@ export default {
   border: 1px solid var(--border); 
   border-radius: 32rpx;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
-}
-
-.achievement-card {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.achievement-card:active {
-  transform: scale(0.97);
-  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
-}
-
-.achievement-card::after {
-  content: '›';
-  position: absolute;
-  right: 16rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 32rpx;
-  color: #6b7280;
-}
-
-.recovery-card {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.recovery-card:active {
-  transform: scale(0.97);
-  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
-}
-
-.recovery-card::after {
-  content: '›';
-  position: absolute;
-  right: 16rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 32rpx;
-  color: #6b7280;
-}
-
-.craving-card {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.craving-card:active {
-  transform: scale(0.97);
-  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
-}
-
-.craving-card::after {
-  content: '›';
-  position: absolute;
-  right: 16rpx;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 32rpx;
-  color: #6b7280;
 }
 
 /* 每日挑战卡片 */

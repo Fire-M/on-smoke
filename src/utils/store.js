@@ -36,7 +36,7 @@ const EXTRA_KEYS = [
 
 // 数据结构版本。改动计算规则时递增，启动时由 migrateIfNeeded() 自动迁移，
 // 避免老用户带着错误数据（比如旧版反向的省钱金额）继续用。
-const DATA_VERSION = 2
+const DATA_VERSION = 4
 
 // ---- 品牌单一数据源（页面与剩余计算共用，避免口径分裂）----
 export const BRANDS = [
@@ -384,58 +384,18 @@ export function getCleanDays() {
 }
 
 // ---- 省钱结算 ----
-// 规则：以「原本每天抽 dailyOriginal 根」为基准，
-// 每天省下 (dailyOriginal - 当天实际抽的根数) × 单价。
-// 只在当天结束后结算，避免数字在一天内来回跳。
+// 旧版采用「游标结算」：每天结束后把昨天及之前的金额累加到 stats.totalSaved。
+// 实测有 3 个硬伤：
+//   1. 首次进入游标写 today（应 yesterday）→ 首日永远结算不到
+//   2. 整体永远滞后一天结算
+//   3. 修改 dailyOriginal / cigarettePrice 后历史不重算，看到旧数字会以为"计算不对"
+//
+// 新版改为「实时重算」：getSavedMoney 每次基于 history 重算 [首日, 今天]，
+// history 是真实数据且根数只增不减（点火即记账），没有来回跳的问题。
+// 改烟价/基准量后数字立即生效。函数保留 export 是为了让旧调用点
+// （App.vue / savings / dashboard / achievements / share / brand / health-calc）
+// 不需要逐个改 —— 这里 noop 一下即可。
 export function settleDailySavings() {
-  const settings = getSettings()
-  const today = _todayStr()
-  const settle = _read(KEYS.savingsSettle, null)
-
-  // 首次进入：不做历史补算（旧数据口径不同，避免重复累加），从今天开始记账
-  if (!settle || !settle.lastSettleDate) {
-    _write(KEYS.savingsSettle, { lastSettleDate: today })
-    return getSavedMoney()
-  }
-
-  const last = settle.lastSettleDate
-  if (last >= today) return getSavedMoney()
-
-  // 逐日结算 last 之后、today 之前的每一天
-  const history = getHistory()
-  const daily = {}
-  history.forEach(r => {
-    if (!r || !r.timestamp) return
-    const day = _todayStr(r.timestamp)
-    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
-    daily[day].count += 1
-    // 单价按当天实际抽的品牌算（品牌 price 之前完全没参与计算）
-    daily[day].cost += getBrandPricePerCig(r.brandId)
-  })
-
-  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
-  const original = Math.max(0, settings.dailyOriginal || 0)
-
-  let gained = 0
-  let cursor = _shiftDays(last, 1)
-  let guard = 0
-  while (cursor < today && guard < 3650) {
-    const rec = daily[cursor]
-    const smoked = rec ? rec.count : 0
-    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
-    const avoided = Math.max(0, original - smoked)
-    gained += avoided * avgPrice
-    cursor = _shiftDays(cursor, 1)
-    guard++
-  }
-
-  if (gained > 0) {
-    const stats = getStats()
-    stats.totalSaved = (stats.totalSaved || 0) + gained
-    saveStats(stats)
-  }
-
-  _write(KEYS.savingsSettle, { lastSettleDate: _shiftDays(today, -1) })
   return getSavedMoney()
 }
 
@@ -449,9 +409,46 @@ export function getTodaySaved() {
   return Math.round(avoided * pricePerCig * 10) / 10
 }
 
+// 累计省钱：以「原本每天抽 dailyOriginal 根」为基准，
+// 每天省下 (dailyOriginal − 当天实际抽的根数) × 当天实际单根均价。
+// 实时：每次调用都基于 history 重算 [首日, 今天]，含今天。
 export function getSavedMoney() {
-  const stats = getStats()
-  return Math.round((stats.totalSaved || 0) * 10) / 10
+  const settings = getSettings()
+  const history = getHistory()
+  if (!history.length) return 0
+
+  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
+  const original = Math.max(0, settings.dailyOriginal || 0)
+
+  // 按天聚合根数与实付单价
+  const daily = {}
+  let minTs = Infinity
+  history.forEach(r => {
+    if (!r || !r.timestamp) return
+    const day = _todayStr(r.timestamp)
+    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
+    daily[day].count += 1
+    daily[day].cost += getBrandPricePerCig(r.brandId)
+    if (r.timestamp < minTs) minTs = r.timestamp
+  })
+
+  const startDay = _todayStr(minTs)
+  const today = _todayStr()
+
+  let total = 0
+  let cursor = startDay
+  let guard = 0
+  while (cursor <= today && guard < 3651) {   // ≤ 含今天
+    const rec = daily[cursor]
+    const smoked = rec ? rec.count : 0
+    // 当天抽过就用当天的实付均价，没抽（或没记录）才回落到设置价
+    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
+    total += Math.max(0, original - smoked) * avgPrice
+    cursor = _shiftDays(cursor, 1)
+    guard++
+  }
+
+  return Math.round(total * 100) / 100
 }
 
 // 少抽的根数：基准量 − 实际抽的量（之前直接返回 totalSmoked，名实相反）
@@ -567,56 +564,12 @@ export function getBadgeList() {
 }
 
 /**
- * 用历史记录重算累计省钱。
- * 旧版算法是「每抽一根 +1 根的钱」，激励方向完全反了，
- * 老用户设备里存的 totalSaved 是错的，必须基于 history（唯一真实数据）重算。
- * 口径与 settleDailySavings 一致：只结算「昨天及之前」，今天不结算。
+ * 旧版用 history 重算 stats.totalSaved。
+ * 现在 getSavedMoney() 本身就是实时重算，这个函数已无意义，
+ * 保留 export 仅为兼容，直接转发即可。
  */
 export function recomputeSavedFromHistory() {
-  const history = getHistory()
-  const stats = getStats()
-
-  if (!history.length) {
-    stats.totalSaved = 0
-    saveStats(stats)
-    return 0
-  }
-
-  const settings = getSettings()
-  const original = Math.max(0, settings.dailyOriginal || 0)
-  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
-
-  // 按天聚合根数与实付单价
-  const daily = {}
-  let minTs = Infinity
-  history.forEach(r => {
-    if (!r || !r.timestamp) return
-    const day = _todayStr(r.timestamp)
-    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
-    daily[day].count += 1
-    daily[day].cost += getBrandPricePerCig(r.brandId)
-    if (r.timestamp < minTs) minTs = r.timestamp
-  })
-
-  const startDay = _todayStr(minTs)
-  const today = _todayStr()
-
-  let total = 0
-  let cursor = startDay
-  let guard = 0
-  while (cursor < today && guard < 3650) {
-    const rec = daily[cursor]
-    const smoked = rec ? rec.count : 0
-    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
-    total += Math.max(0, original - smoked) * avgPrice
-    cursor = _shiftDays(cursor, 1)
-    guard++
-  }
-
-  total = Math.round(total * 100) / 100
-  stats.totalSaved = total
-  saveStats(stats)
-  return total
+  return getSavedMoney()
 }
 
 /**
@@ -629,16 +582,6 @@ export function migrateIfNeeded() {
 
   const result = { from, to: DATA_VERSION, changed: false }
 
-  // 省钱金额：旧版方向反了，用历史记录重算
-  const oldSaved = getSavedMoney()
-  const newSaved = recomputeSavedFromHistory()
-  if (Math.abs(oldSaved - newSaved) >= 0.05) {
-    result.savedChanged = true
-    result.oldSaved = oldSaved
-    result.newSaved = newSaved
-    result.changed = true
-  }
-
   // 每日挑战：旧版 updateChallengeProgress 从未被调用，completed 恒为 false，
   // 且 limit / time_range 缺少判定分支，历史记录不可信，清空重来
   const challenges = _read(KEYS.challenges, {})
@@ -648,8 +591,16 @@ export function migrateIfNeeded() {
     result.changed = true
   }
 
-  // 结算游标重置，避免与刚重算的结果重复叠加
-  _write(KEYS.savingsSettle, { last: _todayStr() })
+  // 清掉旧版结算游标。getSavedMoney 改为实时重算后不再需要它，
+  // 留着反而有害：旧数据里字段名是错的 last，未来若有人恢复游标逻辑会被误导。
+  try { uni.removeStorageSync(KEYS.savingsSettle) } catch (e) {}
+
+  // 老用户（有抽烟记录）：省钱改成实时结算后数字会变，必须告知，
+  // 否则用户会以为是 App 坏了。新用户无记录，不必打扰。
+  if (getHistory().length) {
+    result.savedRealtime = true
+    result.changed = true
+  }
 
   // 勋章：旧版成就页硬编码解锁前两枚，状态不可信，按新规则重算
   syncBadges()

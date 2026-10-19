@@ -9,8 +9,7 @@ export default {
       const migrated = Store.migrateIfNeeded()
       if (migrated) this.showMigrationNotice(migrated)
 
-      // 启动时结算「昨天及之前」的省钱，并同步勋章/挑战状态
-      Store.settleDailySavings()
+      // 省钱已改为实时结算（getSavedMoney 基于 history 现算），无需每日结算。
       Store.settlePastChallenges()
       Store.syncBadges()
     } catch (e) {}
@@ -27,8 +26,8 @@ export default {
     // 数字突变却不说原因，用户会以为 App 坏了，所以必须告知
     showMigrationNotice(m) {
       const parts = []
-      if (m.savedChanged) {
-        parts.push(`· 省钱金额已按真实记录重算（${m.oldSaved} → ${m.newSaved} 元）`)
+      if (m.savedRealtime) {
+        parts.push('· 省钱金额改为实时结算，抽一根立刻看到变化')
       }
       if (m.challengesReset) {
         parts.push('· 每日挑战数据已重置')
