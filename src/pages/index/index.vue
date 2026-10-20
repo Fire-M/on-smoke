@@ -15,19 +15,33 @@
         <text class="hero-quote mt-12 block">嘴又痒了?</text>
       </view>
 
-      <!-- 今日已抽：大字给已抽根数，进度条走「已抽 / 配额」，
-           剩余根数放副标题，不用心算 -->
+      <!-- 今日已抽 / 今日剩余：两组数字对角对称，同字号同状态色，
+           进度条走「已抽 / 配额」，底部补总量，全程不用心算 -->
       <view class="mx-20 mb-16">
         <view class="card p-20">
-          <text class="text-sm text-gray-400 block">今日已抽</text>
-          <view class="quota-row">
-            <text class="quota-remain" :class="[quotaLevel, { bump: heroBump }]">{{ todaySmoked }}</text>
-            <text class="quota-unit">根</text>
+          <!-- 已抽 / 剩余 对角对称：两组数字共用同一套字号与状态色规则，
+               不给剩余单独做小胶囊，只靠左右位置区分主次 -->
+          <view class="quota-header">
+            <view class="quota-stat">
+              <text class="text-sm text-gray-400">今日已抽</text>
+              <view class="quota-row">
+                <text class="quota-remain" :class="[quotaLevel, { bump: heroBump }]">{{ todaySmoked }}</text>
+                <text class="quota-unit">根</text>
+              </view>
+            </view>
+            <view class="quota-stat quota-stat-right">
+              <text class="text-sm text-gray-400">今日剩余</text>
+              <view class="quota-row">
+                <text class="quota-remain" :class="quotaLevel">{{ quotaRemain }}</text>
+                <text class="quota-unit">根</text>
+              </view>
+            </view>
           </view>
           <view class="progress-bar">
             <view class="progress-fill" :class="quotaLevel" :style="{ width: quotaPercent + '%' }"></view>
           </view>
-          <text class="text-sm text-gray-500 mt-12 block">还能抽 {{ quotaRemain }} 根 · 配额 {{ effectiveQuota }}</text>
+          <!-- 剩余已在右侧同款展示，这里只补总量，避免同一信息重复 -->
+          <text class="text-sm text-gray-500 mt-12 block">配额 {{ effectiveQuota }} 根</text>
 
           <!-- 还有额度：看广告加一根 -->
           <view class="ad-quota-btn" @click="watchAdForQuota" v-if="quotaRemain <= 0 && adRewardRemain > 0">
@@ -69,7 +83,7 @@
       <view class="mx-20 mb-16 three-col">
         <view class="mini-card" @click="goToCraving">
           <text class="mini-icon">📝</text>
-          <text class="mini-value">{{ todayCravings }}</text>
+          <text class="mini-value text-amber">{{ todayCravings }}</text>
           <text class="mini-label">今日烟瘾</text>
         </view>
         <view class="mini-card" @click="goToAchievements">
@@ -537,6 +551,32 @@ export default {
 }
 
 /* ===== 今天还能抽 ===== */
+/* ===== 今日已抽 / 今日剩余：对角对称 ===== */
+/* 两组数字共用 .quota-remain / .quota-unit 的同一套字号、字重与状态色，
+   不再给剩余单独做小胶囊，左右视觉权重保持一致 */
+.quota-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.quota-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  min-width: 0;
+}
+
+/* 右侧一组整体靠右，与左侧「今日已抽」形成对角阅读线 */
+.quota-stat-right {
+  align-items: flex-end;
+}
+
+.quota-stat-right .quota-row {
+  justify-content: flex-end;
+}
+
 .quota-row {
   display: flex;
   align-items: baseline;
@@ -554,10 +594,12 @@ export default {
 }
 
 /* 已抽根数按进度变色，让数字自己会说话。
-   只沿用项目既有的三个语义变量，不新增颜色，主题换肤自动跟随：
-   good 绿（抽得少）→ warn 主色（过半）→ over 红（额度用完） */
-.quota-remain.good { color: var(--accent) !important; }
-.quota-remain.warn { color: var(--primary) !important; }
+   三档全取自主题自身变量，不用 --accent：accent 在各主题里语义不一致
+   （mint 主题的 primary 是绿、accent 是琥珀，与 amber 主题正好反过来），
+   用它会导致同一套状态在不同主题下意思漂移。
+   good 主色（还很宽裕）→ warn 次色（快用完）→ over 危险红（归零） */
+.quota-remain.good { color: var(--primary) !important; }
+.quota-remain.warn { color: var(--primary-2) !important; }
 .quota-remain.over { color: var(--danger-1) !important; }
 
 .quota-unit {
@@ -669,8 +711,8 @@ export default {
 
 /* 进度条跟上数字的颜色，保持「数字=进度」是同一件事的观感。
    App.vue 的 .progress-fill 带 !important，这里必须同样加才能覆盖 */
-.progress-fill.good { background-color: var(--accent) !important; }
-.progress-fill.warn { background-color: var(--primary) !important; }
+.progress-fill.good { background-color: var(--primary) !important; }
+.progress-fill.warn { background-color: var(--primary-2) !important; }
 .progress-fill.over { background-color: var(--danger-1) !important; }
 
 /* 底部按钮 */

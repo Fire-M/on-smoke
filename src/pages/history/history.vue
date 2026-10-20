@@ -40,9 +40,13 @@
             </view>
             <view class="record-info">
               <text class="text-sm text-gray-200">{{ formatTime(record.timestamp) }}</text>
-              <text class="text-xs text-gray-500">持续 {{ formatDuration(record.duration) }}</text>
+              <view class="record-meta">
+                <text class="record-brand" :class="{ 'record-brand-plain': !record.brandId }">{{ formatBrand(record.brandId) }}</text>
+                <text class="text-xs text-gray-500">持续 {{ formatDuration(record.duration) }}</text>
+              </view>
             </view>
             <view class="record-right">
+              <text class="record-price">¥{{ formatPrice(record) }}</text>
               <text class="text-xs text-gray-600">{{ formatRelativeTime(record.timestamp) }}</text>
             </view>
           </view>
@@ -117,6 +121,20 @@ export default {
       const totalSec = this.filteredRecords.reduce((sum, r) => sum + (r.duration || 0), 0)
       this.totalDuration = Math.round(totalSec / 60 * 10) / 10
       this.avgDuration = this.summaryCount > 0 ? Math.round(totalSec / this.summaryCount) : 0
+    },
+
+    // 抽的什么烟：取自记录里的 brandId，与省钱按品牌单价计算是同一份数据。
+    // 没选品牌时显示「普通烟」，不让它看起来像漏记
+    formatBrand(brandId) {
+      if (!brandId) return '普通烟'
+      const brand = Store.BRANDS.find(b => b.id === brandId)
+      return brand ? brand.cn : '普通烟'
+    },
+
+    // 这根烟的单根价格：优先读记录里的 pricePerCig 快照（点烟时锁定），
+    // 与省钱计算共用 getRecordPrice —— 页面上写的数就是这根帮你省下的钱
+    formatPrice(record) {
+      return Math.round(Store.getRecordPrice(record) * 100) / 100
     },
 
     formatTime(ts) {
@@ -269,8 +287,41 @@ export default {
   gap: 4rpx;
 }
 
+/* 品牌名与时长同一行，不让记录项被多撑一行 */
+.record-meta {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+/* 品牌名用主色，和摘要里「抽烟次数」的强调是同一套配色 */
+.record-brand {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* 没选品牌的记录用中性色，避免看起来像真品牌 */
+.record-brand-plain {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* 右侧竖排：价格在上、时间在下面，右侧整体右对齐 */
 .record-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4rpx;
   flex-shrink: 0;
+}
+
+/* 单价用主色，和品牌名、摘要强调数字同色系 */
+.record-price {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--primary);
+  line-height: 1;
 }
 
 /* 空状态 */
