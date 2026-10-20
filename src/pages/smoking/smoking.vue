@@ -346,7 +346,12 @@ export default {
       this.settled = true
       Store.recordSmoke(0, this.brandId)
       if (this.brandId) {
-        Store.savePackRemaining(this.brandId, this.remaining)
+        if (this.remaining <= 0) {
+          // 这根把最后一包抽空了：记一包并自动开下一包
+          Store.completePackAndRefill(this.brandId)
+        } else {
+          Store.savePackRemaining(this.brandId, this.remaining)
+        }
       }
     },
 

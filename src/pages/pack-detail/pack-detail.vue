@@ -97,6 +97,12 @@
         <view class="box-pull-hint" :class="{ show: showPullHint }">
           <text>点击任意一支抽出</text>
         </view>
+        <!-- 抽了几包 / 这包还剩几根：抽空自动开下一包，包数累加 -->
+        <view class="box-stats">
+          <text class="box-stats-item">已抽完 <text class="box-stats-num">{{ packsCompleted }}</text> 包</text>
+          <text class="box-stats-sep">·</text>
+          <text class="box-stats-item">这包剩 <text class="box-stats-num">{{ boxRemainingCigs }}</text> 根</text>
+        </view>
         <!-- 抽空后的空盒提示 + 开新包 -->
         <view class="box-empty-hint" v-if="boxRemainingCigs <= 0">
           <text class="box-empty-text">这包已经抽完啦</text>
@@ -135,6 +141,7 @@ export default {
       dragStartRotX: 0,
       dragMoved: false,
       boxRemainingCigs: 20,
+      packsCompleted: 0,   // 该品牌累计抽完几包（跨天不清）
       isPulling: false,
       activeIndex: null,
       faceCount: 24
@@ -201,6 +208,7 @@ export default {
     refreshPack() {
       this.brand.packSize = Store.getPackSize(this.brand.id)
       this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+      this.packsCompleted = Store.getPacksCompleted(this.brand.id)
     },
 
     // 抽空后开新的一包（之前抽完 20 根就再也抽不了了）
@@ -1097,6 +1105,35 @@ page {
   0%   { transform: rotateY(var(--cig-rot)) translateY(0) scale(1); }
   25%  { transform: rotateY(var(--cig-rot)) translateY(-80px) scale(1.05); }
   100% { transform: rotateY(var(--cig-rot)) rotateZ(6deg) translateY(-360px) scale(0); }
+}
+
+/* 抽了几包 / 这包剩几根 */
+.box-stats {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.box-stats-item {
+  color: rgba(240, 230, 210, 0.7);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+}
+
+.box-stats-num {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.box-stats-sep {
+  color: rgba(240, 230, 210, 0.3);
+  font-size: 13px;
 }
 
 .box-pull-hint {

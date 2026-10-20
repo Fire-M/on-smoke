@@ -22,6 +22,7 @@ const KEYS = {
   smokeStyles: 'os_smoke_styles',
   theme: 'os_theme',
   packRemaining: 'os_pack_remaining',
+  packsCompleted: 'os_packs_completed',
   savingsSettle: 'os_savings_settle'
 }
 
@@ -165,7 +166,9 @@ export function saveSettings(s) {
 // ---- 今日状态 ----
 export function getToday() {
   const t = _read(KEYS.today, DEFAULT_TODAY)
-  // 跨午夜自动重置
+  // 跨午夜自动重置。
+  // brandCounts 不清：它是「当前这包烟各品牌已抽几根」的累计，跨天保留；
+  // 一包抽完才归零开下一包。lastSmokeTime 同理保留（算距上次抽烟）。
   if (t.date !== _todayStr()) {
     t.date = _todayStr()
     t.smokedCount = 0
@@ -186,7 +189,18 @@ export function getHistory() {
 export function addHistory(record) {
   const list = getHistory()
   list.unshift(record)
-  if (list.length > 500) list.length = 500
+  // 超出上限要截断，但省钱是「history 逐根累加」的，直接丢会让累计省钱缩水。
+  // 先把被丢弃记录的金额沉淀到 stats.savedLegacy，getSavedMoney 再把它加回来。
+  if (list.length > 500) {
+    const dropped = list.splice(500)
+    let legacy = 0
+    dropped.forEach(r => { legacy += getRecordPrice(r) })
+    if (legacy > 0) {
+      const stats = getStats()
+      stats.savedLegacy = Math.round(((stats.savedLegacy || 0) + legacy) * 100) / 100
+      saveStats(stats)
+    }
+  }
   _write(KEYS.history, list)
 }
 
@@ -359,6 +373,22 @@ export function refillPack(brandId) {
   return getPackRemaining(brandId)
 }
 
+// ---- 抽完的包数 ----
+// 抽完一包自动开下一包，包数累加，跨天不清（抽了几包是累计事实）。
+// 手动「开新的一包」不计入 —— 那是换包，不是抽完。
+export function getPacksCompleted(brandId) {
+  const data = _read(KEYS.packsCompleted, {})
+  return brandId ? (data[brandId] || 0) : data
+}
+
+// 这包抽完了：包数 +1 并自动开下一包，返回新包的剩余支数
+export function completePackAndRefill(brandId) {
+  const data = _read(KEYS.packsCompleted, {})
+  data[brandId] = (data[brandId] || 0) + 1
+  _write(KEYS.packsCompleted, data)
+  return refillPack(brandId)
+}
+
 // 获取某品牌剩余数量（基于持久化的包剩余，跨天不重置）
 export function getBrandRemaining(brandId) {
   return getPackRemaining(brandId)
@@ -433,9 +463,10 @@ export function getTodaySaved() {
 // 注意：不按天摊、也没有「每天原本该抽多少」的基线 —— 抽几根算几根。
 export function getSavedMoney() {
   const history = getHistory()
-  if (!history.length) return 0
+  // 被截断掉的老记录，金额已沉淀在 stats.savedLegacy，必须加回来，
+  // 否则抽满 500 根之后累计省钱会越用越少
+  let total = getStats().savedLegacy || 0
 
-  let total = 0
   history.forEach(r => {
     if (!r) return
     total += getRecordPrice(r)
@@ -1365,6 +1396,7 @@ export default {
   getBrandSmokedCount, getBrandRemaining,
   getBrandPackSize, getBrandPricePerCig, getRecordPrice,
   getPackSize, getPackRemaining, savePackRemaining, refillPack,
+  getPacksCompleted, completePackAndRefill,
   settleDailySavings, getTodaySaved,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
