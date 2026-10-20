@@ -65,7 +65,7 @@
                   v-for="cig in row"
                   :key="cig.index"
                   class="box-cig-3d"
-                  :class="{ 'is-active': cig.index === activeIndex, pulling: cig.index === activeIndex && isPulling }"
+                  :class="{ 'is-active': cig.index === activeIndex, pulling: cig.index === activeIndex && isPulling, 'is-empty': cig.empty }"
                   :style="{ '--cig-rot': cig.rot + 'deg' }"
                   @click="pullCig(cig.index)"
                 >
@@ -96,12 +96,6 @@
         </view>
         <view class="box-pull-hint" :class="{ show: showPullHint }">
           <text>点击任意一支抽出</text>
-        </view>
-        <!-- 抽了几包 / 这包还剩几根：抽空自动开下一包，包数累加 -->
-        <view class="box-stats">
-          <text class="box-stats-item">已抽完 <text class="box-stats-num">{{ packsCompleted }}</text> 包</text>
-          <text class="box-stats-sep">·</text>
-          <text class="box-stats-item">这包剩 <text class="box-stats-num">{{ boxRemainingCigs }}</text> 根</text>
         </view>
         <!-- 抽空后的空盒提示 + 开新包 -->
         <view class="box-empty-hint" v-if="boxRemainingCigs <= 0">
@@ -141,7 +135,6 @@ export default {
       dragStartRotX: 0,
       dragMoved: false,
       boxRemainingCigs: 20,
-      packsCompleted: 0,   // 该品牌累计抽完几包（跨天不清）
       isPulling: false,
       activeIndex: null,
       faceCount: 24
@@ -157,14 +150,19 @@ export default {
 
     boxCigs() {
       if (!this.lidOpen) return []
-      const count = Math.max(this.boxRemainingCigs, 0)
-      const cigs = Array.from({ length: count }, (_, index) => {
-        const colIndex = index % 10
-        return {
-          index,
+      // 槽位固定为整包支数，已抽走的留空位（从前往后抽），
+      // 这样「哪一格空了」就等于「哪根被抽走」，不会出现抽 A 根、消失 B 根的错位
+      const total = Math.max(this.brand.packSize || 0, this.boxRemainingCigs || 0, 0)
+      const emptyCount = Math.max(0, total - Math.max(this.boxRemainingCigs, 0))
+      const cigs = []
+      for (let i = 0; i < total; i++) {
+        const colIndex = i % 10
+        cigs.push({
+          index: i,
+          empty: i < emptyCount,
           rot: -4 + colIndex * (8 / Math.max(9, 1))
-        }
-      })
+        })
+      }
       const rows = []
       for (let i = 0; i < cigs.length; i += 10) rows.push(cigs.slice(i, i + 10))
       return rows
@@ -208,7 +206,6 @@ export default {
     refreshPack() {
       this.brand.packSize = Store.getPackSize(this.brand.id)
       this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
-      this.packsCompleted = Store.getPacksCompleted(this.brand.id)
     },
 
     // 抽空后开新的一包（之前抽完 20 根就再也抽不了了）
@@ -242,7 +239,9 @@ export default {
         return
       }
       this.showPullHint = false
-      this.activeIndex = index
+      // 抽的是「第一个还有烟的槽位」：抽完它正好变空位，视觉上连续。
+      // 若按点击的那根抽，会出现「抽的是第 5 根、消失的却是别的」，数量看着不对。
+      this.activeIndex = Math.max(0, (this.brand.packSize || 0) - this.boxRemainingCigs)
       this.isPulling = true
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
@@ -996,6 +995,12 @@ page {
   transition: transform 0.2s ease-out;
 }
 
+/* 已抽走的槽位：留白占位（保持后排烟的位置不塌），且不再响应点击 */
+.box-cig-3d.is-empty {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .box-cig-3d::before {
   content: '';
   position: absolute;
@@ -1105,35 +1110,6 @@ page {
   0%   { transform: rotateY(var(--cig-rot)) translateY(0) scale(1); }
   25%  { transform: rotateY(var(--cig-rot)) translateY(-80px) scale(1.05); }
   100% { transform: rotateY(var(--cig-rot)) rotateZ(6deg) translateY(-360px) scale(0); }
-}
-
-/* 抽了几包 / 这包剩几根 */
-.box-stats {
-  position: absolute;
-  left: 50%;
-  bottom: 4%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 5;
-  white-space: nowrap;
-}
-
-.box-stats-item {
-  color: rgba(240, 230, 210, 0.7);
-  font-size: 13px;
-  letter-spacing: 0.05em;
-}
-
-.box-stats-num {
-  color: var(--primary);
-  font-weight: 700;
-}
-
-.box-stats-sep {
-  color: rgba(240, 230, 210, 0.3);
-  font-size: 13px;
 }
 
 .box-pull-hint {

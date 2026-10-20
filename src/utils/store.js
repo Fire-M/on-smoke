@@ -381,6 +381,14 @@ export function getPacksCompleted(brandId) {
   return brandId ? (data[brandId] || 0) : data
 }
 
+// 所有品牌累计抽完的包数（首页展示用）
+export function getTotalPacksCompleted() {
+  const data = _read(KEYS.packsCompleted, {})
+  let total = 0
+  Object.keys(data).forEach(k => { total += Number(data[k]) || 0 })
+  return total
+}
+
 // 这包抽完了：包数 +1 并自动开下一包，返回新包的剩余支数
 export function completePackAndRefill(brandId) {
   const data = _read(KEYS.packsCompleted, {})
@@ -519,11 +527,12 @@ export const BADGE_LIST = [
   { id: 'save_10', name: '首枚硬币', icon: '💰', category: 1, desc: '累计省下 10 元', condition: (s) => s.totalSaved >= 10 },
   { id: 'save_50', name: '小富即安', icon: '💵', category: 1, desc: '累计省下 50 元', condition: (s) => s.totalSaved >= 50 },
   { id: 'save_100', name: '百元大关', icon: '💴', category: 1, desc: '累计省下 100 元', condition: (s) => s.totalSaved >= 100 },
+  // 最高档就到 1000 元：省钱是「假抽一根省一根」的逐根累加（默认 1.5 元/根），
+  // 原来的「万元户」要假抽 6667 根才够，按 5 根/天要三年多，实质不可达。
   { id: 'save_1000', name: '千元户', icon: '💶', category: 1, desc: '累计省下 1000 元', condition: (s) => s.totalSaved >= 1000 },
-  { id: 'save_10000', name: '万元户', icon: '💎', category: 1, desc: '累计省下 10000 元', condition: (s) => s.totalSaved >= 10000 },
 
-  // 抽烟次数
-  { id: 'smoke_1', name: '初试啼声', icon: '🎯', category: 2, desc: '首次抽完一根', condition: (s) => s.totalSmoked >= 1 },
+  // 抽烟次数。原来这里的 smoke_1 与「戒烟里程碑」的 first_air_cig 条件完全相同
+  // （都是 totalSmoked >= 1），抽第一根时两枚一起亮，属于凑数，已移除。
   { id: 'smoke_10', name: '十根老手', icon: '🎪', category: 2, desc: '累计抽完 10 根', condition: (s) => s.totalSmoked >= 10 },
   { id: 'smoke_100', name: '百根大师', icon: '🎭', category: 2, desc: '累计抽完 100 根', condition: (s) => s.totalSmoked >= 100 },
   { id: 'smoke_1000', name: '千根传奇', icon: '🌠', category: 2, desc: '累计抽完 1000 根', condition: (s) => s.totalSmoked >= 1000 },
@@ -1396,7 +1405,7 @@ export default {
   getBrandSmokedCount, getBrandRemaining,
   getBrandPackSize, getBrandPricePerCig, getRecordPrice,
   getPackSize, getPackRemaining, savePackRemaining, refillPack,
-  getPacksCompleted, completePackAndRefill,
+  getPacksCompleted, getTotalPacksCompleted, completePackAndRefill,
   settleDailySavings, getTodaySaved,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,

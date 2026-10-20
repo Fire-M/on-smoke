@@ -11,7 +11,7 @@
           <text class="hero-days" :class="{ bump: heroBump }">{{ quitDays }}</text>
           <text class="hero-unit">天</text>
         </view>
-        <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天</text>
+        <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天 · 已抽完 <text style="color: var(--primary); font-weight: 600;">{{ packsCompleted }}</text> 包</text>
         <text class="hero-quote mt-12 block">嘴又痒了?</text>
       </view>
 
@@ -196,6 +196,7 @@ export default {
     return {
       quitDays: 1,
       streakDays: 0,
+      packsCompleted: 0,   // 累计抽完几包（跨品牌合计）
       savedAmount: '0.0',
       todaySmoked: 0,
       quotaTotal: 5,
@@ -308,6 +309,8 @@ export default {
       this.quitHours = Math.floor(Store.getSmokeFreeDuration() / 3600)
       // 连续打卡：history 里连续每天至少 1 根的天数
       this.streakDays = Store.getSmokeStreak()
+      // 已抽完几包（所有品牌累计，抽空自动开下一包时 +1）
+      this.packsCompleted = Store.getTotalPacksCompleted()
 
       const savedNum = Store.getSavedMoney()
       this.savedAmount = savedNum.toFixed(1)
