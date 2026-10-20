@@ -91,8 +91,11 @@ export default {
 
   computed: {
     currentBadges() {
-      if (this.currentCategory === 0) return this.badges
-      return this.badges.filter(b => b.category === this.currentCategory)
+      // 直接用 CATEGORIES 里定义的 filter：分类项索引(1~5)和徽章的 category(0~4)
+      // 是两套编号，拿索引去比字段值会整体错位一格，且「健康成就」永远空白
+      const cat = CATEGORIES[this.currentCategory]
+      if (!cat) return this.badges
+      return this.badges.filter(cat.filter)
     },
     unlockedCount() {
       return this.badges.filter(b => b.unlocked).length
