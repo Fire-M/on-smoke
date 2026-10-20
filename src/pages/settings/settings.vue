@@ -98,6 +98,21 @@ import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { THEMES, themeState, setTheme, themeClass } from '@/utils/theme.js'
 
+// 数字收敛：非法值回落默认值，合法值夹到 [min, max]。
+// 原来写的是 parseX || 默认值 —— 0 会被当成 falsy 吞掉（用户根本输不进 0），
+// 而 -10 是真值反而能穿透，存下来的负单价会让省钱金额跟着变负。
+function clampNum(v, min, max, fallback) {
+  const n = Number(v)
+  if (!isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, n))
+}
+
+function clampInt(v, min, max, fallback) {
+  const n = Number(v)
+  if (!isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.round(n)))
+}
+
 export default {
   components: { CustomTabbar, AppNavbar },
   data() {
@@ -123,21 +138,24 @@ export default {
   },
 
   methods: {
+    // 输入过程保留原始值（清空重输、0 都允许），范围收敛统一放到 saveSettings。
+    // 一边输一边改写数据会把输入内容顶掉，光标乱跳。
     onPriceInput(e) {
-      this.settings.cigarettePrice = parseFloat(e.detail.value) || 25
+      this.settings.cigarettePrice = e.detail.value
     },
 
     onPackSizeInput(e) {
-      this.settings.packSize = parseInt(e.detail.value) || 20
+      this.settings.packSize = e.detail.value
     },
 
     onCooldownInput(e) {
-      this.settings.cooldownMinutes = parseInt(e.detail.value) || 5
+      this.settings.cooldownMinutes = e.detail.value
     },
 
+    // 戒烟前每天抽多少。只用于健康计算器里的「少抽的根数」，
+    // 不参与省钱计算（省钱是「假抽一根省一根」的逐根累加）
     onOriginalInput(e) {
-      // 省钱 =（这个值 − 当天实际抽的根数）× 单价，是省钱计算的基准
-      this.settings.dailyOriginal = Math.max(1, parseInt(e.detail.value) || 20)
+      this.settings.dailyOriginal = e.detail.value
     },
 
     increaseQuota() {
@@ -153,7 +171,16 @@ export default {
     },
 
     saveSettings() {
-      Store.saveSettings(this.settings)
+      // 输入时允许中间态，保存时才收敛到合法范围。
+      // 负的烟价/包数会让单价变负，进而把首页、看板、省钱页的金额全带成负数
+      const s = this.settings
+      s.cigarettePrice = clampNum(s.cigarettePrice, 0.1, 999, 30)
+      s.packSize = clampInt(s.packSize, 1, 100, 20)
+      s.cooldownMinutes = clampInt(s.cooldownMinutes, 0, 120, 30)
+      s.dailyOriginal = clampInt(s.dailyOriginal, 0, 999, 20)
+      // 与加减按钮的上下限保持一致（1~20）
+      s.dailyQuota = clampInt(s.dailyQuota, 1, 20, 5)
+      Store.saveSettings(s)
       uni.showToast({ title: '已保存', icon: 'success' })
     },
 

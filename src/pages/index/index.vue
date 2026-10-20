@@ -228,7 +228,8 @@ export default {
       challengeStreak: 0,
       challengeProgress: 0,
       cooldownTimer: null,
-      midnightTimer: null
+      midnightTimer: null,
+      adWatching: false    // 广告播放中，防止连点重复加配额
     }
   },
 
@@ -247,7 +248,7 @@ export default {
   onLoad() {
     this.refreshData()
     this.checkCooldown()
-    this.midnightTimer = setInterval(() => this.refreshData(), 30000)
+    this.startPolling()
     
     // 初始化广告
     AdManager.initRewardedAd()
@@ -262,16 +263,37 @@ export default {
   },
 
   onUnload() {
-    clearInterval(this.midnightTimer)
+    this.stopPolling()
     clearInterval(this.cooldownTimer)
   },
 
   onShow() {
     this.refreshData()
     this.checkCooldown()
+    this.startPolling()
+  },
+
+  // tabBar 页切走只触发 onHide，不会 unload。
+  // 不在这里停掉的话，首页的 30 秒轮询会在后台永久跑下去（每 30 秒一次全量重算 + 写 storage）。
+  onHide() {
+    this.stopPolling()
+    clearInterval(this.cooldownTimer)
   },
 
   methods: {
+    // 30 秒轮询：用于跨零点刷新、挑战/里程碑状态跟进
+    startPolling() {
+      if (this.midnightTimer) return   // 已在跑就别重复起
+      this.midnightTimer = setInterval(() => this.refreshData(), 30000)
+    },
+
+    stopPolling() {
+      if (this.midnightTimer) {
+        clearInterval(this.midnightTimer)
+        this.midnightTimer = null
+      }
+    },
+
     refreshData() {
       const settings = Store.getSettings()
       const today = Store.getToday()
@@ -320,9 +342,14 @@ export default {
       const challenge = Store.getDailyChallenge()
       this.challengeTitle = challenge.title
       this.challengeIcon = challenge.icon
-      this.challengeProgress = this.calcChallengeProgress(challenge, today)
-      Store.updateChallengeProgress(this.challengeProgress)
-      this.challengeCompleted = !!challenge.completed
+      // 传给 store 的是「原始值」不是百分比：updateChallengeProgress 要拿它跟 target 比大小。
+      // 之前把百分比传进去，导致 limit 一早就判失败、time_range 胜负反转。
+      const value = this.calcChallengeValue(challenge, today)
+      const updated = Store.updateChallengeProgress(value)
+      // 进度条要的是百分比，单独算，别拿原始值当宽度
+      this.challengeProgress = this.calcChallengePercent(challenge, value)
+      // 用回写后的对象判定，否则读到的是更新前的快照，要再等一次刷新才显示已完成
+      this.challengeCompleted = !!(updated && updated.completed)
       this.challengeStreak = Store.getChallengeStreak()
 
       // 数字变了就闪一下，让「又扛住一天」有即时反馈
@@ -347,41 +374,54 @@ export default {
       })
     },
 
-    // 按挑战类型计算进度，并把「达标判定」交给 store
-    calcChallengeProgress(challenge, today) {
+    // 挑战的「原始值」，语义与 store.updateChallengeProgress 的契约一致：
+    //   limit → 今日已抽根数 / save → 今日已省金额 / resist → 今日抵抗次数
+    //   time_range → 该时段内已抽根数 / delay → 距上次抽烟已过去分钟数
+    // 达标判定全交给 store，这里只负责把真实数字算出来。
+    calcChallengeValue(challenge, today) {
       if (challenge.type === 'limit') {
-        // 「不超过 N 根」：配额用掉的越少越好，进度 = 剩余额度占比
-        const target = challenge.target || 1
-        const remain = Math.max(0, target - (today.smokedCount || 0))
-        return Math.round(Math.min(100, (remain / target) * 100))
+        return Number(today.smokedCount) || 0
       }
       if (challenge.type === 'save') {
-        const saved = Store.getTodaySaved()
-        return Math.round(Math.min(100, (saved / challenge.target) * 100))
+        return Store.getTodaySaved()
       }
       if (challenge.type === 'resist') {
-        return Math.round(Math.min(100, (this.resistedCount / challenge.target) * 100))
+        return Number(this.resistedCount) || 0
       }
       if (challenge.type === 'time_range') {
-        // 该时段内一根没抽才算达标；时段没过完先按当前结果展示
+        // 只数该时段内的根数。不判断「时段有没有过完」：
+        // 过完之前根数天然为 0，过完之后 store 按 completed = (progress === 0) 结算
         const range = challenge.target || { start: 0, end: 12 }
-        const hour = new Date().getHours()
-        if (hour < range.end) return 0
-        const inRange = Store.getHistory().filter(r => {
-          const d = new Date(r.timestamp)
-          return Store.todayStr(r.timestamp) === Store.todayStr()
-            && d.getHours() >= range.start && d.getHours() < range.end
+        const todayStr = Store.todayStr()
+        return Store.getHistory().filter(r => {
+          if (!r || !r.timestamp) return false
+          if (Store.todayStr(r.timestamp) !== todayStr) return false
+          const h = new Date(r.timestamp).getHours()
+          return h >= range.start && h < range.end
         }).length
-        return inRange === 0 ? 100 : 0
       }
       if (challenge.type === 'delay') {
-        // 「延迟 1 小时」：距上次抽烟已过去多少分钟
+        // 「延迟 1 小时」：距上次抽烟已过去多少分钟；今天还没抽过视为已达标
         const last = today.lastSmokeTime
-        if (!last) return 100
-        const minutes = Math.floor((Date.now() - last) / 60000)
-        return Math.round(Math.min(100, (minutes / challenge.target) * 100))
+        if (!last) return Number(challenge.target) || 0
+        return Math.floor((Date.now() - last) / 60000)
       }
       return 0
+    },
+
+    // 进度条要的百分比。limit 是「剩得越多越好」，所以展示剩余占比；
+    // 其余类型都是「越接近 target 越好」，展示 value / target。
+    calcChallengePercent(challenge, value) {
+      const target = Number(challenge.target) || 1
+      if (challenge.type === 'limit') {
+        const remain = Math.max(0, target - (Number(value) || 0))
+        return Math.round((remain / target) * 100)
+      }
+      if (challenge.type === 'time_range') {
+        // 时段内一根没抽 = 100%，抽了一根就掉到 0
+        return (Number(value) || 0) === 0 ? 100 : 0
+      }
+      return Math.round(Math.min(100, ((Number(value) || 0) / target) * 100))
     },
 
     updateMilestone() {
@@ -461,11 +501,20 @@ export default {
     },
 
     watchAdForQuota() {
+      // 防连点：广告回调是异步的，连点会并发多个 Promise，
+      // 每个都 resolve 就白拿多份配额
+      if (this.adWatching) return
+      this.adWatching = true
       AdManager.showRewardedAd('quota').then(success => {
         if (success) {
+          this.adWatching = false
           Store.addExtraQuota()
           this.refreshData()
+        } else {
+          this.adWatching = false
         }
+      }).catch(() => {
+        this.adWatching = false
       })
     }
   }

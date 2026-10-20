@@ -6,8 +6,12 @@
         <view class="card p-20">
           <text class="card-title">当前已省</text>
           <text class="saved-amount">¥{{ savedMoney }}</text>
-          <view class="progress-bar"><view class="progress-fill" :style="{ width: progress + '%' }"></view></view>
-          <text class="progress-text">目标{{ goalName ? '：' + goalName : '' }} ¥{{ goalAmount }}</text>
+          <!-- 没设过目标就不画进度条，别用一个凭空的 ¥1000 假装存在目标 -->
+          <template v-if="hasGoal">
+            <view class="progress-bar"><view class="progress-fill" :style="{ width: progress + '%' }"></view></view>
+            <text class="progress-text">目标{{ goalName ? '：' + goalName : '' }} ¥{{ goalAmount }} · 还差 ¥{{ goalRemain }}</text>
+          </template>
+          <text class="progress-text" v-else>还没设目标，点下面的按钮定一个</text>
         </view>
       </view>
       <view class="mx-20 mb-16">
@@ -60,6 +64,8 @@ export default {
       savedMoney: '0',
       goalAmount: 1000,
       goalName: '',
+      goalRemain: 0,
+      hasGoal: false,     // 是否真的设过目标（无目标时不显示进度条）
       progress: 0,
       goals: [],
       showSetGoal: false,
@@ -73,10 +79,20 @@ export default {
     this.goals = Store.getSavingsGoals()
     if (this.goals.length > 0) {
       const last = this.goals[this.goals.length - 1]
+      this.hasGoal = true
       this.goalAmount = last.target
       this.goalName = last.name || ''
+      // 进度从「目标创建时已省的钱」算起，否则累计已省的钱会让新目标一诞生就 100%。
+      // 老目标没有 baseline 字段，按 0 处理（即原来的算法），无法追溯。
+      const baseline = Number(last.baseline) || 0
+      const delta = Math.max(0, saved - baseline)
+      this.goalRemain = Math.max(0, this.goalAmount - delta)
+      this.progress = this.goalAmount > 0 ? Math.min(100, (delta / this.goalAmount) * 100) : 0
+    } else {
+      this.hasGoal = false
+      this.progress = 0
+      this.goalRemain = 0
     }
-    this.progress = this.goalAmount > 0 ? Math.min(100, (saved / this.goalAmount) * 100) : 0
   },
   methods: {
     saveGoal() {
@@ -87,7 +103,9 @@ export default {
       }
       Store.addSavingsGoal({
         name: (this.newGoal.name || '').trim() || '省钱目标',
-        target: target
+        target: target,
+        // 记下创建时已省的钱，进度按「从现在起再省多少」算
+        baseline: Store.getSavedMoney()
       })
       this.showSetGoal = false
       this.newGoal = { name: '', target: '1000' }
