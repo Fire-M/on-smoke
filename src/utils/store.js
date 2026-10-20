@@ -36,7 +36,7 @@ const EXTRA_KEYS = [
 
 // 数据结构版本。改动计算规则时递增，启动时由 migrateIfNeeded() 自动迁移，
 // 避免老用户带着错误数据（比如旧版反向的省钱金额）继续用。
-const DATA_VERSION = 4
+const DATA_VERSION = 5
 
 // ---- 品牌单一数据源（页面与剩余计算共用，避免口径分裂）----
 export const BRANDS = [
@@ -255,11 +255,14 @@ export function recordSmoke(duration, brandId = null) {
   
   saveToday(today)
 
+  // 单根价格快照：点烟那一刻的价格写死进记录，
+  // 以后改设置里的烟价/包数都不会改变这根已经省下的钱
   addHistory({
     id: now.toString(36) + Math.random().toString(36).slice(2, 6),
     timestamp: now,
     duration: duration,
-    brandId: brandId
+    brandId: brandId,
+    pricePerCig: getBrandPricePerCig(brandId)
   })
 
   const stats = getStats()
@@ -399,54 +402,44 @@ export function settleDailySavings() {
   return getSavedMoney()
 }
 
-// 今天到目前为止省下的钱（未结算，仅用于展示「今日」）
-export function getTodaySaved() {
-  const settings = getSettings()
-  const today = getToday()
-  const pricePerCig = settings.cigarettePrice / (settings.packSize || 20)
-  const original = Math.max(0, settings.dailyOriginal || 0)
-  const avoided = Math.max(0, original - (today.smokedCount || 0))
-  return Math.round(avoided * pricePerCig * 10) / 10
+// 取某条记录当时的单根价格：
+// 优先用记录里的 pricePerCig 快照（新记录）；
+// 老记录没有快照，回落到按 brandId + 当前设置推算，保证旧数据照常可用。
+export function getRecordPrice(record) {
+  if (record && typeof record.pricePerCig === 'number' && record.pricePerCig > 0) {
+    return record.pricePerCig
+  }
+  return getBrandPricePerCig(record ? record.brandId : null)
 }
 
-// 累计省钱：以「原本每天抽 dailyOriginal 根」为基准，
-// 每天省下 (dailyOriginal − 当天实际抽的根数) × 当天实际单根均价。
-// 实时：每次调用都基于 history 重算 [首日, 今天]，含今天。
-export function getSavedMoney() {
-  const settings = getSettings()
+// 今天到目前为止省下的钱（未结算，仅用于展示「今日」）
+export function getTodaySaved() {
   const history = getHistory()
-  if (!history.length) return 0
-
-  const defaultPrice = settings.cigarettePrice / (settings.packSize || 20)
-  const original = Math.max(0, settings.dailyOriginal || 0)
-
-  // 按天聚合根数与实付单价
-  const daily = {}
-  let minTs = Infinity
-  history.forEach(r => {
-    if (!r || !r.timestamp) return
-    const day = _todayStr(r.timestamp)
-    if (!daily[day]) daily[day] = { count: 0, cost: 0 }
-    daily[day].count += 1
-    daily[day].cost += getBrandPricePerCig(r.brandId)
-    if (r.timestamp < minTs) minTs = r.timestamp
-  })
-
-  const startDay = _todayStr(minTs)
   const today = _todayStr()
 
   let total = 0
-  let cursor = startDay
-  let guard = 0
-  while (cursor <= today && guard < 3651) {   // ≤ 含今天
-    const rec = daily[cursor]
-    const smoked = rec ? rec.count : 0
-    // 当天抽过就用当天的实付均价，没抽（或没记录）才回落到设置价
-    const avgPrice = (rec && smoked > 0) ? (rec.cost / smoked) : defaultPrice
-    total += Math.max(0, original - smoked) * avgPrice
-    cursor = _shiftDays(cursor, 1)
-    guard++
-  }
+  history.forEach(r => {
+    if (!r || !r.timestamp) return
+    if (_todayStr(r.timestamp) !== today) return
+    total += getRecordPrice(r)
+  })
+
+  return Math.round(total * 100) / 100
+}
+
+// 累计省钱：每假抽一根，就少烧一根真烟，省下这一根的钱。
+// 单价用记录里的 pricePerCig 快照（点烟时锁定）；
+// 没有快照的老记录按 brandId + 当前设置价推算。
+// 注意：不按天摊、也没有「每天原本该抽多少」的基线 —— 抽几根算几根。
+export function getSavedMoney() {
+  const history = getHistory()
+  if (!history.length) return 0
+
+  let total = 0
+  history.forEach(r => {
+    if (!r) return
+    total += getRecordPrice(r)
+  })
 
   return Math.round(total * 100) / 100
 }
@@ -595,10 +588,10 @@ export function migrateIfNeeded() {
   // 留着反而有害：旧数据里字段名是错的 last，未来若有人恢复游标逻辑会被误导。
   try { uni.removeStorageSync(KEYS.savingsSettle) } catch (e) {}
 
-  // 老用户（有抽烟记录）：省钱改成实时结算后数字会变，必须告知，
-  // 否则用户会以为是 App 坏了。新用户无记录，不必打扰。
+  // 老用户（有抽烟记录）：省钱口径从「少抽才省」改成「假抽一根省一根」，
+  // 数字会明显变小，必须告知，否则用户会以为钱被吞了。新用户无记录，不必打扰。
   if (getHistory().length) {
-    result.savedRealtime = true
+    result.savedLogic = true
     result.changed = true
   }
 
@@ -1370,7 +1363,7 @@ export default {
   recordSmoke, incrementStat, markStyleUsed,
   getSmokeStreak,
   getBrandSmokedCount, getBrandRemaining,
-  getBrandPackSize, getBrandPricePerCig,
+  getBrandPackSize, getBrandPricePerCig, getRecordPrice,
   getPackSize, getPackRemaining, savePackRemaining, refillPack,
   settleDailySavings, getTodaySaved,
   getSmokeFreeDuration, getCleanDays,

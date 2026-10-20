@@ -26,8 +26,8 @@ export default {
     // 数字突变却不说原因，用户会以为 App 坏了，所以必须告知
     showMigrationNotice(m) {
       const parts = []
-      if (m.savedRealtime) {
-        parts.push('· 省钱金额改为实时结算，抽一根立刻看到变化')
+      if (m.savedLogic) {
+        parts.push('· 省钱改为「假抽一根 = 省一根烟的钱」')
       }
       if (m.challengesReset) {
         parts.push('· 每日挑战数据已重置')

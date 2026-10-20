@@ -175,6 +175,7 @@ export default {
       // 计算本周数据
       const weekDays = []
       let weekTotal = 0
+      let weekSavedNum = 0
       const dayNames = ['日', '一', '二', '三', '四', '五', '六']
       
       for (let i = 0; i < 7; i++) {
@@ -184,6 +185,8 @@ export default {
         const dayRecords = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr)
         const count = dayRecords.length
         weekTotal += count
+        // 每根按记录里的价格快照累加，与「至今已省」保持同一口径
+        dayRecords.forEach(r => { weekSavedNum += Store.getRecordPrice(r) })
         
         weekDays.push({
           label: dayNames[i],
@@ -194,15 +197,10 @@ export default {
       }
 
       this.weekSmoked = weekTotal
-      const settings = Store.getSettings()
-      const pricePerCig = settings.cigarettePrice / (settings.packSize || 20)
-      const original = Math.max(0, settings.dailyOriginal || 0)
-
-      // 省钱 = 本周「原本该抽的量 − 实际抽的量」× 单价。
-      // 原来是 weekTotal × 单价（抽越多省越多），方向反了。
-      // 已过完的天数：周一到今天的天数（含今天），避免用 7 天把日均/省钱摊薄。
+      // 已过完的天数：周一到今天的天数（含今天），避免用 7 天把日均摊薄
       const elapsedDays = Math.min(7, today.getDay() + 1)
-      this.weekSaved = Math.max(0, (elapsedDays * original - weekTotal) * pricePerCig).toFixed(1)
+      // 本周省钱 = 本周假抽的根数 × 各自品牌的单价
+      this.weekSaved = weekSavedNum.toFixed(1)
       this.weekAvg = (weekTotal / elapsedDays).toFixed(1)
 
       // 计算柱状图高度
