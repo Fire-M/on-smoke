@@ -221,7 +221,7 @@ export default {
 .stat-label { font-size: 24rpx; color: var(--text-dim); width: 60rpx; }
 .stat-bar { flex: 1; height: 16rpx; background: rgba(255, 255, 255, 0.06); border-radius: 12rpx; overflow: hidden; }
 .stat-fill { height: 100%; border-radius: 12rpx; transition: width 0.3s ease; }
-.stat-fill.health { background: linear-gradient(90deg, #10b981 0%, #059669 100%); }
+.stat-fill.health { background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%); }
 .stat-fill.happy { background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%); }
 .stat-fill.exp { background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); }
 .stat-value { font-size: 22rpx; color: var(--text-dim); width: 100rpx; text-align: right; }
@@ -234,8 +234,8 @@ export default {
   align-items: center;
   gap: 12rpx;
   padding: 20rpx 40rpx;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(249, 115, 22, 0.1) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, var(--glow) 0%, rgba(249, 115, 22, 0.1) 100%);
+  border: 1px solid var(--glow);
   border-radius: 40rpx;
 }
 .dress-btn:active {
@@ -352,7 +352,7 @@ export default {
   color: var(--text-dim);
 }
 .custom-tab.active {
-  background: rgba(245, 158, 11, 0.15);
+  background: var(--glow);
   color: var(--primary);
 }
 .custom-body {
@@ -375,7 +375,7 @@ export default {
 }
 .custom-item.selected {
   border-color: var(--primary);
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--glow);
 }
 .custom-item.locked {
   opacity: 0.6;
@@ -432,7 +432,7 @@ export default {
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--glow);
   display: flex;
   align-items: center;
   justify-content: center;

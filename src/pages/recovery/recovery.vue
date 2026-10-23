@@ -298,7 +298,7 @@ export default {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary) 100%);
   border-radius: 12rpx;
   transition: width 0.5s ease;
 }
@@ -338,7 +338,7 @@ export default {
   top: 0;
   bottom: 0;
   width: 2rpx;
-  background: linear-gradient(to bottom, rgba(245, 158, 11, 0.3) 0%, rgba(16, 185, 129, 0.3) 100%);
+  background: linear-gradient(to bottom, var(--glow) 0%, rgba(16, 185, 129, 0.3) 100%);
 }
 
 .timeline-item {
@@ -369,8 +369,8 @@ export default {
 }
 
 .timeline-item.achieved .timeline-dot {
-  background: #10b981;
-  border-color: #10b981;
+  background: var(--primary);
+  border-color: var(--primary);
   color: var(--bg);
   box-shadow: 0 0 12rpx rgba(16, 185, 129, 0.4);
 }
@@ -379,7 +379,7 @@ export default {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--bg);
-  box-shadow: 0 0 16rpx rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 16rpx var(--glow);
   animation: dotPulse 2s ease-in-out infinite;
 }
 
@@ -402,9 +402,9 @@ export default {
 }
 
 .timeline-item.current .timeline-content {
-  background: rgba(245, 158, 11, 0.08);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 2rpx 12rpx rgba(245, 158, 11, 0.1);
+  background: var(--glow);
+  border-color: var(--glow);
+  box-shadow: 0 2rpx 12rpx var(--glow);
 }
 
 .timeline-header {
@@ -421,7 +421,7 @@ export default {
 }
 
 .timeline-item.achieved .timeline-time {
-  color: #10b981;
+  color: var(--primary);
 }
 
 .timeline-item.current .timeline-time {
@@ -438,11 +438,11 @@ export default {
 
 .timeline-badge.achieved {
   background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  color: var(--primary);
 }
 
 .timeline-badge.current {
-  background: rgba(245, 158, 11, 0.2);
+  background: var(--glow);
   color: var(--primary);
 }
 

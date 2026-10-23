@@ -394,7 +394,7 @@ export default {
   width: 100%;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #ef4444 0%, var(--primary) 100%);
+  background: linear-gradient(135deg, var(--danger-1) 0%, var(--primary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -467,7 +467,7 @@ export default {
 
 .pattern-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--danger-1) 100%);
   border-radius: 10rpx;
   transition: width 0.3s ease;
 }
@@ -504,11 +504,11 @@ export default {
   transition: height 0.3s ease;
 }
 
-.intensity-bar.level-1 { background: #10b981; }
+.intensity-bar.level-1 { background: var(--primary); }
 .intensity-bar.level-2 { background: #84cc16; }
 .intensity-bar.level-3 { background: var(--primary); }
 .intensity-bar.level-4 { background: var(--primary-2); }
-.intensity-bar.level-5 { background: #ef4444; }
+.intensity-bar.level-5 { background: var(--danger-1); }
 
 .intensity-value {
   position: absolute;
@@ -577,7 +577,7 @@ export default {
 }
 
 .history-tag.intensity {
-  background: rgba(245, 158, 11, 0.2);
+  background: var(--glow);
   color: var(--primary);
 }
 
@@ -588,7 +588,7 @@ export default {
 
 .history-tag.resisted {
   background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  color: var(--primary);
 }
 
 .history-note {
@@ -673,11 +673,11 @@ export default {
   transform: scale(1.1);
 }
 
-.intensity-option.level-1.active { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981; }
+.intensity-option.level-1.active { background: rgba(16, 185, 129, 0.2); border-color: var(--primary); color: var(--primary); }
 .intensity-option.level-2.active { background: rgba(132, 204, 22, 0.2); border-color: #84cc16; color: #84cc16; }
-.intensity-option.level-3.active { background: rgba(245, 158, 11, 0.2); border-color: var(--primary); color: var(--primary); }
+.intensity-option.level-3.active { background: var(--glow); border-color: var(--primary); color: var(--primary); }
 .intensity-option.level-4.active { background: rgba(249, 115, 22, 0.2); border-color: var(--primary-2); color: var(--primary-2); }
-.intensity-option.level-5.active { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444; }
+.intensity-option.level-5.active { background: rgba(239, 68, 68, 0.2); border-color: var(--danger-1); color: var(--danger-1); }
 
 /* 触发因素 */
 .trigger-grid {
@@ -740,7 +740,7 @@ export default {
 .resist-option.active {
   background: rgba(16, 185, 129, 0.15);
   border-color: rgba(16, 185, 129, 0.4);
-  color: #10b981;
+  color: var(--primary);
 }
 
 /* 备注 */
@@ -778,7 +778,7 @@ export default {
 }
 
 .modal-btn.confirm {
-  background: linear-gradient(135deg, var(--primary) 0%, #ef4444 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--danger-1) 100%);
   color: white;
 }
 

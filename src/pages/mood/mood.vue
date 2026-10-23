@@ -424,12 +424,12 @@ export default {
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
   background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: var(--danger-1);
 }
 
 .history-tag.clean {
   background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  color: var(--primary);
 }
 
 .history-note {

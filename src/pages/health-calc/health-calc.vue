@@ -96,10 +96,10 @@ export default {
 .result-item:last-child { border-bottom: none; }
 .result-label { font-size: 26rpx; color: var(--text-dim); }
 .result-value { font-size: 28rpx; color: #f3f4f6; font-weight: 600; }
-.result-value.highlight { color: #10b981; }
+.result-value.highlight { color: var(--primary); }
 .milestone-item { display: flex; gap: 16rpx; margin-bottom: 20rpx; }
 .milestone-icon { font-size: 28rpx; color: var(--text-dim); min-width: 40rpx; }
-.milestone-icon.done { color: #10b981; }
+.milestone-icon.done { color: var(--primary); }
 .milestone-content { flex: 1; }
 .milestone-title { font-size: 26rpx; color: #f3f4f6; display: block; margin-bottom: 4rpx; }
 .milestone-desc { font-size: 22rpx; color: var(--text-dim); }

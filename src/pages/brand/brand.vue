@@ -361,7 +361,7 @@ export default {
 
 .brand-card.selected {
   border-color: var(--primary);
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 18rpx rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 18rpx var(--glow);
 }
 
 /* 卡片入场动画 */

@@ -1982,7 +1982,7 @@ export default {
 .lung-value {
   font-size: 36rpx;
   font-weight: bold;
-  color: #10b981;
+  color: var(--primary);
   transition: color 0.3s ease;
 }
 
@@ -2001,7 +2001,7 @@ export default {
 
 .lung-alert-text {
   font-size: 20rpx;
-  color: #ef4444;
+  color: var(--danger-1);
   text-align: center;
 }
 
@@ -2045,9 +2045,9 @@ export default {
 .burn-progress-bar {
   height: 100%;
   border-radius: 8rpx;
-  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--danger-1) 100%);
   transition: width 0.3s ease;
-  box-shadow: 0 0 8rpx rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 8rpx var(--glow);
 }
 
 .burn-progress-text {
@@ -2234,14 +2234,14 @@ export default {
 }
 
 .st-tool.active .st-tool-ic {
-  background: rgba(245, 158, 11, 0.15);
+  background: var(--glow);
   border-color: var(--primary);
   color: var(--primary);
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 14px var(--glow);
 }
 
 .st-tool:active .st-tool-ic {
-  background: rgba(245, 158, 11, 0.25);
+  background: var(--glow);
 }
 
 .st-tool-lbl {
@@ -2410,8 +2410,8 @@ export default {
 
 .picker-item.active {
   border-color: var(--primary);
-  background: rgba(245, 158, 11, 0.1);
-  box-shadow: 0 0 12rpx rgba(245, 158, 11, 0.3);
+  background: var(--glow);
+  box-shadow: 0 0 12rpx var(--glow);
 }
 
 .picker-item:active {
@@ -3104,8 +3104,8 @@ page {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
+  background: var(--primary);
+  box-shadow: 0 0 6px var(--glow);
 }
 
 /* 吐烟圈长按指示 */
@@ -3113,7 +3113,7 @@ page {
   animation: ringPulse 0.5s ease-in-out infinite alternate;
 }
 @keyframes ringPulse {
-  0% { box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
-  100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.9); }
+  0% { box-shadow: 0 0 6px var(--glow); }
+  100% { box-shadow: 0 0 20px var(--glow); }
 }
 </style>

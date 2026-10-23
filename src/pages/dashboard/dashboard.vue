@@ -536,13 +536,13 @@ export default {
 .trend-good {
   font-size: 28rpx;
   font-weight: bold;
-  color: #10b981;
+  color: var(--primary);
 }
 
 .trend-bad {
   font-size: 28rpx;
   font-weight: bold;
-  color: #ef4444;
+  color: var(--danger-1);
 }
 
 .trend-desc {
@@ -569,8 +569,8 @@ export default {
 }
 
 .calendar-day.has-smoke {
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: var(--glow);
+  border: 1px solid var(--glow);
 }
 
 .calendar-day.no-smoke {
@@ -603,7 +603,7 @@ export default {
 
 .calendar-day-icon {
   font-size: 18rpx;
-  color: #10b981;
+  color: var(--primary);
   margin-top: 2rpx;
 }
 

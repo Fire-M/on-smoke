@@ -131,11 +131,11 @@ export default {
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
 .card-title { font-size: 28rpx; color: var(--text-dim); display: block; margin-bottom: 16rpx; }
-.saved-amount { font-size: 72rpx; font-weight: bold; color: #10b981; display: block; margin-bottom: 24rpx; }
+.saved-amount { font-size: 72rpx; font-weight: bold; color: var(--primary); display: block; margin-bottom: 24rpx; }
 .progress-bar { height: 16rpx; background: rgba(255, 255, 255, 0.06); border-radius: 12rpx; overflow: hidden; margin-bottom: 12rpx; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%); border-radius: 12rpx; transition: width 0.3s ease; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%); border-radius: 12rpx; transition: width 0.3s ease; }
 .progress-text { font-size: 24rpx; color: var(--text-dim); }
-.set-goal-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 32rpx; font-weight: 600; border: none; }
+.set-goal-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: white; font-size: 32rpx; font-weight: 600; border: none; }
 
 /* 历史目标 */
 .goal-item { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -153,5 +153,5 @@ export default {
 .modal-actions { display: flex; gap: 20rpx; margin-top: 32rpx; }
 .modal-btn { flex: 1; padding: 24rpx; border-radius: 16rpx; font-size: 28rpx; font-weight: 600; border: none; }
 .modal-btn.cancel { background-color: var(--surface-1); color: var(--text-dim); }
-.modal-btn.confirm { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+.modal-btn.confirm { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: white; }
 </style>

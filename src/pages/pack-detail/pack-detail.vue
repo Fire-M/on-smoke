@@ -1098,8 +1098,9 @@ page {
 }
 
 .box-cig-3d.is-active .box-cig-cap-top {
+  /* 滤嘴的软木色是实物材质色，固定不动；外圈描边是「选中」反馈，跟随主题 */
   background: radial-gradient(ellipse at 40% 40%, #ffe6b0 0%, #e8b86a 50%, #c8902f 85%, #7a4f18 100%);
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55), inset 0 0 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px var(--glow), inset 0 0 8px rgba(0, 0, 0, 0.25);
 }
 
 .box-cig-3d.pulling {

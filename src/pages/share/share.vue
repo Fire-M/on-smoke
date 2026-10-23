@@ -163,7 +163,7 @@ export default {
 
 .result-title {
   font-size: 36rpx;
-  color: rgba(245, 158, 11, 0.9);
+  color: var(--glow);
   letter-spacing: 4rpx;
 }
 
@@ -206,9 +206,9 @@ export default {
   width: 100%;
   padding: 28rpx;
   border-radius: 24rpx;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  background: rgba(245, 158, 11, 0.1);
-  color: rgba(245, 158, 11, 0.8);
+  border: 1px solid var(--glow);
+  background: var(--glow);
+  color: var(--glow);
   font-size: 28rpx;
   font-weight: 500;
 }
@@ -221,7 +221,7 @@ export default {
   color: var(--bg);
   font-weight: bold;
   font-size: 32rpx;
-  box-shadow: 0 8rpx 24rpx rgba(245, 158, 11, 0.2);
+  box-shadow: 0 8rpx 24rpx var(--glow);
   border: none;
 }
 

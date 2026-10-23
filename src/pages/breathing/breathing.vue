@@ -205,8 +205,8 @@ export default {
 
 .breath-circle.hold {
   transform: scale(1.3);
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.1) 100%);
-  border-color: rgba(245, 158, 11, 0.5);
+  background: radial-gradient(circle, var(--glow) 0%, var(--glow) 100%);
+  border-color: var(--glow);
 }
 
 .breath-circle.exhale {
@@ -246,7 +246,7 @@ export default {
 }
 
 .stop-btn {
-  background: linear-gradient(135deg, #ef4444 0%, var(--primary-2) 100%);
+  background: linear-gradient(135deg, var(--danger-1) 0%, var(--primary-2) 100%);
 }
 
 .start-btn:active, .stop-btn:active {
