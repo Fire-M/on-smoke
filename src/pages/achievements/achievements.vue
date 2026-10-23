@@ -94,8 +94,14 @@ export default {
       // 直接用 CATEGORIES 里定义的 filter：分类项索引(1~5)和徽章的 category(0~4)
       // 是两套编号，拿索引去比字段值会整体错位一格，且「健康成就」永远空白
       const cat = CATEGORIES[this.currentCategory]
-      if (!cat) return this.badges
-      return this.badges.filter(cat.filter)
+      const list = cat ? this.badges.filter(cat.filter) : this.badges
+      // 已解锁的按解锁时间倒序排前面（刚拿到的排最前），未解锁的保持原顺序排后面。
+      // unlockTime 取不到时按 0 处理，老数据不会打乱顺序。
+      const unlocked = list
+        .filter(b => b.unlocked)
+        .slice()
+        .sort((a, b) => (b.unlockTime || 0) - (a.unlockTime || 0))
+      return unlocked.concat(list.filter(b => !b.unlocked))
     },
     unlockedCount() {
       return this.badges.filter(b => b.unlocked).length
@@ -207,7 +213,7 @@ export default {
 
 .ach-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, #ef4444 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--danger-1) 100%);
   border-radius: 8rpx;
   transition: width 0.3s ease;
 }
@@ -256,10 +262,10 @@ export default {
 }
 
 .category-tab.active {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
+  background: linear-gradient(135deg, var(--glow) 0%, rgba(239, 68, 68, 0.1) 100%);
   color: var(--primary);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 2rpx 12rpx rgba(245, 158, 11, 0.15);
+  border-color: var(--glow);
+  box-shadow: 0 2rpx 12rpx var(--glow);
   font-weight: 600;
 }
 
@@ -292,9 +298,9 @@ export default {
 }
 
 .badge-card.unlocked {
-  background: rgba(245, 158, 11, 0.08);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 0 20rpx rgba(245, 158, 11, 0.15);
+  background: var(--glow);
+  border-color: var(--glow);
+  box-shadow: 0 0 20rpx var(--glow);
 }
 
 .badge-card:active {
@@ -414,7 +420,7 @@ export default {
 }
 
 .modal-status.unlocked {
-  color: #10b981;
+  color: var(--primary);
 }
 
 .modal-status.locked {

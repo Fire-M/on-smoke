@@ -56,23 +56,24 @@
         </view>
       </view>
 
-      <!-- 至今已省（降级为普通尺寸，视觉重心让给 Hero） -->
+      <!-- 至今已花（降级为普通尺寸，视觉重心让给 Hero） -->
       <view class="mx-20 mb-16 saved-card">
         <view class="flex">
           <view class="saved-bar"></view>
           <view class="flex-1 p-20">
-            <text class="text-sm text-gray-400 mb-8 block">至今已省</text>
+            <text class="text-sm text-gray-400 mb-8 block">至今已花</text>
             <text class="text-2xl font-bold text-amber">¥{{ savedAmount }}</text>
-            <!-- 金额还不够一个换算单位时不要显示「0 包辣条」。
+            <!-- 警示向：已经花掉的钱，折算成被烧掉的零食。
+                 金额还不够一个换算单位时不要显示「0 包辣条」。
                  用数值字段判断，避免拿字符串去比大小的隐式转换 -->
             <text class="text-sm text-gray-500 mt-12 block" v-if="savedCups >= 1">
-              约 {{ savedPackages }} 包辣条 · {{ savedCups }} 杯咖啡
+              这些钱够买 {{ savedPackages }} 包辣条 · {{ savedCups }} 杯咖啡，都烧没了 💸
             </text>
             <text class="text-sm text-gray-500 mt-12 block" v-else-if="savedPackages >= 1">
-              约 {{ savedPackages }} 包辣条
+              这些钱够买 {{ savedPackages }} 包辣条，都烧没了 💸
             </text>
             <text class="text-sm text-gray-500 mt-12 block" v-else>
-              再忍忍，第一包辣条快到手了 💪
+              再抽下去，一包辣条钱就没啦 💸
             </text>
           </view>
         </view>
@@ -529,7 +530,9 @@ export default {
   height: 100vh;
   width: 100vw;
   background-color: var(--bg);
-  color: #e5e7eb;
+  /* 原来是写死的 #e5e7eb（等于 amber 主题的 --text），
+     在 mono 主题下 --text 是 #f5f5f5，会比这里亮，出现不一致 */
+  color: var(--text);
   overflow: hidden;
   position: relative;
   display: flex;
@@ -541,7 +544,7 @@ export default {
   height: 100%;
 }
 
-/* 至今已省卡片 */
+/* 至今已花卡片 */
 .saved-card {
   border-radius: 32rpx;
   overflow: hidden;
@@ -943,13 +946,13 @@ export default {
 
 .challenge-badge {
   font-size: 22rpx;
-  color: #10b981;
+  color: var(--primary);
   font-weight: 600;
 }
 
 .challenge-streak {
   font-size: 22rpx;
-  color: #f59e0b;
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -962,7 +965,7 @@ export default {
 
 .challenge-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary) 0%, #10b981 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary) 100%);
   border-radius: 8rpx;
   transition: width 0.3s ease;
 }
