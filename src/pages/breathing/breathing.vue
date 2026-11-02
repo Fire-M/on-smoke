@@ -117,6 +117,12 @@ export default {
 
   onUnload() {
     this.stopBreathing()
+  },
+
+  // 切后台/被其它页面盖住时也要停：interval 在后台继续跑，
+  // 回来时节奏已经错位，还白耗电
+  onHide() {
+    this.stopBreathing()
   }
 }
 </script>

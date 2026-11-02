@@ -68,7 +68,13 @@ export default {
     this.duration = parseInt(options.duration) || 0
 
     const settings = Store.getSettings()
-    const pricePerCig = settings.cigarettePrice / settings.packSize
+    // 金额口径必须和首页/历史一致：优先取「最近一根」实际入账的钱（含翻倍），
+    // 没有记录时才用设置里的单价兜底。原来固定用 cigarettePrice/packSize，
+    // 跟品牌价算出来的数对不上。
+    const last = Store.getHistory()[0]
+    const pricePerCig = last
+      ? Store.getRecordSaved(last)
+      : (Number(settings.cigarettePrice) || 30) / (Number(settings.packSize) || 20)
 
     this.resultSaved = pricePerCig.toFixed(1)
     this.resultTar = '8mg'
@@ -77,7 +83,7 @@ export default {
 
     const m = Math.floor(this.duration / 60)
     const s = this.duration % 60
-    this.resultDetail = `吐了 0 口 · 耗时 ${m} 分 ${s} 秒 · 这包剩 ${this.remaining} 根`
+    this.resultDetail = `耗时 ${m} 分 ${s} 秒 · 这包剩 ${this.remaining} 根`
 
     // 检查解锁
     this.checkUnlock()

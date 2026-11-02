@@ -47,7 +47,9 @@ export default {
     this._engine = createPetEngine()
     // #endif
   },
-  beforeDestroy() {
+  // Vue 3 里 beforeDestroy 已经废弃（不会触发），组件销毁时引擎和定时器都不会清理，
+  // 反复进出宠物页会累积动画循环。
+  beforeUnmount() {
     // #ifdef H5
     if (this.initTimer) { clearTimeout(this.initTimer); this.initTimer = null }
     if (this._engine) { this._engine.destroy(); this._engine = null }

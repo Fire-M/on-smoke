@@ -212,6 +212,11 @@ export default {
     this.refreshPack()
   },
 
+  onUnload() {
+    this._unmounted = true
+    if (this.pullTimer) { clearTimeout(this.pullTimer); this.pullTimer = null }
+  },
+
   onShow() {
     // 从抽烟页 navigateBack 回来时复位，避免 isPulling 卡死导致抽不出
     this.isPulling = false
@@ -288,8 +293,12 @@ export default {
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
 
       // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）
-      // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转
-      setTimeout(() => {
+      // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转。
+      // timer 必须存起来并在页面销毁时清掉：否则用户在这 900ms 内点返回，
+      // 定时器照样执行，会把人从别的页面强行推进抽烟页。
+      this.pullTimer = setTimeout(() => {
+        this.pullTimer = null
+        if (this._unmounted) return
         this.boxRemainingCigs = remainingAfterPull
         // 不在此处持久化，等 smoking.vue 真正抽完才扣减；中途返回则恢复
         uni.navigateTo({

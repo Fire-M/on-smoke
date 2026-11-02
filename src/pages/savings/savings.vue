@@ -84,11 +84,22 @@ export default {
       this.goalAmount = last.target
       this.goalName = last.name || ''
       // 进度从「目标创建时已省的钱」算起，否则累计已省的钱会让新目标一诞生就 100%。
-      // 老目标没有 baseline 字段，按 0 处理（即原来的算法），无法追溯。
-      const baseline = Number(last.baseline) || 0
+      // 老目标没有 baseline 字段：这里就地补一个（从现在起算），
+      // 否则它们会永远显示 100%（原来是按 0 处理）
+      let baseline = Number(last.baseline)
+      if (!isFinite(baseline)) {
+        baseline = saved
+        Store.updateSavingsGoal(last.id, { baseline: baseline })
+      }
       const delta = Math.max(0, saved - baseline)
       this.goalRemain = Math.max(0, this.goalAmount - delta)
       this.progress = this.goalAmount > 0 ? Math.min(100, (delta / this.goalAmount) * 100) : 0
+
+      // 达成提示：每个目标只弹一次（之前达成了也没有任何反馈）
+      if (this.goalAmount > 0 && delta >= this.goalAmount && !last.achievedNotified) {
+        Store.updateSavingsGoal(last.id, { achievedNotified: true })
+        uni.showToast({ title: '🎉 目标达成！', icon: 'none' })
+      }
     } else {
       this.hasGoal = false
       this.progress = 0

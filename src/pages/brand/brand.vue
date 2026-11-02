@@ -10,11 +10,11 @@
       <view class="brand-grid">
         <view v-for="(brand, index) in brands" :key="brand.id"
           class="brand-card" :class="['theme-' + brand.theme, { 'has-skin': activeSkin && settings.selectedBrand === brand.id, 'selected': brand.id === settings.selectedBrand }]"
-          :style="[brand.id === settings.selectedBrand && activeSkin ? { borderColor: activeSkin.color, boxShadow: `0 8rpx 24rpx rgba(0,0,0,0.4), 0 0 20rpx ${activeSkin.glow}` } : {}, { animationDelay: index * 0.06 + 's' }]"
+          :style="[brand.id === settings.selectedBrand && activeSkin ? { borderColor: 'var(--primary)', boxShadow: '0 8rpx 24rpx rgba(0,0,0,0.4), 0 0 20rpx var(--glow)' } : {}, { animationDelay: index * 0.06 + 's' }]"
           @click="selectBrand(brand)">
           <!-- 皮肤徽章 -->
           <view class="skin-badge" v-if="brand.id === settings.selectedBrand && activeSkin">
-            <text class="skin-badge-emoji">{{ activeSkin.emoji }}</text>
+            <text class="skin-badge-emoji">{{ activeSkin.icon }}</text>
             <text class="skin-badge-name">{{ activeSkin.name }}</text>
           </view>
           <!-- 已选标记 -->

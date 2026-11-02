@@ -117,9 +117,10 @@
               <text class="text-sm text-gray-500 mt-4 block">{{ challengeTitle }}</text>
             </view>
             <text v-if="challengeCompleted" class="challenge-badge">✅ 已完成</text>
+            <text v-else-if="challengeFailed" class="challenge-failed">❌ 今日未达成</text>
             <text v-if="!challengeCompleted && challengeStreak > 0" class="challenge-streak">🔥 {{ challengeStreak }}天</text>
           </view>
-          <view class="challenge-progress-bar" v-if="!challengeCompleted">
+          <view class="challenge-progress-bar" v-if="!challengeCompleted && !challengeFailed">
             <view class="challenge-progress-fill" :style="{ width: challengeProgress + '%' }"></view>
           </view>
         </view>
@@ -213,6 +214,7 @@ export default {
       adRewardRemain: 10,
       adQuotaPerAd: AdManager.REWARD_QUOTA_PER_AD,   // 看一次广告给几根（广告模块统一定义）
       adEnabled: false,    // 没开通流量主时为 false，广告入口全部隐藏
+      navigating: false,   // 跳转锁：防止连点推进多个页面
       canBoost: false,     // 上一根是否还能通过看广告翻倍
       quotaPercent: 0,
       // 已抽根数的语义色由 computed quotaLevel 实时算（避免 dev HMR 漏赋值）
@@ -238,6 +240,7 @@ export default {
       challengeTitle: '',
       challengeIcon: '🎯',
       challengeCompleted: false,
+      challengeFailed: false,   // 挑战已失败（limit 超额 / time_range 时段内抽了）
       challengeStreak: 0,
       challengeProgress: 0,
       cooldownTimer: null,
@@ -365,6 +368,8 @@ export default {
       this.challengeProgress = this.calcChallengePercent(challenge, value)
       // 用回写后的对象判定，否则读到的是更新前的快照，要再等一次刷新才显示已完成
       this.challengeCompleted = !!(updated && updated.completed)
+      // 失败态之前完全没展示，用户超额了还以为自己在挑战中
+      this.challengeFailed = !!(updated && updated.failed)
       this.challengeStreak = Store.getChallengeStreak()
 
       // 数字变了就闪一下，让「又扛住一天」有即时反馈
@@ -475,8 +480,14 @@ export default {
         setTimeout(() => { this.showToast = false }, 2000)
         return
       }
+      // 防重入：连点会往页面栈塞多个品牌页，返回时要按好几次才回得来
+      if (this.navigating) return
+      this.navigating = true
       // 跳转到品牌选择页
-      uni.navigateTo({ url: '/pages/brand/brand' })
+      uni.navigateTo({
+        url: '/pages/brand/brand',
+        complete: () => { this.navigating = false }
+      })
     },
 
     goToAchievements() {
@@ -978,6 +989,12 @@ export default {
 .challenge-badge {
   font-size: 22rpx;
   color: var(--primary);
+  font-weight: 600;
+}
+
+.challenge-failed {
+  font-size: 22rpx;
+  color: var(--danger-1);
   font-weight: 600;
 }
 

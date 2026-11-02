@@ -34,6 +34,13 @@
             @input="onPackSizeInput" placeholder="20" />
         </view>
 
+        <!-- 说明这两项的作用范围，避免以为改了品牌价也跟着变 -->
+        <view class="setting-hint">
+          <text class="text-xs text-gray-600">
+            选过品牌时按该品牌的价格和支数计算；上面两项只对首页「来一根」的快速记录生效。
+          </text>
+        </view>
+
         <!-- 戒烟前每日烟量（省钱计算的基准） -->
         <view class="setting-row">
           <text class="text-sm text-gray-300">戒烟前每天抽（根）</text>
@@ -49,13 +56,6 @@
             <text class="quota-value">{{ settings.dailyQuota }}</text>
             <button class="quota-btn" @click="increaseQuota">+</button>
           </view>
-        </view>
-
-        <!-- 冷却时间 -->
-        <view class="setting-row">
-          <text class="text-sm text-gray-300">冷却时间（分钟）</text>
-          <input class="setting-input" type="number" :value="settings.cooldownMinutes"
-            @input="onCooldownInput" placeholder="5" />
         </view>
 
         <!-- 开始日期 -->
@@ -110,13 +110,17 @@ import { THEMES, themeState, setTheme, themeClass } from '@/utils/theme.js'
 // 数字收敛：非法值回落默认值，合法值夹到 [min, max]。
 // 原来写的是 parseX || 默认值 —— 0 会被当成 falsy 吞掉（用户根本输不进 0），
 // 而 -10 是真值反而能穿透，存下来的负单价会让省钱金额跟着变负。
+// 空字符串要按「没填」处理：Number('') === 0 是有限数，
+// 会一路穿过 clamp 变成最小值（烟价 0.1 元、包支数 1 支、配额 1 根）
 function clampNum(v, min, max, fallback) {
+  if (v === '' || v === null || v === undefined) return fallback
   const n = Number(v)
   if (!isFinite(n)) return fallback
   return Math.min(max, Math.max(min, n))
 }
 
 function clampInt(v, min, max, fallback) {
+  if (v === '' || v === null || v === undefined) return fallback
   const n = Number(v)
   if (!isFinite(n)) return fallback
   return Math.min(max, Math.max(min, Math.round(n)))
@@ -157,10 +161,6 @@ export default {
       this.settings.packSize = e.detail.value
     },
 
-    onCooldownInput(e) {
-      this.settings.cooldownMinutes = e.detail.value
-    },
-
     // 戒烟前每天抽多少。只用于健康计算器里的「少抽的根数」，
     // 不参与省钱计算（省钱是「假抽一根省一根」的逐根累加）
     onOriginalInput(e) {
@@ -185,11 +185,22 @@ export default {
       const s = this.settings
       s.cigarettePrice = clampNum(s.cigarettePrice, 0.1, 999, 30)
       s.packSize = clampInt(s.packSize, 1, 100, 20)
-      s.cooldownMinutes = clampInt(s.cooldownMinutes, 0, 120, 30)
       s.dailyOriginal = clampInt(s.dailyOriginal, 0, 999, 20)
       // 与加减按钮的上下限保持一致（1~20）
       s.dailyQuota = clampInt(s.dailyQuota, 1, 20, 5)
-      Store.saveSettings(s)
+      // 用存储里的最新快照打底，只覆盖本页真正编辑的字段。
+      // 直接写整个 this.settings 会把 onLoad 时的旧 selectedBrand 等一起写回去，
+      // 覆盖掉用户在品牌页刚选的品牌（回到首页选中角标就没了）
+      const latest = Store.getSettings()
+      Store.saveSettings({
+        ...latest,
+        cigarettePrice: s.cigarettePrice,
+        packSize: s.packSize,
+        dailyOriginal: s.dailyOriginal,
+        dailyQuota: s.dailyQuota,
+        quitDate: s.quitDate
+      })
+      this.settings = Store.getSettings()
       uni.showToast({ title: '已保存', icon: 'success' })
     },
 
@@ -217,6 +228,11 @@ export default {
 .main-scroll {
   flex: 1;
   min-height: 0;
+}
+
+.setting-hint {
+  margin: -16rpx 8rpx 24rpx;
+  line-height: 1.6;
 }
 
 .setting-row {

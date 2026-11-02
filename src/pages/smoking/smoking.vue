@@ -31,7 +31,7 @@
     </view>
 
     <!-- 顶部状态栏 -->
-    <view class="smoke-dashboard" v-if="!sceneReady">
+    <view class="smoke-dashboard" v-if="remaining > 0">
       <view class="sd-row">
         <text class="sd-label">剩余</text>
         <text class="sd-val">{{ remaining }} 根</text>
@@ -314,7 +314,10 @@ export default {
 
   onLoad(options) {
     this.brandId = options.brandId || ''
-    this.remaining = parseInt(options.remaining) || 0
+    // 参数缺失或非法时不能当 0：会被记成「抽完一包」并补满整包。
+    // 回退到该品牌真实的剩余支数。
+    const parsedRemaining = parseInt(options.remaining, 10)
+    this.remaining = isNaN(parsedRemaining) ? Store.getBrandRemaining(this.brandId) : parsedRemaining
     this.sessionStartTs = Date.now()
     this.sceneReady = true
     this.state = 'ready'
@@ -336,6 +339,37 @@ export default {
 
   onUnload() {
     this.cleanup()
+  },
+
+  onHide() {
+    // 切后台/锁屏/来电：后台不会触发 touchend，且进度是按绝对时间算的，
+    // 不处理的话回来第一帧就直接 100% → 判定「抽完」并 reLaunch 首页。
+    this._hiddenAt = Date.now()
+    if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
+    this.isPressing = false
+    if (this.state === 'smoking') {
+      this.state = 'lit'
+      this.showHint = true
+      this.hintText = '长按吸烟'
+    } else if (this.state === 'exhaling') {
+      // 后台期间把这次吐烟直接结算掉，回来不会半途卡在 exhaling
+      if (this.exhaleTimer) { clearInterval(this.exhaleTimer); this.exhaleTimer = null }
+      if (this.exhaleEndTimer) { clearTimeout(this.exhaleEndTimer); this.exhaleEndTimer = null }
+      this.lungFill = 0
+      this.state = 'lit'
+      this.showHint = true
+      this.hintText = '长按吸烟'
+    }
+  },
+
+  onShow() {
+    if (!this._hiddenAt) return
+    const away = Date.now() - this._hiddenAt
+    this._hiddenAt = 0
+    if (away <= 0) return
+    // 把在后台待的时间从计时基准里扣掉，本次吸烟进度不因切后台而跳变
+    if (this.smokeStartTime) this.smokeStartTime += away
+    if (this.currentPuffStart) this.currentPuffStart += away
   },
 
   methods: {
@@ -361,8 +395,12 @@ export default {
       if (!this.smokeStartTime) {
         this.cancelled = true
       } else if (this.settled) {
-        const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
-        Store.updateLastSmokeDuration(duration)
+        // 已经抽完（burnout / cooldown）时 finishSmoking 已经回填过真实时长，
+        // 这里再按 smokeStartTime 重算会把这条记录的时间拉长：越晚点返回，时长越长
+        if (this.state !== 'burnout' && this.state !== 'cooldown') {
+          const duration = Math.round((Date.now() - this.smokeStartTime) / 1000)
+          Store.updateLastSmokeDuration(duration)
+        }
       }
       // 清理资源
       this.cleanup()
@@ -530,6 +568,9 @@ export default {
     },
 
     cleanup() {
+      this._unmounted = true
+      if (this.finishTimerA) { clearTimeout(this.finishTimerA); this.finishTimerA = null }
+      if (this.finishTimerB) { clearTimeout(this.finishTimerB); this.finishTimerB = null }
       if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
       if (this.pressTimer) { clearTimeout(this.pressTimer); this.pressTimer = null }
       if (this.puffTimer) { clearTimeout(this.puffTimer); this.puffTimer = null }
@@ -630,22 +671,37 @@ export default {
     startCanvasLoop() {
       if (this.animFrame) return
       const canvas = this.canvas
-      const rafFn = (canvas && canvas.requestAnimationFrame)
+      // 起帧和取消必须成对：小程序 Canvas 2D 只有 canvas.requestAnimationFrame，
+      // 全局没有 cancelAnimationFrame。原来起帧用 canvas 的、取消用全局 caf(→clearTimeout)，
+      // 句柄对不上 → 循环永远停不掉，反复进入页面会叠加出多条循环。
+      const useCanvasRaf = !!(canvas && typeof canvas.requestAnimationFrame === 'function')
+      const rafFn = useCanvasRaf
         ? canvas.requestAnimationFrame.bind(canvas)
-        : (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb) => setTimeout(() => cb(Date.now()), 16))
+        : raf
+      this._cancelFrame = (useCanvasRaf && typeof canvas.cancelAnimationFrame === 'function')
+        ? canvas.cancelAnimationFrame.bind(canvas)
+        : caf
+      this._loopDead = false
+      this.last = null
       const loop = (now) => {
+        if (this._loopDead) return
         if (this.last == null) this.last = now
         let dt = (now - this.last) / 1000
         this.last = now
         if (dt > 0.05) dt = 0.05
         this.frame(dt, now)
+        if (this._loopDead) return
         this.animFrame = rafFn(loop)
       }
       this.animFrame = rafFn(loop)
     },
 
     stopCanvasLoop() {
-      if (this.animFrame) { caf(this.animFrame); this.animFrame = null }
+      this._loopDead = true
+      if (this.animFrame) {
+        try { (this._cancelFrame || caf)(this.animFrame) } catch (e) {}
+        this.animFrame = null
+      }
       this.active = []
       if (this.canvasCtx) this.canvasCtx.clearRect(0, 0, this.canvasW, this.canvasH)
     },
@@ -1099,9 +1155,10 @@ export default {
     },
 
     tapAsh() {
-      // 弹烟灰计数（成就「弹烟灰专家」）
-      Store.incrementStat('ashTapped', 1)
       if (this.ashGrowth > 0) {
+        // 只有真的弹掉烟灰才计数（成就「弹烟灰专家」）。
+        // 原来无条件 +1，页面上写「没有烟灰可弹」却照样计数，成就等于白送。
+        Store.incrementStat('ashTapped', 1)
         // 创建烟灰碎片粒子效果，烟灰越多碎片越多
         this.createAshParticles(this.ashGrowth)
         this.ashGrowth = 0
@@ -1165,9 +1222,12 @@ export default {
 
       if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })
 
-      setTimeout(() => {
+      // 这两个定时器必须存起来：用户在 2s/1.5s 内点返回时，页面已卸载但定时器还在，
+      // 1.5 秒后会把用户从别的页面强行 reLaunch 回首页
+      this.finishTimerA = setTimeout(() => {
         this.state = 'cooldown'
-        setTimeout(() => {
+        this.finishTimerB = setTimeout(() => {
+          if (this._unmounted) return
           // 返回首页（关闭所有页面）
           uni.reLaunch({
             url: '/pages/index/index'
@@ -1349,9 +1409,16 @@ export default {
         () => this.emitScatterEffect(),
       ]
       const idx = this.ringCurrentStyle
+      // 12 种花样全部依赖 DOM 烟雾层（document.createElement + 绝对定位）。
+      // 小程序没有 DOM，这些花样根本画不出来——画不出来就不能记成就，
+      // 否则「花样大师」等于白送（原来无条件 markStyleUsed 就是这个 bug）。
+      const canRender = typeof document !== 'undefined' && !!this.$refs.domSmokeWrap
       if (emitters[idx]) emitters[idx]()
-      // 记录用过的花样（成就「花样大师」需要 12 种齐全）
-      Store.markStyleUsed(idx)
+      if (canRender) {
+        Store.markStyleUsed(idx)
+      } else {
+        this.showToastMsg('当前环境不支持这个花样')
+      }
     },
 
     // 获取形状效果上下文
@@ -1768,6 +1835,8 @@ export default {
 
     // 10. 文字烟雾
     emitTextEffect() {
+      // 小程序没有 document，这里必须前置拦截，否则一点就抛 ReferenceError
+      if (typeof document === 'undefined') return
       const textPoints = []
       const canvas = document.createElement('canvas')
       canvas.width = 300; canvas.height = 80
@@ -1883,6 +1952,12 @@ export default {
 
     confirmPass() {
       this.showPassModal = false
+      // 没点着的烟派不出去：只有手里真有一根（已点火）才计数，
+      // 否则一进页面连点就能把「派烟达人」刷满
+      if (this.state === 'ready' || this.state === 'cooldown' || this.state === 'burnout') {
+        this.showToastMsg('先点一根再说')
+        return
+      }
       // 派烟计数（成就「派烟达人」）
       Store.incrementStat('passedCount', 1)
     },

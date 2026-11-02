@@ -291,10 +291,20 @@ export function recordSmoke(duration, brandId = null) {
   if (hour >= 0 && hour < 5) stats.nightSmoked = (stats.nightSmoked || 0) + 1
   if (hour >= 6 && hour < 8) stats.earlySmoked = (stats.earlySmoked || 0) + 1
 
-  // 最长连续打卡天数：基于历史记录真实计算
-  const streak = getSmokeStreak()
-  if (streak > (stats.maxStreak || 0)) {
-    stats.maxStreak = streak
+  // 连续打卡天数：改为增量维护，不再依赖 history。
+  // history 上限 500 条，抽得多的人一旦触发截断，连续天数会凭空变小。
+  const todayStr = _todayStr()
+  const lastStreakDate = stats.streakLastDate || ''
+  if (lastStreakDate === todayStr) {
+    // 今天已经记过，天数不变
+  } else if (lastStreakDate && _shiftDays(todayStr, -1) === lastStreakDate) {
+    stats.streakDays = (stats.streakDays || 0) + 1
+  } else {
+    stats.streakDays = 1
+  }
+  stats.streakLastDate = todayStr
+  if ((stats.streakDays || 0) > (stats.maxStreak || 0)) {
+    stats.maxStreak = stats.streakDays
   }
   saveStats(stats)
 
@@ -304,6 +314,19 @@ export function recordSmoke(duration, brandId = null) {
 
 // 连续打卡天数：从今天（或昨天）往前数，历史里每天至少 1 根的连续天数
 export function getSmokeStreak() {
+  const stats = getStats()
+  const today = _todayStr()
+
+  // 新版：recordSmoke 时增量维护，不受 history 截断影响
+  if (stats.streakLastDate) {
+    // 今天还没抽不算断签，所以「昨天」也算连续中
+    if (stats.streakLastDate === today || stats.streakLastDate === _shiftDays(today, -1)) {
+      return stats.streakDays || 0
+    }
+    return 0
+  }
+
+  // 老数据没有增量字段，退回按 history 回溯
   const history = getHistory()
   if (!history.length) return 0
 
@@ -312,7 +335,6 @@ export function getSmokeStreak() {
     if (r && r.timestamp) daySet.add(_todayStr(r.timestamp))
   })
 
-  const today = _todayStr()
   // 今天还没抽不算断签，从昨天开始回溯
   let cursor = daySet.has(today) ? today : _shiftDays(today, -1)
 
@@ -504,13 +526,18 @@ export function getSavedMoney() {
   return Math.round(total * 100) / 100
 }
 
-// 少抽的根数：基准量 − 实际抽的量（之前直接返回 totalSmoked，名实相反）
+// 少抽的根数：戒烟开始后「按原习惯本该抽的量」− 「戒烟后实际抽的量」。
+// 原来减的是 stats.totalSmoked（全部历史，含戒烟前的记录），
+// 只要历史累计够多，这个值就恒为 0，等于永远显示 0。
 export function getLessSmoked() {
   const settings = getSettings()
-  const stats = getStats()
+  const start = parseLocalDate(settings.quitDate)
+  if (!start) return 0
+  const startTs = start.getTime()
   const days = Math.max(1, getCleanDays() + 1)
-  const original = Math.max(0, settings.dailyOriginal || 0)
-  return Math.max(0, days * original - (stats.totalSmoked || 0))
+  const original = Math.max(0, Number(settings.dailyOriginal) || 0)
+  const smokedSinceQuit = getHistory().filter(r => r.timestamp >= startTs).length
+  return Math.max(0, days * original - smokedSinceQuit)
 }
 
 // 勋章系统
@@ -580,6 +607,13 @@ export const BADGE_LIST = [
 // 构造勋章判定所需的完整 stats（补齐 cleanDays / 时段 / 计数器等派生字段）
 export function buildBadgeStats() {
   const s = getStats()
+  const smokeFree = getSmokeFreeDuration()
+  // 健康类成就（12小时/3天/2周…）以前只看瞬时值：抽一根就归零，
+  // 用户明明坚持过那么久，一旦超过就再也拿不到。这里记录历史峰值再判定。
+  if (smokeFree > (s.maxSmokeFreeSec || 0)) {
+    s.maxSmokeFreeSec = smokeFree
+    saveStats(s)
+  }
   return {
     totalSmoked: s.totalSmoked || 0,
     totalSaved: getSavedMoney(),
@@ -590,8 +624,8 @@ export function buildBadgeStats() {
     stylesUsed: s.stylesUsed || 0,
     passedCount: s.passedCount || 0,
     ashTapped: s.ashTapped || 0,
-    // 健康成就用「连续无烟时长」（抽一根就重新计时）
-    smokeFreeSeconds: getSmokeFreeDuration()
+    // 健康成就用「历史最长的无烟时长」，避免达成瞬间没打开页面就永久错过
+    smokeFreeSeconds: Math.max(smokeFree, s.maxSmokeFreeSec || 0)
   }
 }
 
@@ -989,9 +1023,15 @@ export function harmPet(healthD, happyD) {
 // 互动：摸摸宠物，回点血/快乐 + 少量经验
 export function petPet() {
   const pet = getPet()
+  const now = Date.now()
+  // 摸头经验加冷却：原来连点就能无限 +5 经验，等级门槛等于不存在
+  const canGainExp = !pet.lastPetTime || now - pet.lastPetTime > 60000
   pet.happiness = clamp100(pet.happiness + 4)
-  pet.health = clamp100(pet.health + 2)
-  addExp(pet, 5)
+  if (canGainExp) {
+    pet.health = clamp100(pet.health + 2)
+    addExp(pet, 5)
+    pet.lastPetTime = now
+  }
   savePet(pet)
   return pet
 }
@@ -1008,7 +1048,6 @@ export function recoverPetDaily() {
   if (pet.lastRecoverDate === yesterday) return pet
 
   const history = getHistory()
-  const smokedYesterday = history.some(r => r && r.timestamp && _todayStr(r.timestamp) === yesterday)
 
   // 第一次进入（还没有历史）时不做补算，直接把游标拨到昨天
   if (!pet.lastRecoverDate && !history.length) {
@@ -1017,14 +1056,24 @@ export function recoverPetDaily() {
     return pet
   }
 
-  pet.lastRecoverDate = yesterday
+  // 逐日结算：之前只结算「昨天」一天，隔三天没开 App，中间两天就永久漏发。
+  // 最多补 7 天，避免长期未登录一次性刷爆等级。
+  const smokedDays = new Set()
+  history.forEach(r => { if (r && r.timestamp) smokedDays.add(_todayStr(r.timestamp)) })
 
-  if (!smokedYesterday) {
-    pet.health = clamp100(pet.health + 12)
-    pet.happiness = clamp100(pet.happiness + 10)
-    addExp(pet, 12)
+  let cursor = pet.lastRecoverDate ? _shiftDays(pet.lastRecoverDate, 1) : yesterday
+  let guard = 0
+  while (cursor <= yesterday && guard < 7) {
+    if (!smokedDays.has(cursor)) {
+      pet.health = clamp100(pet.health + 12)
+      pet.happiness = clamp100(pet.happiness + 10)
+      addExp(pet, 12)
+    }
+    cursor = _shiftDays(cursor, 1)
+    guard++
   }
 
+  pet.lastRecoverDate = yesterday
   pet.lastFed = Date.now()
   savePet(pet)
   return pet
@@ -1386,8 +1435,15 @@ export function equipPetAccessory(accessoryId) {
   const data = getPetAccessories()
   const accessory = PET_ACCESSORY_LIST.find(a => a.id === accessoryId)
   if (!accessory) return false
-  if (!data.unlocked.includes(accessoryId)) return false
-  
+  // 解锁条件有两个来源：花金币解锁，或宠物等级达标（等级解锁的之前装不上，
+  // 列表显示「已解锁」但点装备返回 false，pet.vue 还照样提示「已装备」）
+  const pet = getPet()
+  const unlockedByLevel = !!accessory.unlockLevel && pet.level >= accessory.unlockLevel
+  if (!data.unlocked.includes(accessoryId) && !unlockedByLevel) return false
+
+  // 等级解锁的顺手补进 unlocked，保证后续判断一致
+  if (!data.unlocked.includes(accessoryId)) data.unlocked.push(accessoryId)
+
   // 装备到对应槽位
   data.equipped[accessory.slot] = accessoryId
   savePetAccessories(data)

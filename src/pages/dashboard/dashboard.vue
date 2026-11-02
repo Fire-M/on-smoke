@@ -69,7 +69,7 @@
           <text class="section-title mb-16 block">月度趋势</text>
           <view class="month-compare">
             <view class="month-item">
-              <text class="month-label">上月</text>
+              <text class="month-label">上月同期</text>
               <view class="month-bar-wrap">
                 <view class="month-bar" :style="{ width: lastMonthPercent + '%' }"></view>
               </view>
@@ -101,8 +101,9 @@
           <view class="calendar-grid">
             <view v-for="(day, idx) in calendarDays" :key="idx" 
               class="calendar-day" :class="{ 
-                'has-smoke': day.count > 0, 
-                'no-smoke': day.count === 0 && day.isPast,
+                'isEmpty': day.isEmpty,
+                'has-smoke': !day.isEmpty && day.count > 0, 
+                'no-smoke': !day.isEmpty && day.count === 0 && day.isPast,
                 'today': day.isToday,
                 'future': day.isFuture
               }">
@@ -223,29 +224,17 @@ export default {
       // 最长连续天数：历史峰值与当前连续取大（与成就页口径一致）
       this.bestStreak = Math.max(stats.maxStreak || 0, Store.getSmokeStreak())
 
-      // 最少一天：从戒烟日起逐日统计（含「一根没抽」的 0 根日）。
-      // 原来只遍历 history，没抽烟的日子根本不在列表里，指标恒 >= 1。
+      // 最少一天：只看「有抽烟记录的日子」里最少抽了几根。
+      // 之前把没抽烟的日子按 0 根算进来，只要有戒烟日这个「个人记录」就恒为 0，
+      // 完全失去意义。
       const dailyCounts = {}
       history.forEach(r => {
         if (!r || !r.timestamp) return
         const dateStr = Store.todayStr(r.timestamp)
         dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1
       })
-
-      const settings = Store.getSettings()
-      const quitDay = Store.parseLocalDate(settings.quitDate)
-      const todayStr = Store.todayStr()
-      const startDay = quitDay ? Store.todayStr(quitDay) : todayStr
-
-      let least = Infinity
-      let cursor = startDay
-      let guard = 0
-      while (cursor <= todayStr && guard < 3650) {
-        least = Math.min(least, dailyCounts[cursor] || 0)
-        cursor = Store.shiftDays(cursor, 1)
-        guard++
-      }
-      this.leastDay = least === Infinity ? 0 : least
+      const dayCounts = Object.keys(dailyCounts).map(k => dailyCounts[k])
+      this.leastDay = dayCounts.length ? Math.min.apply(null, dayCounts) : 0
     },
 
     loadMonthData() {
@@ -264,9 +253,12 @@ export default {
       // 上月数据
       const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1
       const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear
+      // 上月只取「同期」：本月才过了 N 天，拿它和上月整月比，
+      // 每月 1~10 号必然显示「比上月减少」，趋势是假的
+      const dayOfMonth = now.getDate()
       const lastMonthRecords = history.filter(r => {
         const d = new Date(r.timestamp)
-        return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear
+        return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear && d.getDate() <= dayOfMonth
       })
       this.lastMonthCount = lastMonthRecords.length
 

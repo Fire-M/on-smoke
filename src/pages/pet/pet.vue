@@ -19,7 +19,7 @@
         <view class="stat-row">
           <text class="stat-label">经验</text>
           <view class="stat-bar"><view class="stat-fill exp" :style="{ width: expPercent + '%' }"></view></view>
-          <text class="stat-value">{{ pet.exp }}/{{ pet.level * 100 }}</text>
+          <text class="stat-value">{{ pet.exp }}/{{ expNeed }}</text>
         </view>
         
         <!-- 装扮按钮 -->
@@ -128,7 +128,12 @@ export default {
       } 
     },
   computed: { 
-    expPercent() { return (this.pet.exp / (this.pet.level * 100)) * 100 },
+    // pet.level 可能是 0 / undefined（老数据）→ 分母为 0 时宽度会变成 NaN% / Infinity%
+    expNeed() { return (Number(this.pet.level) || 1) * 100 },
+    expPercent() {
+      const exp = Number(this.pet.exp) || 0
+      return Math.max(0, Math.min(100, (exp / this.expNeed) * 100))
+    },
     petMood() {
       if (this.pet.happiness >= 80) return 'happy'
       if (this.pet.happiness < 30) return 'sad'

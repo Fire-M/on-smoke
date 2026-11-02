@@ -152,23 +152,20 @@ export function initRewardedAd() {
   // #endif
 }
 
-// 首次 show 失败（未加载完成）时，重新 load 后再试一次
+// 首次 show 失败（未加载完成）时，重新 load 后再试一次。
+// 注意：任何失败分支都必须把 pendingResolve 结算掉。之前第二次 show 的 catch 是空的，
+// Promise 永远不 resolve → 页面 adWatching 卡在 true，该页广告入口此后点了没反应。
 function _reloadAndShow(resolve) {
-  if (!rewardedAd || typeof rewardedAd.load !== 'function') {
-    pendingResolve = null
-    resolve(false)
-    return
-  }
+  const fail = () => { pendingResolve = null; resolve(false) }
+  if (!rewardedAd || typeof rewardedAd.load !== 'function') { fail(); return }
   try {
     rewardedAd.load().then(() => {
-      if (rewardedAd && typeof rewardedAd.show === 'function') rewardedAd.show().catch(() => {})
-    }).catch(() => {
-      pendingResolve = null
-      resolve(false)
-    })
+      if (!rewardedAd || typeof rewardedAd.show !== 'function') { fail(); return }
+      const p = rewardedAd.show()
+      if (p && typeof p.catch === 'function') p.catch(fail)
+    }).catch(fail)
   } catch (e) {
-    pendingResolve = null
-    resolve(false)
+    fail()
   }
 }
 
@@ -196,6 +193,12 @@ export function showRewardedAd(purpose = 'quota') {
     // #endif
 
     // #ifdef MP-WEIXIN
+    // 上一次还在播：直接拒绝。pendingResolve 是单槽，后一次会覆盖前一次，
+    // 前一次的 Promise 就永远不结算了（表现为连点后广告入口全废）
+    if (pendingResolve) {
+      resolve(false)
+      return
+    }
     if (!rewardedAd) initRewardedAd()
     if (!rewardedAd || typeof rewardedAd.show !== 'function') {
       // 广告拉不到时不发奖励、也不占用每日次数

@@ -6,7 +6,12 @@
       <!-- 情绪统计 -->
       <view class="stats-card mx-20 mb-16">
         <text class="card-title">情绪分布</text>
-        <view class="mood-stats">
+        <!-- 空态：新用户看到一排「😀 0」很困惑 -->
+        <view v-if="!totalMoods" class="mood-empty">
+          <text class="mood-empty-icon">🌤️</text>
+          <text class="mood-empty-text">还没有记录，写下此刻的心情试试</text>
+        </view>
+        <view v-else class="mood-stats">
           <view v-for="(count, mood) in moodDist" :key="mood" class="mood-stat">
             <text class="mood-emoji">{{ getMoodEmoji(mood) }}</text>
             <text class="mood-count">{{ count }}</text>
@@ -72,7 +77,7 @@
     </scroll-view>
 
     <!-- 记录情绪弹窗 -->
-    <view class="modal-mask" v-if="showRecordModal" @click="showRecordModal = false">
+    <view class="modal-mask" v-if="showRecordModal" @click="closeRecordModal">
       <view class="modal-card" @click.stop>
         <text class="modal-title">记录心情</text>
         
@@ -113,7 +118,7 @@
         </view>
 
         <view class="modal-actions">
-          <button class="modal-btn cancel" @click="showRecordModal = false">取消</button>
+          <button class="modal-btn cancel" @click="closeRecordModal">取消</button>
           <button class="modal-btn confirm" @click="saveMood">保存</button>
         </view>
       </view>
@@ -188,6 +193,13 @@ export default {
       const hour = String(d.getHours()).padStart(2, '0')
       const min = String(d.getMinutes()).padStart(2, '0')
       return `${month}月${day}日 ${hour}:${min}`
+    },
+
+    // 关闭弹窗时复位表单：原来只把 showRecordModal 置 false，
+    // 下次打开还是上次的情绪和文字，容易误存重复记录
+    closeRecordModal() {
+      this.showRecordModal = false
+      this.newMood = { mood: 'happy', smoked: false, note: '' }
     },
 
     saveMood() {
@@ -598,6 +610,21 @@ export default {
 
 .modal-btn:active {
   transform: scale(0.97);
+}
+
+.mood-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 40rpx 0;
+}
+.mood-empty-icon {
+  font-size: 48rpx;
+}
+.mood-empty-text {
+  font-size: 24rpx;
+  color: var(--text-dim);
 }
 
 .local-only-tip {

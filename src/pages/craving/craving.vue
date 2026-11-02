@@ -92,7 +92,7 @@
     </scroll-view>
 
     <!-- 记录烟瘾弹窗 -->
-    <view class="modal-mask" v-if="showRecordModal" @click="showRecordModal = false">
+    <view class="modal-mask" v-if="showRecordModal" @click="closeRecordModal">
       <view class="modal-card" @click.stop>
         <text class="modal-title">记录烟瘾</text>
         
@@ -145,7 +145,7 @@
         </view>
 
         <view class="modal-actions">
-          <button class="modal-btn cancel" @click="showRecordModal = false">取消</button>
+          <button class="modal-btn cancel" @click="closeRecordModal">取消</button>
           <button class="modal-btn confirm" @click="saveCraving">保存</button>
         </view>
       </view>
@@ -264,6 +264,12 @@ export default {
     formatTime(timestamp) {
       const d = new Date(timestamp)
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    },
+
+    // 关弹窗复位表单，避免下次打开还留着上次填的内容
+    closeRecordModal() {
+      this.showRecordModal = false
+      this.newCraving = { intensity: 3, trigger: '', resisted: true, note: '' }
     },
 
     saveCraving() {

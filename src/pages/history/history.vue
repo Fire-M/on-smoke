@@ -11,6 +11,13 @@
           <button class="history-tab" :class="{ active: tabRange === 'month' }" @click="setTab('month')">本月</button>
         </view>
 
+        <!-- 分享卡片入口（share 页之前没有任何入口，属于死页面） -->
+        <view class="share-entry" v-if="allRecords.length > 0" @click="goShare">
+          <text class="share-entry-icon">📤</text>
+          <text class="share-entry-text">生成最近一根的分享卡片</text>
+          <text class="share-entry-arrow">›</text>
+        </view>
+
         <!-- 统计摘要 -->
         <view class="summary-card" v-if="summaryCount > 0">
           <view class="summary-row">
@@ -94,6 +101,17 @@ export default {
       this.filterRecords()
     },
 
+    // 跳到分享页，把最近一根的品牌/时长/剩余带过去
+    goShare() {
+      const last = this.allRecords[0]
+      if (!last) return
+      const brandId = last.brandId || ''
+      const remaining = brandId ? Store.getBrandRemaining(brandId) : 0
+      uni.navigateTo({
+        url: `/pages/share/share?brandId=${brandId}&duration=${last.duration || 0}&remaining=${remaining}`
+      })
+    },
+
     filterRecords() {
       const now = Date.now()
       let start = 0
@@ -103,15 +121,18 @@ export default {
         today.setHours(0, 0, 0, 0)
         start = today.getTime()
       } else if (this.tabRange === 'week') {
-        const weekAgo = new Date()
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        weekAgo.setHours(0, 0, 0, 0)
-        start = weekAgo.getTime()
+        // 与数据中心保持一致：自然周（周日为起点），不用「滚动 7 天」，
+        // 否则同一周两个页面显示的根数/省钱对不上
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - today.getDay())
+        start = weekStart.getTime()
       } else {
-        const monthAgo = new Date()
-        monthAgo.setDate(monthAgo.getDate() - 30)
-        monthAgo.setHours(0, 0, 0, 0)
-        start = monthAgo.getTime()
+        // 自然月：本月 1 号 0 点起（原来取 30 天窗口，跨月数据会串）
+        const today = new Date()
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        start = monthStart.getTime()
       }
 
       this.filteredRecords = this.allRecords.filter(r => r.timestamp >= start)
@@ -134,7 +155,9 @@ export default {
     // 这根烟的单根价格：优先读记录里的 pricePerCig 快照（点烟时锁定），
     // 与省钱计算共用 getRecordPrice —— 页面上写的数就是这根帮你省下的钱
     formatPrice(record) {
-      return Math.round(Store.getRecordPrice(record) * 100) / 100
+      // 必须用 getRecordSaved：看过「上一根翻倍」广告的记录是 2 倍，
+      // 用 getRecordPrice 会和累计省钱对不上
+      return Math.round(Store.getRecordSaved(record) * 100) / 100
     },
 
     formatTime(ts) {
@@ -191,6 +214,32 @@ export default {
   justify-content: center;
   gap: 16rpx;
   margin-bottom: 32rpx;
+}
+
+.share-entry {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 22rpx 28rpx;
+  margin-bottom: 24rpx;
+  border-radius: 20rpx;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+}
+.share-entry:active {
+  background: var(--surface-2);
+}
+.share-entry-icon {
+  font-size: 26rpx;
+}
+.share-entry-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--text);
+}
+.share-entry-arrow {
+  font-size: 28rpx;
+  color: var(--text-dim);
 }
 
 .history-tab {

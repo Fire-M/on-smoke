@@ -103,17 +103,14 @@ export default {
 
   methods: {
     loadData() {
-      const settings = Store.getSettings()
-      // quitDate 是 'YYYY-MM-DD' 字符串，直接参与减法会得到 NaN（整页时长全变 NaN）。
-      // 必须显式解析为本地时间当天的 00:00。
-      const quitDate = Store.parseLocalDate(settings.quitDate) || new Date()
-      const now = Date.now()
-      const diffMs = now - quitDate.getTime()
-      const diffSeconds = Math.max(0, Math.floor(diffMs / 1000))
+      // 时间轴必须用「距离上一次抽烟」的时长：这套节点是「不抽烟后身体恢复」，
+      // 抽一根就该重新计时。原来从 quitDate 起算，抽完一根后健康计算器已经归零，
+      // 这页还显示「已恢复 30 天」，两个页面互相打架。
+      const diffSeconds = Store.getSmokeFreeDuration()
       const diffDays = Math.floor(diffSeconds / 86400)
 
-      // 展示用「第 N 天」含当天，第一天是第 1 天
-      this.quitDays = diffDays + 1
+      // 「第 N 天」是坚持天数（从戒烟日开始算，与首页一致），和无烟时长不是一回事
+      this.quitDays = Store.getCleanDays() + 1
       this.quitSeconds = diffSeconds
 
       // 计算戒烟时间字符串
