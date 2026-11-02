@@ -40,13 +40,16 @@ const EXTRA_KEYS = [
 const DATA_VERSION = 5
 
 // ---- 品牌单一数据源（页面与剩余计算共用，避免口径分裂）----
+// 品牌全部为虚构，命名刻意避开任何真实烟草品牌（含谐音、近似字），
+// 否则容易被认定为变相烟草广告 —— 广告法明令禁止烟草广告。
+// id 保持不变：老用户已存的抽烟记录是按 id 记的，改 id 会导致历史对不上。
 export const BRANDS = [
-  { id: 'lanhe', cn: '蓝河', en: 'LAN·HE', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
-  { id: 'hongta', cn: '太华', en: 'TA·HWA', price: 88, theme: 'red', tag: '浓郁·想象味', quote: '送礼倍有面（的空气）', packSize: 20 },
-  { id: 'heiye', cn: '熊猫666', en: 'PANDA', price: 100, theme: 'black', tag: '顶配·都是心理味', quote: '国宝都戒了你还抽？', packSize: 20 },
-  { id: 'jinsi', cn: '羊驼', en: 'LLAMA', price: 22, theme: 'gold', tag: '粗犷·沙漠风', quote: '原版是骆驼，这是羊驼', packSize: 20 },
+  { id: 'lanhe', cn: '蓝汐', en: 'LAN·XI', price: 50, theme: 'blue', tag: '冰凉回甘·空气味', quote: '假装自己很高级', packSize: 20 },
+  { id: 'hongta', cn: '丹霞', en: 'DAN·XIA', price: 88, theme: 'red', tag: '浓郁·想象味', quote: '送礼倍有面（的空气）', packSize: 20 },
+  { id: 'heiye', cn: '胖达666', en: 'PANDA666', price: 100, theme: 'black', tag: '顶配·都是心理味', quote: '国宝都戒了你还抽？', packSize: 20 },
+  { id: 'jinsi', cn: '羊驼', en: 'LLAMA', price: 22, theme: 'gold', tag: '粗犷·沙漠风', quote: '沙漠来的，跟任何真品牌都没关系', packSize: 20 },
   { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', price: 35, theme: 'lightblue', tag: '薄荷冰爆·脑瓜疼', quote: '爆珠一捏，感觉良好', packSize: 20 },
-  { id: 'zimeng', cn: '紫云', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 }
+  { id: 'zimeng', cn: '紫雾', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 }
 ]
 
 // 取品牌每包支数（未命中时回落到用户设置的 packSize）
@@ -194,7 +197,8 @@ export function addHistory(record) {
   if (list.length > 500) {
     const dropped = list.splice(500)
     let legacy = 0
-    dropped.forEach(r => { legacy += getRecordPrice(r) })
+    // 翻倍过的记录要按 2 倍沉淀，否则截断后省钱会莫名缩水
+    dropped.forEach(r => { legacy += getRecordSaved(r) })
     if (legacy > 0) {
       const stats = getStats()
       stats.savedLegacy = Math.round(((stats.savedLegacy || 0) + legacy) * 100) / 100
@@ -450,6 +454,23 @@ export function getRecordPrice(record) {
   return getBrandPricePerCig(record ? record.brandId : null)
 }
 
+// 单根记录贡献的省钱额：看过广告翻倍的那根按 2 倍计。
+// 所有累加省钱的地方都走这里，避免某个入口漏掉翻倍导致口径不一致。
+export function getRecordSaved(r) {
+  return getRecordPrice(r) * (r && r.boosted ? 2 : 1)
+}
+
+// 看广告把「最后一根」的省钱翻倍。
+// 只针对最后一根，且同一根不能重复翻倍（否则可以无限刷）
+export function boostLastSmoke() {
+  const list = getHistory()
+  if (!list.length) return false
+  if (list[0].boosted) return false
+  list[0].boosted = true
+  _write(KEYS.history, list)
+  return true
+}
+
 // 今天到目前为止省下的钱（未结算，仅用于展示「今日」）
 export function getTodaySaved() {
   const history = getHistory()
@@ -459,7 +480,7 @@ export function getTodaySaved() {
   history.forEach(r => {
     if (!r || !r.timestamp) return
     if (_todayStr(r.timestamp) !== today) return
-    total += getRecordPrice(r)
+    total += getRecordSaved(r)
   })
 
   return Math.round(total * 100) / 100
@@ -477,7 +498,7 @@ export function getSavedMoney() {
 
   history.forEach(r => {
     if (!r) return
-    total += getRecordPrice(r)
+    total += getRecordSaved(r)
   })
 
   return Math.round(total * 100) / 100
@@ -1036,14 +1057,15 @@ export function getExtraQuota() {
   return rewards.extraQuota || 0
 }
 
-// 看广告获得额外配额 +1
-export function addExtraQuota() {
+// 看广告获得额外配额。数量由调用方传入（一次给几根在广告模块统一定义），
+// 这里不写死，避免两处各写一个数字对不上
+export function addExtraQuota(count = 1) {
   const rewards = getAdRewards()
   if (rewards.lastResetDate !== _todayStr()) {
     rewards.extraQuota = 0
     rewards.lastResetDate = _todayStr()
   }
-  rewards.extraQuota += 1
+  rewards.extraQuota += Math.max(0, Number(count) || 0)
   _write(KEYS.adRewards, rewards)
   return rewards.extraQuota
 }
@@ -1403,7 +1425,8 @@ export default {
   recordSmoke, incrementStat, markStyleUsed,
   getSmokeStreak,
   getBrandSmokedCount, getBrandRemaining,
-  getBrandPackSize, getBrandPricePerCig, getRecordPrice,
+  getBrandPackSize, getBrandPricePerCig, getRecordPrice, getRecordSaved,
+  boostLastSmoke,
   getPackSize, getPackRemaining, savePackRemaining, refillPack,
   getPacksCompleted, getTotalPacksCompleted, completePackAndRefill,
   settleDailySavings, getTodaySaved,

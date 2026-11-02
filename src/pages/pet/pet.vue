@@ -35,7 +35,7 @@
       
       <!-- 看广告加速 -->
       <view class="mx-20 mb-16">
-        <view class="ad-action-btn" @click="watchAdForPet">
+        <view class="ad-action-btn" v-if="adEnabled" @click="watchAdForPet">
           <text class="ad-action-icon">🎬</text>
           <view class="ad-action-text">
             <text class="ad-action-title">看广告加速升级</text>
@@ -104,7 +104,7 @@
 
 <script>
 import Store from '@/utils/store.js'
-import { showRewardedAd } from '@/utils/ad-manager.js'
+import { showRewardedAd, isAdEnabled } from '@/utils/ad-manager.js'
 import PetCanvas from '@/components/PetCanvas.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
@@ -120,6 +120,7 @@ export default {
         accessoryList: [],
         equippedAccessories: {},
         showAdModal: false,
+        adEnabled: false,   // 未开通流量主时隐藏广告入口
         adModalTarget: null,
         adModalIcon: '',
         adModalTitle: '',
@@ -139,6 +140,7 @@ export default {
   },
   onShow() { 
     Store.recoverPetDaily()
+    this.adEnabled = isAdEnabled()
     this.pet = Store.getPet()
     if (this._prevLevel != null && this.pet.level > this._prevLevel) {
       uni.showToast({ title: '🎉 宠物升到 Lv.' + this.pet.level + '，解锁新装扮！', icon: 'none' })
@@ -208,14 +210,14 @@ export default {
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: #f3f4f6; }
-.page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
+.back-icon { font-size: 48rpx; color: var(--text); }
+.page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
 .pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
-.main-scroll { flex: 1; height: 100%; padding-bottom: 40rpx; }
+.main-scroll { flex: 1; min-height: 0; padding-bottom: 40rpx; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
 .pet-card { padding: 40rpx; text-align: center; }
-.pet-name { font-size: 40rpx; font-weight: bold; color: #f3f4f6; display: block; margin-bottom: 8rpx; }
+.pet-name { font-size: 40rpx; font-weight: bold; color: var(--text); display: block; margin-bottom: 8rpx; }
 .pet-level { font-size: 28rpx; color: var(--primary); display: block; margin-bottom: 32rpx; }
 .stat-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 16rpx; }
 .stat-label { font-size: 24rpx; color: var(--text-dim); width: 60rpx; }
@@ -223,7 +225,7 @@ export default {
 .stat-fill { height: 100%; border-radius: 12rpx; transition: width 0.3s ease; }
 .stat-fill.health { background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%); }
 .stat-fill.happy { background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%); }
-.stat-fill.exp { background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%); }
+.stat-fill.exp { background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); }
 .stat-value { font-size: 22rpx; color: var(--text-dim); width: 100rpx; text-align: right; }
 .tip { font-size: 24rpx; color: var(--text-dim); text-align: center; display: block; }
 
@@ -257,8 +259,8 @@ export default {
   align-items: center;
   gap: 20rpx;
   padding: 28rpx 32rpx;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(236, 72, 153, 0.08) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: linear-gradient(135deg, var(--glow) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--glow);
   border-radius: 24rpx;
 }
 .ad-action-btn:active {
@@ -274,7 +276,7 @@ export default {
 .ad-action-title {
   display: block;
   font-size: 28rpx;
-  color: #a78bfa;
+  color: var(--primary);
   font-weight: 600;
 }
 .ad-action-desc {
@@ -323,7 +325,7 @@ export default {
 .custom-title {
   font-size: 32rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 .custom-close {
   width: 48rpx;
@@ -444,7 +446,7 @@ export default {
 .ad-modal-title {
   font-size: 32rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 10rpx;
 }
 .ad-modal-desc {

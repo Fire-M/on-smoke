@@ -1,6 +1,6 @@
 <template>
   <view class="page-container" :class="themeClass()">
-    <app-navbar title="身体恢复"></app-navbar>
+    <app-navbar title="恢复时间轴"></app-navbar>
     <!-- 顶部标题 -->
     <view class="recovery-header">
       <view class="recovery-subtitle">
@@ -30,6 +30,11 @@
 
     <!-- 时间线 -->
     <scroll-view scroll-y class="timeline-scroll">
+      <view class="timeline-note">
+        <text class="timeline-note-text">
+          以下时间轴整理自公开资料中的常见结论，个体差异很大，仅供鼓励与参考，不构成医学建议。
+        </text>
+      </view>
       <view class="timeline">
         <view v-for="(item, idx) in milestones" :key="idx"
           class="timeline-item" :class="{ achieved: item.achieved, current: item.isCurrent }">
@@ -52,7 +57,7 @@
 
       <!-- 底部提示 -->
       <view class="timeline-footer">
-        <text class="footer-text">💪 坚持下去，身体会越来越好</text>
+        <text class="footer-text">💪 坚持下去，每一分钟都算数</text>
       </view>
     </scroll-view>
   </view>
@@ -217,13 +222,13 @@ export default {
 
 .recovery-back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .recovery-title {
   font-size: 44rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .recovery-subtitle {
@@ -449,7 +454,7 @@ export default {
 .timeline-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
   display: block;
   margin-bottom: 8rpx;
 }
@@ -459,6 +464,19 @@ export default {
   color: var(--text-dim);
   display: block;
   line-height: 1.5;
+}
+
+.timeline-note {
+  margin: 0 40rpx 24rpx;
+  padding: 20rpx 24rpx;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 20rpx;
+}
+.timeline-note-text {
+  font-size: 22rpx;
+  color: var(--text-dim);
+  line-height: 1.7;
 }
 
 .timeline-footer {

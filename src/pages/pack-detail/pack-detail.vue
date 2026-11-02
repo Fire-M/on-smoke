@@ -103,6 +103,13 @@
           <button class="box-refill-btn" @click.stop="refillPack">开新的一包</button>
         </view>
       </view>
+
+      <!-- 看广告补满这包：只要这包没抽满就常驻，多一个广告入口 -->
+      <view class="pack-ad-bar" v-if="canRefillByAd" @click="watchAdRefill">
+        <text class="pack-ad-icon">🎬</text>
+        <text class="pack-ad-text">看广告补满这包 +{{ adQuotaPerAd }} 根</text>
+        <text class="pack-ad-remain">今日还可 {{ adRewardRemain }} 次</text>
+      </view>
     </view>
   </view>
 </template>
@@ -111,6 +118,7 @@
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
+import { showRewardedAd, getRewardRemain, isAdEnabled, REWARD_QUOTA_PER_AD } from '@/utils/ad-manager.js'
 
 // 品牌数据统一取自 Store.BRANDS（与品牌列表页、剩余计算共用一份）。
 // 必须返回副本：下面的 onLoad 会写 brand.packSize，直接返回引用会污染全局常量。
@@ -135,6 +143,10 @@ export default {
       dragStartRotX: 0,
       dragMoved: false,
       boxRemainingCigs: 20,
+      adRewardRemain: 0,   // 今日还能看几次广告
+      adQuotaPerAd: REWARD_QUOTA_PER_AD,  // 看一次广告给几根配额
+      adEnabled: false,    // 未开通流量主时隐藏广告入口
+      adWatching: false,   // 广告播放中，防连点
       isPulling: false,
       activeIndex: null,
       faceCount: 24
@@ -142,6 +154,12 @@ export default {
   },
 
   computed: {
+    // 包抽空时走免费的「开新的一包」，不占用广告入口
+    canRefillByAd() {
+      const size = this.brand.packSize || 0
+      return this.adEnabled && this.adRewardRemain > 0 && this.boxRemainingCigs > 0 && this.boxRemainingCigs < size
+    },
+
     wrapperStyle() {
       return {
         transform: `rotateY(${this.boxRotY}deg) rotateX(${this.boxRotX}deg)`
@@ -200,6 +218,9 @@ export default {
     this.activeIndex = null
     // 从存储重新读取包剩余（抽完会扣减，没抽完则不变）
     this.refreshPack()
+    // 看完广告回来后刷新剩余次数（含跨天重置）
+    this.adRewardRemain = getRewardRemain()
+    this.adEnabled = isAdEnabled()
   },
 
   methods: {
@@ -214,6 +235,26 @@ export default {
       this.isPulling = false
       this.activeIndex = null
       if (uni.showToast) uni.showToast({ title: '开了新的一包', icon: 'none' })
+    },
+
+    // 看广告补满这包：补满 + 送配额（补满本身是虚拟的，配额才是用户真正要的）
+    watchAdRefill() {
+      if (this.adWatching) return
+      if (!this.canRefillByAd) return
+      this.adWatching = true
+      showRewardedAd('refill').then((success) => {
+        this.adWatching = false
+        this.adRewardRemain = getRewardRemain()
+        if (!success) return
+        this.boxRemainingCigs = Store.refillPack(this.brand.id)
+        Store.addExtraQuota(REWARD_QUOTA_PER_AD)
+        this.isPulling = false
+        this.activeIndex = null
+        if (uni.showToast) uni.showToast({ title: `已补满 · 配额 +${REWARD_QUOTA_PER_AD}`, icon: 'none' })
+      }).catch(() => {
+        this.adWatching = false
+        this.adRewardRemain = getRewardRemain()
+      })
     },
 
     openLid() {
@@ -296,11 +337,44 @@ export default {
 }
 
 .box-area {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 64rpx;
+}
+
+/* 看广告补满这包（常驻广告入口） */
+.pack-ad-bar {
+  position: absolute;
+  left: 48rpx;
+  right: 48rpx;
+  bottom: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 18rpx 24rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid var(--glow);
+  z-index: 40;
+}
+.pack-ad-bar:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+.pack-ad-icon {
+  font-size: 26rpx;
+}
+.pack-ad-text {
+  font-size: 27rpx;
+  font-weight: 600;
+  color: var(--primary);
+}
+.pack-ad-remain {
+  font-size: 22rpx;
+  color: var(--text-dim);
 }
 
 /* 空盒提示 */
@@ -1139,8 +1213,8 @@ page {
 }
 
 @keyframes btnPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(238,90,36,0.5); }
-  50% { box-shadow: 0 0 0 16px rgba(238,90,36,0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow); }
+  50% { box-shadow: 0 0 0 16px transparent; }
 }
 #btn-have-one {
   animation: btnPulse 2.5s ease-in-out infinite;

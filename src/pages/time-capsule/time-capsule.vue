@@ -23,6 +23,7 @@
         <textarea class="modal-textarea" v-model="newContent"
           placeholder="想对未来的自己说点什么..." maxlength="300" />
         <text class="modal-counter">{{ newContent.length }}/300</text>
+        <text class="local-only-tip">仅保存在本机，不会上传或公开</text>
         <view class="modal-actions">
           <button class="modal-btn cancel" @click="showWrite = false">取消</button>
           <button class="modal-btn confirm" @click="saveCapsule">封存</button>
@@ -36,6 +37,7 @@
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
+import { guardContent } from '@/utils/content-check.js'
 export default {
   components: { AppNavbar },
   data() { return { capsules: [], showWrite: false, newContent: '' } },
@@ -47,6 +49,7 @@ export default {
         uni.showToast({ title: '写点什么再封存吧', icon: 'none' })
         return
       }
+      if (!guardContent(content)) return
       Store.addTimeCapsule({ content: content })
       this.newContent = ''
       this.showWrite = false
@@ -64,15 +67,15 @@ export default {
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: #f3f4f6; }
-.page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
-.main-scroll { flex: 1; height: 100%; }
+.back-icon { font-size: 48rpx; color: var(--text); }
+.page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
+.main-scroll { flex: 1; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
-.write-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: white; font-size: 32rpx; font-weight: 600; border: none; }
+.write-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: var(--bg); font-size: 32rpx; font-weight: 600; border: none; }
 .card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; }
 .p-20 { padding: 40rpx; }
-.card-title { font-size: 30rpx; font-weight: 600; color: #f3f4f6; display: block; margin-bottom: 24rpx; }
+.card-title { font-size: 30rpx; font-weight: 600; color: var(--text); display: block; margin-bottom: 24rpx; }
 .empty { text-align: center; padding: 40rpx; color: var(--text-dim); font-size: 26rpx; }
 .capsule-item { padding: 20rpx; background: rgba(255, 255, 255, 0.03); border-radius: 16rpx; margin-bottom: 16rpx; }
 .capsule-date { font-size: 22rpx; color: var(--text-dim); display: block; margin-bottom: 8rpx; }
@@ -87,5 +90,6 @@ export default {
 .modal-actions { display: flex; gap: 20rpx; margin-top: 28rpx; }
 .modal-btn { flex: 1; padding: 24rpx; border-radius: 16rpx; font-size: 28rpx; font-weight: 600; border: none; }
 .modal-btn.cancel { background-color: var(--surface-1); color: var(--text-dim); }
-.modal-btn.confirm { background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: white; }
+.modal-btn.confirm { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: var(--bg); }
+.local-only-tip { font-size: 20rpx; color: var(--text-dim); opacity: 0.7; display: block; margin-top: 8rpx; }
 </style>

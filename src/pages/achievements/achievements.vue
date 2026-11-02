@@ -194,13 +194,13 @@ export default {
 
 .ach-back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .ach-title {
   font-size: 44rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .ach-progress-bar {
@@ -401,7 +401,7 @@ export default {
   display: block;
   font-size: 36rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 12rpx;
 }
 

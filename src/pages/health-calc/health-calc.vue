@@ -1,11 +1,11 @@
 <template>
   <view class="page-container" :class="themeClass()">
-    <app-navbar title="健康计算器"></app-navbar>
+    <app-navbar title="戒烟计算器"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="card mx-20 mb-16 p-20">
         <text class="card-title">戒烟收益</text>
         <view class="result-item">
-          <text class="result-label">已延长寿命</text>
+          <text class="result-label">估算延长寿命</text>
           <text class="result-value highlight">+{{ lifeGained }} 天</text>
         </view>
         <view class="result-item">
@@ -18,7 +18,7 @@
         </view>
       </view>
       <view class="card mx-20 mb-16 p-20">
-        <text class="card-title">健康恢复</text>
+        <text class="card-title">常见恢复阶段（参考）</text>
         <view v-for="(m, idx) in milestones" :key="idx" class="milestone-item">
           <text class="milestone-icon" :class="{ done: m.done }">{{ m.done ? '✓' : '○' }}</text>
           <view class="milestone-content">
@@ -26,6 +26,12 @@
             <text class="milestone-desc">{{ m.desc }}</text>
           </view>
         </view>
+      </view>
+      <!-- 免责声明：数字都是粗略估算，不能让人当成医学结论 -->
+      <view class="disclaimer mx-20 mb-16">
+        <text class="disclaimer-text">
+          以上数字均为粗略估算，仅供娱乐与自我记录参考，不构成医学建议，也不能替代专业医疗意见。
+        </text>
       </view>
       <view style="height: 80rpx;"></view>
     </scroll-view>
@@ -84,23 +90,25 @@ export default {
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: #f3f4f6; }
-.page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
-.main-scroll { flex: 1; height: 100%; }
+.back-icon { font-size: 48rpx; color: var(--text); }
+.page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
+.main-scroll { flex: 1; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
 .card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; }
 .p-20 { padding: 40rpx; }
-.card-title { font-size: 30rpx; font-weight: 600; color: #f3f4f6; display: block; margin-bottom: 24rpx; }
+.card-title { font-size: 30rpx; font-weight: 600; color: var(--text); display: block; margin-bottom: 24rpx; }
 .result-item { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .result-item:last-child { border-bottom: none; }
 .result-label { font-size: 26rpx; color: var(--text-dim); }
-.result-value { font-size: 28rpx; color: #f3f4f6; font-weight: 600; }
+.result-value { font-size: 28rpx; color: var(--text); font-weight: 600; }
 .result-value.highlight { color: var(--primary); }
 .milestone-item { display: flex; gap: 16rpx; margin-bottom: 20rpx; }
 .milestone-icon { font-size: 28rpx; color: var(--text-dim); min-width: 40rpx; }
 .milestone-icon.done { color: var(--primary); }
 .milestone-content { flex: 1; }
-.milestone-title { font-size: 26rpx; color: #f3f4f6; display: block; margin-bottom: 4rpx; }
+.milestone-title { font-size: 26rpx; color: var(--text); display: block; margin-bottom: 4rpx; }
 .milestone-desc { font-size: 22rpx; color: var(--text-dim); }
+.disclaimer { padding: 24rpx 28rpx; border-radius: 20rpx; background: var(--surface-1); border: 1px solid var(--border); }
+.disclaimer-text { font-size: 22rpx; color: var(--text-dim); line-height: 1.7; }
 </style>

@@ -160,7 +160,7 @@ function sysSafeRight() {
 .app-navbar__title-text {
   font-size: 34rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

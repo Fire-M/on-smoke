@@ -141,6 +141,7 @@
           <text class="form-label">备注（可选）</text>
           <textarea class="form-textarea" v-model="newCraving.note"
             placeholder="记录当时的想法..." maxlength="100"></textarea>
+          <text class="local-only-tip">仅保存在本机，不会上传或公开</text>
         </view>
 
         <view class="modal-actions">
@@ -156,6 +157,7 @@
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
+import { guardContent } from '@/utils/content-check.js'
 
 const TRIGGER_OPTIONS = [
   { id: 'stress', name: '压力大', icon: '😰' },
@@ -270,6 +272,8 @@ export default {
         return
       }
 
+      if (!guardContent(this.newCraving.note)) return
+
       Store.addCraving({
         intensity: this.newCraving.intensity,
         trigger: this.newCraving.trigger,
@@ -336,18 +340,18 @@ export default {
 
 .back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .page-title {
   font-size: 44rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .main-scroll {
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 /* 统计卡片 */
@@ -361,7 +365,7 @@ export default {
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 24rpx;
   display: block;
 }
@@ -629,7 +633,7 @@ export default {
 .modal-title {
   font-size: 36rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   display: block;
   text-align: center;
   margin-bottom: 32rpx;
@@ -779,10 +783,18 @@ export default {
 
 .modal-btn.confirm {
   background: linear-gradient(135deg, var(--primary) 0%, var(--danger-1) 100%);
-  color: white;
+  color: var(--bg);
 }
 
 .modal-btn:active {
   transform: scale(0.97);
+}
+
+.local-only-tip {
+  font-size: 20rpx;
+  color: var(--text-dim);
+  opacity: 0.7;
+  display: block;
+  margin-top: 12rpx;
 }
 </style>

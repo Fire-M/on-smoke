@@ -1932,7 +1932,7 @@ export default {
 
 .smoke-back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 /* 肺部承受力可视化 */
@@ -2299,7 +2299,7 @@ export default {
   display: block;
   font-size: 36rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 8rpx;
 }
 

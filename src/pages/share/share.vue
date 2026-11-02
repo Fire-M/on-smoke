@@ -16,7 +16,7 @@
         </view>
         <view class="result-cell">
           <text class="result-value">{{ resultLifespan }}</text>
-          <text class="result-label">续命</text>
+          <text class="result-label">估算延寿</text>
         </view>
         <view class="result-cell">
           <text class="result-value">第 {{ resultCount }} 次</text>
@@ -113,15 +113,15 @@ export default {
       if (navigator.share) {
         navigator.share({
           title: '就抽一根',
-          text: `我刚抽了一根寂寞，省了 ¥${this.resultSaved}！`,
+          text: `我在「就抽一根」里模拟了一根，纯娱乐，别当真～`,
           url: window.location.href
         }).catch(() => {})
       } else {
         uni.showToast({ title: '已复制分享链接', icon: 'none' })
       }
       // #endif
-
-      uni.showToast({ title: '分享成功', icon: 'none' })
+      // 小程序里点这里只是打开系统分享面板，用户可能最后没发出去，
+      // 之前无条件弹「分享成功」属于误导
     },
 
     smokeAgain() {
@@ -131,7 +131,7 @@ export default {
 
   onShareAppMessage() {
     return {
-      title: '就抽一根 - 假装点一根，不伤肺不花钱',
+      title: '就抽一根 - 只是一场模拟，不花钱也不真抽',
       path: '/pages/index/index'
     }
   }

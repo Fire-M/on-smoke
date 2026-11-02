@@ -183,7 +183,7 @@ export default {
 
 .main-scroll {
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 .tab-row {

@@ -55,6 +55,7 @@
 
 <script>
 import Store from '@/utils/store.js'
+import { guardContent } from '@/utils/content-check.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 export default {
@@ -101,6 +102,7 @@ export default {
         uni.showToast({ title: '请输入有效金额', icon: 'none' })
         return
       }
+      if (!guardContent(this.newGoal.name)) return
       Store.addSavingsGoal({
         name: (this.newGoal.name || '').trim() || '省钱目标',
         target: target,
@@ -123,9 +125,9 @@ export default {
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: #f3f4f6; }
-.page-title { font-size: 44rpx; font-weight: bold; color: #f3f4f6; }
-.main-scroll { flex: 1; height: 100%; }
+.back-icon { font-size: 48rpx; color: var(--text); }
+.page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
+.main-scroll { flex: 1; min-height: 0; }
 .card { background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 32rpx; }
 .p-20 { padding: 40rpx; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }

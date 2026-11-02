@@ -185,8 +185,8 @@ export default {
         const dayRecords = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr)
         const count = dayRecords.length
         weekTotal += count
-        // 每根按记录里的价格快照累加，与「至今已省」保持同一口径
-        dayRecords.forEach(r => { weekSavedNum += Store.getRecordPrice(r) })
+        // 每根按记录里的价格快照累加（含看过广告的翻倍），与「至今已花」保持同一口径
+        dayRecords.forEach(r => { weekSavedNum += Store.getRecordSaved(r) })
         
         weekDays.push({
           label: dayNames[i],
@@ -347,8 +347,10 @@ export default {
 }
 
 .main-scroll {
+  /* 只吃剩余空间：同时写 flex:1 和 height:100% 会让滚动区比可视区高出一个导航栏，
+     底部那段内容就永远滚不到。min-height:0 保证能正确收缩。 */
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 .section-header {
@@ -361,7 +363,7 @@ export default {
 .section-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .section-subtitle {
@@ -573,9 +575,10 @@ export default {
   border: 1px solid var(--glow);
 }
 
+/* 无烟日用中性底色，和「抽过」的主题色高亮区分开；原来是写死的绿色，换主题就不搭了 */
 .calendar-day.no-smoke {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
 }
 
 .calendar-day.today {
@@ -615,7 +618,8 @@ export default {
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.15);
 }
 .p-20 { padding: 40rpx; }
-.pb-100 { padding-bottom: 200rpx; }
+/* 底部要留出自定义 tabBar（100rpx）+ 安全区的高度，否则最后一行日历会被挡住 */
+.pb-100 { padding-bottom: calc(220rpx + env(safe-area-inset-bottom, 0px)); }
 .mb-16 { margin-bottom: 32rpx; }
 .mb-12 { margin-bottom: 24rpx; }
 .block { display: block; }

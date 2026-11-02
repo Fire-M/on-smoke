@@ -43,10 +43,13 @@
           <!-- 剩余已在右侧同款展示，这里只补总量，避免同一信息重复 -->
           <text class="text-sm text-gray-500 mt-12 block">配额 {{ effectiveQuota }} 根</text>
 
-          <!-- 还有额度：看广告加一根 -->
-          <view class="ad-quota-btn" @click="watchAdForQuota" v-if="quotaRemain <= 0 && adRewardRemain > 0">
+          <!-- 常驻广告入口：原来只在配额用完时才出现，
+               而配额是 5 根/天，多数用户一天都看不到这个按钮，白白浪费广告曝光。
+               改成随时可看（只要今天还有次数） -->
+          <view class="ad-quota-btn" @click="watchAdForQuota" v-if="adRewardRemain > 0 && adEnabled">
             <text class="ad-quota-icon">🎬</text>
-            <text class="ad-quota-text">看广告 +1 根</text>
+            <text class="ad-quota-text">看广告 +{{ adQuotaPerAd }} 根</text>
+            <text class="ad-quota-remain">今日还可 {{ adRewardRemain }} 次</text>
           </view>
           <!-- 配额用完：给个出口而不是让用户干瞪眼 -->
           <view class="quota-empty-tip" v-if="quotaRemain <= 0">
@@ -75,6 +78,11 @@
             <text class="text-sm text-gray-500 mt-12 block" v-else>
               再抽下去，一包辣条钱就没啦 💸
             </text>
+            <!-- 看广告让「上一根」的金额翻倍。纯正向激励，不阻碍任何流程 -->
+            <view class="boost-btn" v-if="canBoost" @click="watchAdBoost">
+              <text class="boost-btn-icon">🎬</text>
+              <text class="boost-btn-text">看广告，上一根 ×2</text>
+            </view>
           </view>
         </view>
       </view>
@@ -159,7 +167,7 @@
         </view>
         <view class="btn-text-wrap">
           <text class="btn-main-text">{{ cooldownRemain > 0 ? '冷却中' : '来一根' }}</text>
-          <text class="btn-sub-text">{{ cooldownRemain > 0 ? cooldownStr : '假装点一根 · 不伤肺不花钱' }}</text>
+          <text class="btn-sub-text">{{ cooldownRemain > 0 ? cooldownStr : '只是一场模拟 · 不会真的抽烟' }}</text>
         </view>
       </button>
     </view>
@@ -203,6 +211,9 @@ export default {
       quotaTotal: 5,
       effectiveQuota: 5,
       adRewardRemain: 10,
+      adQuotaPerAd: AdManager.REWARD_QUOTA_PER_AD,   // 看一次广告给几根（广告模块统一定义）
+      adEnabled: false,    // 没开通流量主时为 false，广告入口全部隐藏
+      canBoost: false,     // 上一根是否还能通过看广告翻倍
       quotaPercent: 0,
       // 已抽根数的语义色由 computed quotaLevel 实时算（避免 dev HMR 漏赋值）
       // Hero 副标题：已熬过多少小时
@@ -255,13 +266,9 @@ export default {
     // 初始化广告
     AdManager.initRewardedAd()
     AdManager.initInterstitialAd()
-    
-    // 每日首次打开插屏广告
-    if (AdManager.checkDailyFirstOpen()) {
-      setTimeout(() => {
-        AdManager.showInterstitialAd('app_open')
-      }, 3000)
-    }
+    // 这里原本有「每日首次打开 3 秒后弹插屏」，已移除：
+    // 小程序没有开屏广告这种形态（那是 App 才有的），
+    // 而且新用户第一次进来就被广告糊脸，留存和合规都不划算
   },
 
   onUnload() {
@@ -328,6 +335,10 @@ export default {
       // 直接给「还能抽几根」，不让用户自己算 quota − smoked
       this.quotaRemain = Math.max(0, effectiveSafe - smokedSafe)
       this.adRewardRemain = AdManager.getRewardRemain()
+      this.adEnabled = AdManager.isAdEnabled()
+      // 「上一根翻倍」只在有记录、且这根还没翻倍、且今天还有广告次数时才出现
+      const lastRecord = Store.getHistory()[0]
+      this.canBoost = this.adEnabled && !!lastRecord && !lastRecord.boosted && this.adRewardRemain > 0
       this.quotaPercent = effectiveSafe > 0 ? Math.min(smokedSafe / effectiveSafe, 1) * 100 : 0
       // quotaLevel 改由 computed 算，避免 dev HMR 时 data 字段未及时赋值
       this.badgesCount = Store.getBadgeList().filter(b => b.unlocked).length
@@ -512,11 +523,28 @@ export default {
       AdManager.showRewardedAd('quota').then(success => {
         if (success) {
           this.adWatching = false
-          Store.addExtraQuota()
+          // 一次给几根由广告模块统一定义，避免这里和展示文案写两个数字
+          Store.addExtraQuota(AdManager.REWARD_QUOTA_PER_AD)
           this.refreshData()
         } else {
           this.adWatching = false
         }
+      }).catch(() => {
+        this.adWatching = false
+      })
+    },
+
+    // 看广告让「上一根」的金额翻倍（同一根只能翻一次）
+    watchAdBoost() {
+      if (this.adWatching) return
+      this.adWatching = true
+      AdManager.showRewardedAd('boost').then(success => {
+        this.adWatching = false
+        if (!success) return
+        if (Store.boostLastSmoke()) {
+          uni.showToast({ title: '上一根已 ×2', icon: 'none' })
+        }
+        this.refreshData()
       }).catch(() => {
         this.adWatching = false
       })
@@ -541,7 +569,7 @@ export default {
 
 .main-scroll {
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 /* 至今已花卡片 */
@@ -778,7 +806,8 @@ export default {
   bottom: calc(140rpx + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   padding: 16rpx 40rpx 0;
-  background: linear-gradient(to top, #0f0f0f 40%, transparent);
+  /* 底部渐隐要跟着主题背景走，否则薄荷/极光主题下会露出一条灰边 */
+  background: linear-gradient(to top, var(--bg) 40%, transparent);
 }
 
 .btn-have-one {
@@ -789,9 +818,11 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 20rpx;
-  color: white;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #c0392b 100%);
-  box-shadow: 0 12rpx 40rpx rgba(238, 90, 36, 0.35);
+  /* 底色只是比主色深一档（偏中亮），所以文字用深色的主题背景色，对比度才够 */
+  color: var(--bg);
+  /* 用主题主色的加深版：换主题会跟着变，但比亮主色沉一档，不抢眼 */
+  background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary-2-deep) 55%, var(--primary-deep) 100%);
+  box-shadow: 0 12rpx 40rpx var(--glow);
   border: none;
   position: relative;
   overflow: hidden;
@@ -800,7 +831,7 @@ export default {
 
 .btn-have-one:active {
   transform: scale(0.97);
-  box-shadow: 0 6rpx 20rpx rgba(238, 90, 36, 0.25);
+  box-shadow: 0 6rpx 20rpx var(--glow);
 }
 
 .btn-have-one[disabled] {
@@ -810,12 +841,12 @@ export default {
 /* 闪烁动画 */
 @keyframes btnFlash {
   0%, 100% { 
-    box-shadow: 0 12rpx 40rpx rgba(238, 90, 36, 0.35);
+    box-shadow: 0 12rpx 40rpx var(--glow);
     filter: brightness(1);
     transform: scale(1);
   }
   50% { 
-    box-shadow: 0 16rpx 50rpx rgba(238, 90, 36, 0.6), 0 0 30rpx rgba(255, 200, 100, 0.4);
+    box-shadow: 0 16rpx 50rpx var(--glow), 0 0 30rpx var(--glow);
     filter: brightness(1.15);
     transform: scale(1.02);
   }
@@ -905,7 +936,7 @@ export default {
 .mt-4 { margin-top: 8rpx; }
 .mt-8 { margin-top: 16rpx; }
 .opacity-80 { opacity: 0.8; }
-.text-gray-100 { color: #f3f4f6; }
+.text-gray-100 { color: var(--text); }
 .text-gray-300 { color: #d1d5db; }
 .text-gray-500 { color: #6b7280; }
 .text-gray-600 { color: #4b5563; }
@@ -1027,6 +1058,34 @@ export default {
 }
 
 .ad-quota-text {
+  font-size: 22rpx;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 今日还剩几次：让用户知道这是个有限资源，也能预期点了还有没有 */
+.ad-quota-remain {
+  font-size: 20rpx;
+  color: var(--text-dim);
+}
+
+/* 上一根翻倍 */
+.boost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: var(--glow);
+  border: 1px solid var(--glow);
+}
+
+.boost-btn-icon {
+  font-size: 24rpx;
+}
+
+.boost-btn-text {
   font-size: 22rpx;
   color: var(--primary);
   font-weight: 600;

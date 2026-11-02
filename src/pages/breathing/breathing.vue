@@ -159,13 +159,13 @@ export default {
 
 .back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .page-title {
   font-size: 44rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .main-content {
@@ -188,8 +188,10 @@ export default {
   width: 400rpx;
   height: 400rpx;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.05) 100%);
-  border: 4rpx solid rgba(139, 92, 246, 0.3);
+  /* 三个阶段都用主题变量：吸气=主色、屏息=主色+光晕、呼气=副色，
+     换主题时整圈颜色跟着变，不再写死紫/绿/蓝 */
+  background: var(--surface-1);
+  border: 4rpx solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -199,33 +201,34 @@ export default {
 
 .breath-circle.inhale {
   transform: scale(1.3);
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.1) 100%);
-  border-color: rgba(16, 185, 129, 0.5);
+  background: radial-gradient(circle, var(--glow) 0%, transparent 100%);
+  border-color: var(--primary);
 }
 
 .breath-circle.hold {
   transform: scale(1.3);
-  background: radial-gradient(circle, var(--glow) 0%, var(--glow) 100%);
-  border-color: var(--glow);
+  background: radial-gradient(circle, var(--glow) 0%, transparent 100%);
+  border-color: var(--primary-2);
+  box-shadow: 0 0 60rpx var(--glow);
 }
 
 .breath-circle.exhale {
   transform: scale(1);
-  background: radial-gradient(circle, rgba(96, 165, 250, 0.3) 0%, rgba(96, 165, 250, 0.1) 100%);
-  border-color: rgba(96, 165, 250, 0.5);
+  background: radial-gradient(circle, var(--surface-2) 0%, transparent 100%);
+  border-color: var(--accent);
 }
 
 .breath-text {
   font-size: 40rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 16rpx;
 }
 
 .breath-timer {
   font-size: 64rpx;
   font-weight: bold;
-  color: #8b5cf6;
+  color: var(--primary);
 }
 
 .controls {
@@ -238,15 +241,15 @@ export default {
   font-size: 32rpx;
   font-weight: 600;
   border: none;
-  color: white;
+  color: var(--bg);
 }
 
 .start-btn {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
 }
 
 .stop-btn {
-  background: linear-gradient(135deg, var(--danger-1) 0%, var(--primary-2) 100%);
+  background: linear-gradient(135deg, var(--danger-1) 0%, var(--danger-2) 100%);
 }
 
 .start-btn:active, .stop-btn:active {
@@ -264,7 +267,7 @@ export default {
 .info-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
   display: block;
   margin-bottom: 24rpx;
 }
@@ -286,8 +289,8 @@ export default {
   width: 48rpx;
   height: 48rpx;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.2);
-  color: #8b5cf6;
+  background: var(--glow);
+  color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;

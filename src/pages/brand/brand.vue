@@ -226,7 +226,7 @@ export default {
 
 .skin-badge-name {
   font-size: 18rpx;
-  color: #f3f4f6;
+  color: var(--text);
   font-weight: 500;
 }
 

@@ -109,6 +109,7 @@
           <text class="form-label">想说什么？（可选）</text>
           <textarea class="form-textarea" v-model="newMood.note"
             placeholder="记录此刻的想法..." maxlength="200"></textarea>
+          <text class="local-only-tip">仅保存在本机，不会上传或公开</text>
         </view>
 
         <view class="modal-actions">
@@ -124,6 +125,7 @@
 import Store from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
+import { guardContent } from '@/utils/content-check.js'
 
 const MOOD_OPTIONS = [
   { id: 'happy', name: '开心', emoji: '😊' },
@@ -189,6 +191,8 @@ export default {
     },
 
     saveMood() {
+      // 用户自由输入的备注要过一遍合规检查
+      if (!guardContent(this.newMood.note)) return
       Store.addMood({
         mood: this.newMood.mood,
         smoked: this.newMood.smoked,
@@ -252,18 +256,18 @@ export default {
 
 .back-icon {
   font-size: 48rpx;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .page-title {
   font-size: 44rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .main-scroll {
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 .stats-card {
@@ -276,7 +280,7 @@ export default {
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
   margin-bottom: 24rpx;
   display: block;
 }
@@ -318,13 +322,13 @@ export default {
   width: 100%;
   padding: 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
   border: none;
-  color: white;
+  color: var(--bg);
 }
 
 .record-btn:active {
@@ -416,19 +420,20 @@ export default {
 .history-mood {
   font-size: 28rpx;
   font-weight: 600;
-  color: #f3f4f6;
+  color: var(--text);
 }
 
 .history-tag {
   font-size: 20rpx;
   padding: 4rpx 12rpx;
   border-radius: 8rpx;
-  background: rgba(239, 68, 68, 0.2);
+  /* --danger-1 各主题都是 #ff6b6b，底色用同色系半透明保持一致 */
+  background: rgba(255, 107, 107, 0.2);
   color: var(--danger-1);
 }
 
 .history-tag.clean {
-  background: rgba(16, 185, 129, 0.2);
+  background: var(--glow);
   color: var(--primary);
 }
 
@@ -476,7 +481,7 @@ export default {
 .modal-title {
   font-size: 36rpx;
   font-weight: bold;
-  color: #f3f4f6;
+  color: var(--text);
   display: block;
   text-align: center;
   margin-bottom: 32rpx;
@@ -513,8 +518,8 @@ export default {
 }
 
 .mood-option.active {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+  background: var(--glow);
+  border-color: var(--primary);
 }
 
 .mood-option-emoji {
@@ -527,7 +532,7 @@ export default {
 }
 
 .mood-option.active .mood-option-name {
-  color: #8b5cf6;
+  color: var(--primary);
 }
 
 .smoke-toggle {
@@ -549,9 +554,9 @@ export default {
 }
 
 .smoke-option.active {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
-  color: #8b5cf6;
+  background: var(--glow);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .form-textarea {
@@ -587,11 +592,19 @@ export default {
 }
 
 .modal-btn.confirm {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  color: var(--bg);
 }
 
 .modal-btn:active {
   transform: scale(0.97);
+}
+
+.local-only-tip {
+  font-size: 20rpx;
+  color: var(--text-dim);
+  opacity: 0.7;
+  display: block;
+  margin-top: 12rpx;
 }
 </style>

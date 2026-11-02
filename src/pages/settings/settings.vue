@@ -81,6 +81,15 @@
           </view>
         </view>
 
+        <!-- 协议入口（小程序审核要求：必须有隐私政策/用户协议入口） -->
+        <view style="margin-top: 64rpx;">
+          <text class="section-title mb-16 block">关于</text>
+          <view class="setting-row" @click="goToPrivacy">
+            <text class="text-sm text-gray-300">隐私政策与用户协议</text>
+            <text class="text-gray-600">›</text>
+          </view>
+        </view>
+
         <!-- 关于 -->
         <view class="about-section">
           <text class="text-xs text-gray-600 text-center block">就抽一根 v1.0</text>
@@ -186,6 +195,10 @@ export default {
 
     goToTestSmoke() {
       uni.navigateTo({ url: '/pages/test-smoke-svg/test-smoke-svg' })
+    },
+
+    goToPrivacy() {
+      uni.navigateTo({ url: '/pages/privacy/privacy' })
     }
   }
 }
@@ -203,7 +216,7 @@ export default {
 
 .main-scroll {
   flex: 1;
-  height: 100%;
+  min-height: 0;
 }
 
 .setting-row {
