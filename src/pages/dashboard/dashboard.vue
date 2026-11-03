@@ -47,17 +47,17 @@
               <text class="record-label">最长连续(天)</text>
             </view>
             <view class="record-item">
-              <text class="record-icon">💰</text>
+              <text class="record-icon">💸</text>
               <text class="record-value">¥{{ totalSaved }}</text>
               <text class="record-label">累计已花</text>
             </view>
             <view class="record-item">
-              <text class="record-icon">📉</text>
+              <text class="record-icon">🪶</text>
               <text class="record-value">{{ leastDay }}</text>
               <text class="record-label">最少一天(根)</text>
             </view>
             <view class="record-item">
-              <text class="record-icon">📊</text>
+              <text class="record-icon">🚬</text>
               <text class="record-value">{{ totalSmoked }}</text>
               <text class="record-label">总吸烟(根)</text>
             </view>

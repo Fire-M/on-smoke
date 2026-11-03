@@ -133,7 +133,7 @@
         <view class="card mx-20 mb-16 p-20">
           <text class="card-title mb-16 block">情绪洞察</text>
           <view class="insight-item">
-            <text class="insight-icon">📊</text>
+            <text class="insight-icon">💭</text>
             <view class="insight-content">
               <text class="insight-text">总共记录了 <text class="highlight">{{ totalMoods }}</text> 次情绪</text>
             </view>
@@ -145,7 +145,7 @@
             </view>
           </view>
           <view class="insight-item">
-            <text class="insight-icon">✨</text>
+            <text class="insight-icon">🌿</text>
             <view class="insight-content">
               <text class="insight-text">不吸烟时记录 <text class="highlight">{{ nonSmokingMoods }}</text> 次</text>
             </view>
@@ -266,7 +266,7 @@
             </view>
             <view class="smoke-option" :class="{ active: !newMood.smoked }"
               @tap="newMood.smoked = false">
-              <text>✨ 没有吸烟</text>
+              <text>🌿 没有吸烟</text>
             </view>
           </view>
         </view>
