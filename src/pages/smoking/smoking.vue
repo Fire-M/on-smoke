@@ -1983,33 +1983,6 @@ export default {
   overflow: hidden;
 }
 
-/* 返回按钮 */
-.smoke-back-btn {
-  position: absolute;
-  top: 80rpx;
-  left: 40rpx;
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-  z-index: 100;
-}
-
-.smoke-back-btn:active {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(0.92);
-}
-
-.smoke-back-icon {
-  font-size: 48rpx;
-  color: var(--text);
-}
-
 /* 肺部承受力可视化 */
 .lung-container {
   position: absolute;

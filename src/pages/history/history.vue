@@ -1,7 +1,7 @@
 <template>
   <view class="page-container" :class="themeClass()">
     <app-navbar title="吸烟记录"></app-navbar>
-    <scroll-view scroll-y class="main-scroll">
+    <scroll-view scroll-y class="main-scroll" @scrolltolower="loadMore">
       <view class="p-20 pb-100">
 
         <!-- 统计切换 -->
@@ -33,7 +33,7 @@
 
         <!-- 记录列表 -->
         <view class="record-list">
-          <view v-for="(record, index) in filteredRecords" :key="record.id" class="record-item card">
+          <view v-for="(record, index) in visibleRecords" :key="record.id" class="record-item card">
             <view class="record-index">{{ filteredRecords.length - index }}</view>
             <view class="record-left">
               <text class="record-icon">🚬</text>
@@ -50,6 +50,11 @@
               <text class="text-xs text-gray-600">{{ formatRelativeTime(record.timestamp) }}</text>
             </view>
           </view>
+        </view>
+
+        <!-- 分页：记录多时先渲染一屏，滚到底再追加 -->
+        <view class="list-more" v-if="hasMore">
+          <text class="list-more-text">已显示 {{ visibleRecords.length }} / {{ filteredRecords.length }} 条 · 上滑加载更多</text>
         </view>
 
         <!-- 空状态 -->
@@ -70,6 +75,9 @@ import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
+// 每次多渲染多少条记录
+const PAGE_SIZE = 40
+
 export default {
   components: { CustomTabbar, AppNavbar },
   data() {
@@ -79,7 +87,19 @@ export default {
       filteredRecords: [],
       summaryCount: 0,
       totalDuration: 0,
-      avgDuration: 0
+      avgDuration: 0,
+      // 已渲染条数：记录可能上百条，全量渲染时滚动会明显掉帧
+      visibleCount: PAGE_SIZE
+    }
+  },
+
+  computed: {
+    visibleRecords() {
+      return this.filteredRecords.slice(0, this.visibleCount)
+    },
+
+    hasMore() {
+      return this.filteredRecords.length > this.visibleCount
     }
   },
 
@@ -94,7 +114,15 @@ export default {
       this.filterRecords()
     },
 
+    // 滚动到底部时追加一屏
+    loadMore() {
+      if (!this.hasMore) return
+      this.visibleCount += PAGE_SIZE
+    },
+
     filterRecords() {
+      // 换筛选条件后回到第一屏
+      this.visibleCount = PAGE_SIZE
       const now = Date.now()
       let start = 0
       if (this.tabRange === 'day') {
@@ -361,5 +389,17 @@ export default {
   background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
   border: 1px solid var(--border); 
   border-radius: 24rpx;
+}
+
+/* 分页提示 */
+.list-more {
+  display: flex;
+  justify-content: center;
+  padding: 32rpx 0 8rpx;
+}
+
+.list-more-text {
+  font-size: 22rpx;
+  color: var(--border);
 }
 </style>

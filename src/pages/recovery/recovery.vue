@@ -223,33 +223,6 @@ export default {
   margin-bottom: 16rpx;
 }
 
-.recovery-back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.recovery-back-btn-placeholder {
-  width: 64rpx;
-  height: 64rpx;
-}
-
-.recovery-back-btn:active {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(0.92);
-}
-
-.recovery-back-icon {
-  font-size: 48rpx;
-  color: var(--text);
-}
-
 .recovery-title {
   font-size: 44rpx;
   font-weight: bold;

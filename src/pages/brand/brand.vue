@@ -5,39 +5,39 @@
     <scroll-view scroll-y class="brand-scroll">
       <view class="brand-header">
         <text class="brand-header-sub">挑一包解解馋 · 全是假的</text>
+        <text class="brand-header-count">{{ brands.length }} 款</text>
       </view>
 
       <view class="brand-grid">
-        <view v-for="(brand, index) in brands" :key="brand.id"
-          class="brand-card" :class="['theme-' + brand.theme, { 'has-skin': activeSkin && settings.selectedBrand === brand.id, 'selected': brand.id === settings.selectedBrand }]"
-          :style="[brand.id === settings.selectedBrand && activeSkin ? { borderColor: 'var(--primary)', boxShadow: '0 8rpx 24rpx rgba(0,0,0,0.4), 0 0 20rpx var(--glow)' } : {}, { animationDelay: index * 0.06 + 's' }]"
+        <view v-for="brand in brands" :key="brand.id"
+          class="brand-card" :class="['theme-' + brand.theme, { selected: brand.id === settings.selectedBrand }]"
           @click="selectBrand(brand)">
-          <!-- 皮肤徽章 -->
-          <view class="skin-badge" v-if="brand.id === settings.selectedBrand && activeSkin">
-            <text class="skin-badge-emoji">{{ activeSkin.icon }}</text>
-            <text class="skin-badge-name">{{ activeSkin.name }}</text>
+          <view class="pack-top">
+            <view class="pack-price-row">
+              <text class="pack-price">¥{{ brand.price }}</text>
+              <text class="pack-skin" v-if="brand.id === settings.selectedBrand && activeSkin">{{ activeSkin.icon }}</text>
+            </view>
+            <text class="pack-stock">{{ brand.remaining }}/{{ brand.packSize }}</text>
           </view>
-          <!-- 已选标记 -->
-          <view class="selected-badge" v-if="brand.id === settings.selectedBrand">
-            <text class="selected-badge-text">✓ 已选</text>
+
+          <!-- 顶盖折线：真烟盒上盖与盒身的分界，排在价签之下 -->
+          <view class="pack-hinge"></view>
+
+          <!-- 剩余量：盒里还剩多少，比数字更快看懂 -->
+          <view class="pack-gauge">
+            <view class="pack-gauge-fill" :style="{ width: gaugeWidth(brand) }"></view>
           </view>
-          <view class="brand-card-top">
-            <text class="brand-price">¥{{ brand.price }}</text>
-            <view class="brand-seal"></view>
+
+          <view class="pack-name">
+            <text class="pack-name-cn">{{ brand.cn }}</text>
+            <text class="pack-name-en">{{ brand.en }}</text>
           </view>
-          <view class="brand-card-center">
-            <text class="brand-name-cn">{{ brand.cn }}</text>
-            <text class="brand-name-en">{{ brand.en }}</text>
+
+          <!-- 警示条：真烟盒上最占面积的一块，这里换成品牌自己的邪门口味 -->
+          <view class="pack-warning">
+            <text class="pack-tag">{{ brand.tag }}</text>
+            <text class="pack-quote">{{ brand.quote }}</text>
           </view>
-          <view class="brand-card-bottom">
-            <text class="brand-tag">{{ brand.tag }}</text>
-            <text class="brand-quote">"{{ brand.quote }}"</text>
-          </view>
-          <!-- 剩余根数 -->
-          <view class="brand-remaining">
-            <text class="brand-remaining-num">{{ brand.remaining }}/{{ brand.packSize }}</text>
-          </view>
-          <view class="brand-card-shine"></view>
         </view>
       </view>
 
@@ -61,7 +61,9 @@ export default {
     return {
       brands: [],
       settings: { selectedBrand: null },
-      activeSkin: null
+      activeSkin: null,
+      // 上一次列表数据的指纹，用来判断要不要重建数组
+      listSignature: ''
     }
   },
 
@@ -72,23 +74,42 @@ export default {
 
     // 品牌数据与「每包支数」统一取自 Store.BRANDS，
     // 避免分母用全局设置、分子用品牌口径，出现「剩余 15 / 总数 10」。
-    this.brands = Store.BRANDS.map(brand => ({
+    // 包状态一次批量取出：逐品牌各读一次 storage 会在进出页面时明显拖慢。
+    const packStates = Store.getAllPackStates()
+    const list = Store.BRANDS.map(brand => ({
       ...brand,
-      packSize: Store.getPackSize(brand.id),
-      remaining: Store.getPackRemaining(brand.id)
+      ...(packStates[brand.id] || {})
     }))
+
+    // 只有剩余支数真变了才换数组。以前每次 onShow 都新建一遍，
+    // 从详情页返回时 12 张卡会整体重建重绘，切换品牌看着像卡了一下。
+    const signature = list.map(b => `${b.id}:${b.packSize}:${b.remaining}`).join('|')
+    if (signature !== this.listSignature) {
+      this.listSignature = signature
+      this.brands = list
+    }
   },
 
   methods: {
-    selectBrand(brand) {
-      // 保存品牌选择
-      const settings = Store.getSettings()
-      settings.selectedBrand = brand.id
-      Store.saveSettings(settings)
+    // 剩余量条宽度：按包内剩余支数算，包大小为 0 时不画（避免除零得到 NaN）
+    gaugeWidth(brand) {
+      const total = Number(brand.packSize) || 0
+      const left = Number(brand.remaining) || 0
+      if (total <= 0) return '0%'
+      return Math.max(0, Math.min(100, (left / total) * 100)) + '%'
+    },
 
-      // 跳转到烟盒详情页
+    selectBrand(brand) {
+      const brandId = brand.id
+      // 先跳转、后落存储：setStorageSync 是同步调用，放在跳转前会把转场动画推迟，
+      // 手感就是「点下去先顿一下，页面才动」。详情页不依赖 selectedBrand，所以能挪。
       uni.navigateTo({
-        url: `/pages/pack-detail/pack-detail?brandId=${brand.id}`
+        url: `/pages/pack-detail/pack-detail?brandId=${brandId}`,
+        complete: () => {
+          const settings = Store.getSettings()
+          settings.selectedBrand = brandId
+          Store.saveSettings(settings)
+        }
       })
     }
   }
@@ -115,122 +136,173 @@ export default {
 }
 
 .brand-header {
-  padding: 40rpx 12rpx 28rpx;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 44rpx 14rpx 30rpx;
 }
 
 .brand-header-sub {
-  display: block;
-  font-size: 24rpx;
+  font-size: 26rpx;
+  letter-spacing: 1rpx;
   color: var(--text-dim);
-  margin-top: 8rpx;
+}
+
+.brand-header-count {
+  font-size: 22rpx;
+  color: var(--border);
 }
 
 .brand-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
+  gap: 24rpx;
 }
 
-/* 品牌卡片 */
+/* 烟盒卡片：照真烟盒的版式排 —— 顶盖折线、价签、盒面正中品牌名、底部警示条 */
 .brand-card {
   position: relative;
-  border-radius: 28rpx;
-  padding: 28rpx 20rpx 24rpx;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-  min-height: 380rpx;
   display: flex;
   flex-direction: column;
-  animation: cardFadeIn 0.4s ease-out both;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 
-    0 8rpx 24rpx rgba(0, 0, 0, 0.4),
-    0 2rpx 8rpx rgba(0, 0, 0, 0.3),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
-  transform: perspective(1000px) rotateX(0deg) rotateY(0deg);
-}
-
-.brand-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 40%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-.brand-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  background: linear-gradient(0deg, rgba(0,0,0,0.3) 0%, transparent 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* 卡片光泽效果 */
-.brand-card-shine {
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent 40%,
-    rgba(255, 255, 255, 0.05) 45%,
-    rgba(255, 255, 255, 0.08) 50%,
-    rgba(255, 255, 255, 0.05) 55%,
-    transparent 60%
-  );
-  pointer-events: none;
-  transform: rotate(0deg);
-  transition: all 0.5s ease;
+  min-height: 404rpx;
+  padding: 32rpx 26rpx 28rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(240, 230, 210, 0.10);
+  /* 阴影收窄一档：12 张卡同时带大范围模糊阴影，滚动时会一直重绘 */
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
 .brand-card:active {
-  transform: perspective(1000px) scale(0.95) rotateX(5deg);
-  box-shadow: 
-    0 4rpx 12rpx rgba(0, 0, 0, 0.5),
-    0 1rpx 4rpx rgba(0, 0, 0, 0.4),
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.15);
-  filter: brightness(1.2);
+  transform: scale(0.97);
 }
 
-.brand-card:active .brand-card-shine {
-  transform: rotate(15deg) translate(10%, 10%);
+/* 顶盖折线：烟盒上盖和盒身的那道缝。
+   跟着文档流走（负边距撑满卡宽），不再用固定 top，
+   否则字号一变就会压到下面的量条上 */
+.pack-hinge {
+  height: 1rpx;
+  margin: 14rpx -26rpx 0;
+  background: rgba(240, 230, 210, 0.10);
+  box-shadow: 0 1rpx 0 rgba(0, 0, 0, 0.28);
+  pointer-events: none;
 }
 
-/* 皮肤徽章 */
-.skin-badge {
-  position: absolute;
-  bottom: 12rpx;
-  right: 12rpx;
-  z-index: 10;
+/* 顶部一排：价签 + 剩余支数 */
+.pack-top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.pack-price-row {
+  display: flex;
+  align-items: baseline;
   gap: 6rpx;
-  padding: 6rpx 14rpx;
-  background: rgba(0, 0, 0, 0.6);
+}
+
+.pack-price {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #f0e6d2;
+  letter-spacing: 1rpx;
+}
+
+/* 选中那包挂着的皮肤 */
+.pack-skin {
+  font-size: 20rpx;
+  line-height: 1;
+}
+
+.pack-stock {
+  font-size: 20rpx;
+  color: rgba(240, 230, 210, 0.55);
+}
+
+/* 剩余量条 */
+.pack-gauge {
+  height: 4rpx;
+  margin-top: 12rpx;
   border-radius: 999rpx;
-  backdrop-filter: blur(8rpx);
+  background: rgba(240, 230, 210, 0.12);
+  overflow: hidden;
 }
 
-.skin-badge-emoji {
-  font-size: 22rpx;
+.pack-gauge-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(240, 230, 210, 0.6);
+  transition: width 0.3s ease;
 }
 
-.skin-badge-name {
-  font-size: 18rpx;
-  color: var(--text);
+/* 盒面正中 */
+.pack-name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28rpx 0 32rpx;
+}
+
+.pack-name-cn {
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #f0e6d2;
+  letter-spacing: 8rpx;
+  line-height: 1.2;
+  /* 名字一律单行：胖达666 这种 5 个字符的名字再大就会挤出卡片 */
+  white-space: nowrap;
+}
+
+.pack-name-en {
+  margin-top: 10rpx;
+  font-size: 19rpx;
   font-weight: 500;
+  letter-spacing: 5rpx;
+  color: rgba(240, 230, 210, 0.5);
+}
+
+/* 警示条：一道墨线把盒面和底部印字分开 */
+.pack-warning {
+  padding-top: 18rpx;
+  border-top: 1rpx solid rgba(240, 230, 210, 0.12);
+  text-align: center;
+}
+
+.pack-tag {
+  display: block;
+  font-size: 23rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: rgba(240, 230, 210, 0.88);
+}
+
+.pack-quote {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 19rpx;
+  line-height: 1.4;
+  color: rgba(240, 230, 210, 0.52);
+  font-style: italic;
+}
+
+/* 已选：只留边框变色 + 左侧一道琥珀边条，不再叠两个徽章 */
+.brand-card.selected {
+  border-color: var(--primary);
+}
+
+.brand-card.selected::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5rpx;
+  background: var(--primary);
+  pointer-events: none;
 }
 
 /* 卡片主题渐变 */
@@ -240,144 +312,12 @@ export default {
 .brand-card.theme-gold   { background: linear-gradient(155deg, #8b6914 0%, #5a4510 100%); }
 .brand-card.theme-lightblue { background: linear-gradient(155deg, #2d5a6e 0%, #1a3d4f 100%); }
 .brand-card.theme-purple { background: linear-gradient(155deg, #4a2d6e 0%, #2d1a45 100%); }
-
-/* 卡片顶部：价格 + 印章 */
-.brand-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16rpx;
-}
-
-.brand-price {
-  font-size: 26rpx;
-  color: rgba(240, 230, 210, 0.6);
-  font-weight: 600;
-}
-
-/* 圆形印章 */
-.brand-seal {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 50%;
-  border: 3rpx solid rgba(240, 230, 210, 0.3);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.15);
-}
-
-.brand-seal::after {
-  content: '';
-  width: 18rpx;
-  height: 18rpx;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(240,230,210,0.45) 0%, rgba(240,230,210,0.08) 100%);
-}
-
-/* 卡片中心：品牌名 */
-.brand-card-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 12rpx 0;
-}
-
-.brand-name-cn {
-  font-size: 52rpx;
-  font-weight: 800;
-  color: #f0e6d2;
-  letter-spacing: 6rpx;
-  text-align: center;
-  line-height: 1.2;
-  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.3);
-}
-
-.brand-name-en {
-  font-size: 20rpx;
-  font-weight: 500;
-  color: rgba(240, 230, 210, 0.55);
-  letter-spacing: 4rpx;
-  text-align: center;
-  margin-top: 6rpx;
-}
-
-/* 卡片底部：描述 */
-.brand-card-bottom {
-  padding-top: 16rpx;
-  text-align: center;
-  border-top: 1px solid rgba(240, 230, 210, 0.08);
-}
-
-.brand-tag {
-  display: block;
-  font-size: 22rpx;
-  font-weight: 600;
-  color: rgba(240, 230, 210, 0.85);
-  letter-spacing: 1rpx;
-}
-
-.brand-quote {
-  display: block;
-  font-size: 18rpx;
-  color: rgba(240, 230, 210, 0.4);
-  margin-top: 6rpx;
-  font-style: italic;
-  line-height: 1.3;
-}
-
-/* 剩余根数 */
-.brand-remaining {
-  position: absolute;
-  top: 14rpx;
-  right: 80rpx;
-  z-index: 10;
-}
-
-.brand-remaining-num {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-/* 已选标记 */
-.selected-badge {
-  position: absolute;
-  bottom: 12rpx;
-  left: 12rpx;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  padding: 4rpx 14rpx;
-  background: var(--primary);
-  border-radius: 999rpx;
-}
-
-.selected-badge-text {
-  font-size: 18rpx;
-  color: #1a1a1a;
-  font-weight: 700;
-}
-
-.brand-card.selected {
-  border-color: var(--primary);
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 18rpx var(--glow);
-}
-
-/* 卡片入场动画 */
-@keyframes cardFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(30rpx) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+.brand-card.theme-green  { background: linear-gradient(155deg, #264f36 0%, #10261a 100%); }
+.brand-card.theme-pink   { background: linear-gradient(155deg, #7d3554 0%, #401727 100%); }
+.brand-card.theme-brown  { background: linear-gradient(155deg, #6d4b2b 0%, #3b2716 100%); }
+.brand-card.theme-magenta { background: linear-gradient(155deg, #711f60 0%, #3b1032 100%); }
+.brand-card.theme-silver { background: linear-gradient(155deg, #5f646a 0%, #34393e 100%); }
+.brand-card.theme-navy   { background: linear-gradient(155deg, #24345f 0%, #121b3a 100%); }
 
 /* 底部声明 */
 .disclaimer {

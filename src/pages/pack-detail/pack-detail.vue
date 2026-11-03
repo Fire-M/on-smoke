@@ -4,7 +4,7 @@
 
     <!-- 烟盒展示区 -->
     <view class="box-area">
-      <view class="box-scene">
+      <view class="box-scene" v-if="sceneReady">
         <view class="box-wrapper" :style="wrapperStyle"
           @touchstart="onDragStart" @touchmove.prevent="onDragMove" @touchend="onDragEnd">
           <view class="box-ground-shadow"></view>
@@ -44,8 +44,8 @@
                 <text class="box-brand-en">{{ brand.en }}</text>
               </view>
             </view>
-            <!-- 内壁 -->
-            <view class="box-interior">
+            <!-- 内壁：只有开盖后才看得见，否则白占 6 层渐变 -->
+            <view class="box-interior" v-if="lidOpen">
               <view class="box-interior-face box-interior-back"></view>
               <view class="box-interior-face box-interior-left"></view>
               <view class="box-interior-face box-interior-right"></view>
@@ -74,11 +74,7 @@
                     :key="face.index"
                     class="box-cig-face"
                     :style="face.style"
-                  >
-                    <view class="bcf-filter"></view>
-                    <view class="bcf-paper"></view>
-                    <view class="bcf-ring"></view>
-                  </view>
+                  ></view>
                   <view class="box-cig-cap-top"></view>
                   <view class="box-cig-cap-bottom"></view>
                 </view>
@@ -149,7 +145,12 @@ export default {
       adWatching: false,   // 广告播放中，防连点
       isPulling: false,
       activeIndex: null,
-      faceCount: 24
+      // 3D 烟盒（多层渐变 + preserve-3d）首帧很贵，等页面先画出底色再挂载
+      sceneReady: false,
+      // 烟支是多边形柱体，面数直接决定渲染节点量：
+      // 原来 24 面、每个面再套 3 个图层，20 根烟就是 24×4×20 ≈ 1900 个节点，开盖瞬间明显掉帧；
+      // 12 面（每面用多重背景合成滤嘴/纸身）后降到约 280 个，这个尺寸下也看不出棱角
+      faceCount: 12
     }
   },
 
@@ -206,10 +207,20 @@ export default {
   onLoad(options) {
     const brandId = options.brandId || 'lanhe'
     this.brand = findBrand(brandId)
-    this.brand.packSize = Store.getPackSize(this.brand.id)
-    // 从持久化存储读取包剩余（跨天不重置）
-    this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+    // refreshPack 里已经读了每包支数和剩余支数，这里不再重复读一遍
+    // （每次读取都是一次同步 storage 调用，进页面时会累加到首帧时间上）
     this.refreshPack()
+  },
+
+  onReady() {
+    // 首帧画完（导航栏、底色、广告条）后再把 3D 烟盒挂上去。
+    // 页面转场时新页面要立刻出一帧，如果这一帧就在合成 3D 层，
+    // 看起来就是「点卡片 → 白屏一下 → 盒子出现」。
+    // 120ms ≈ 转场动画过半：这时页面底色和导航栏已经画出来了，
+    // 再把 3D 层的栅格化压在动画尾段，比首帧就合成整块 3D 顺很多
+    this.$nextTick(() => {
+      setTimeout(() => { this.sceneReady = true }, 120)
+    })
   },
 
   onUnload() {
@@ -434,6 +445,13 @@ page {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  /* 延后挂载后补一个极短淡入，避免盒子「啪」地跳出来 */
+  animation: sceneIn 0.2s ease-out both;
+}
+
+@keyframes sceneIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 .box-wrapper {
@@ -867,10 +885,12 @@ page {
   bottom: -24px;
   left: 50%;
   transform: translateX(-50%);
-  width: 240px;
-  height: 30px;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 40%, transparent 70%);
-  filter: blur(12px);
+  width: 260px;
+  height: 34px;
+  /* 原来还叠了 filter: blur(12px)，但径向渐变本身就是柔的；
+     模糊滤镜在 webview 里是首屏最贵的一步，进页面的转场动画会被它拖慢 */
+  background: radial-gradient(ellipse at center,
+    rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 45%, transparent 72%);
   z-index: -1;
 }
 
@@ -943,6 +963,72 @@ page {
 #pack-detail.theme-purple .box-top,
 #pack-detail.theme-purple .box-bottom { background: linear-gradient(180deg, #0d0614 0%, #1a0e28 100%); }
 #pack-detail.theme-purple .box-lid-under { background: linear-gradient(180deg, #2d1a45 0%, #0d0614 100%); }
+
+#pack-detail.theme-green .box-front,
+#pack-detail.theme-green .box-back,
+#pack-detail.theme-green .box-lid {
+  background: linear-gradient(180deg, #264f36 0%, #10261a 100%);
+}
+#pack-detail.theme-green .box-left { background: linear-gradient(90deg, #10261a 0%, #1d3f2a 100%); }
+#pack-detail.theme-green .box-right { background: linear-gradient(270deg, #10261a 0%, #1d3f2a 100%); }
+#pack-detail.theme-green .box-top,
+#pack-detail.theme-green .box-bottom { background: linear-gradient(180deg, #08130d 0%, #10261a 100%); }
+#pack-detail.theme-green .box-lid-under { background: linear-gradient(180deg, #1d3f2a 0%, #08130d 100%); }
+
+#pack-detail.theme-pink .box-front,
+#pack-detail.theme-pink .box-back,
+#pack-detail.theme-pink .box-lid {
+  background: linear-gradient(180deg, #7d3554 0%, #401727 100%);
+}
+#pack-detail.theme-pink .box-left { background: linear-gradient(90deg, #401727 0%, #5e2440 100%); }
+#pack-detail.theme-pink .box-right { background: linear-gradient(270deg, #401727 0%, #5e2440 100%); }
+#pack-detail.theme-pink .box-top,
+#pack-detail.theme-pink .box-bottom { background: linear-gradient(180deg, #210a13 0%, #401727 100%); }
+#pack-detail.theme-pink .box-lid-under { background: linear-gradient(180deg, #5e2440 0%, #210a13 100%); }
+
+#pack-detail.theme-brown .box-front,
+#pack-detail.theme-brown .box-back,
+#pack-detail.theme-brown .box-lid {
+  background: linear-gradient(180deg, #6d4b2b 0%, #3b2716 100%);
+}
+#pack-detail.theme-brown .box-left { background: linear-gradient(90deg, #3b2716 0%, #553a1f 100%); }
+#pack-detail.theme-brown .box-right { background: linear-gradient(270deg, #3b2716 0%, #553a1f 100%); }
+#pack-detail.theme-brown .box-top,
+#pack-detail.theme-brown .box-bottom { background: linear-gradient(180deg, #1c1209 0%, #3b2716 100%); }
+#pack-detail.theme-brown .box-lid-under { background: linear-gradient(180deg, #553a1f 0%, #1c1209 100%); }
+
+#pack-detail.theme-magenta .box-front,
+#pack-detail.theme-magenta .box-back,
+#pack-detail.theme-magenta .box-lid {
+  background: linear-gradient(180deg, #711f60 0%, #3b1032 100%);
+}
+#pack-detail.theme-magenta .box-left { background: linear-gradient(90deg, #3b1032 0%, #541747 100%); }
+#pack-detail.theme-magenta .box-right { background: linear-gradient(270deg, #3b1032 0%, #541747 100%); }
+#pack-detail.theme-magenta .box-top,
+#pack-detail.theme-magenta .box-bottom { background: linear-gradient(180deg, #1e0819 0%, #3b1032 100%); }
+#pack-detail.theme-magenta .box-lid-under { background: linear-gradient(180deg, #541747 0%, #1e0819 100%); }
+
+#pack-detail.theme-silver .box-front,
+#pack-detail.theme-silver .box-back,
+#pack-detail.theme-silver .box-lid {
+  background: linear-gradient(180deg, #5f646a 0%, #34393e 100%);
+}
+#pack-detail.theme-silver .box-left { background: linear-gradient(90deg, #2a2f33 0%, #474c51 100%); }
+#pack-detail.theme-silver .box-right { background: linear-gradient(270deg, #2a2f33 0%, #474c51 100%); }
+#pack-detail.theme-silver .box-top,
+#pack-detail.theme-silver .box-bottom { background: linear-gradient(180deg, #1b1f22 0%, #2a2f33 100%); }
+#pack-detail.theme-silver .box-lid-under { background: linear-gradient(180deg, #474c51 0%, #1b1f22 100%); }
+
+#pack-detail.theme-navy .box-front,
+#pack-detail.theme-navy .box-back,
+#pack-detail.theme-navy .box-lid {
+  background: linear-gradient(180deg, #24345f 0%, #121b3a 100%);
+}
+#pack-detail.theme-navy .box-left { background: linear-gradient(90deg, #121b3a 0%, #1b2750 100%); }
+#pack-detail.theme-navy .box-right { background: linear-gradient(270deg, #121b3a 0%, #1b2750 100%); }
+#pack-detail.theme-navy .box-top,
+#pack-detail.theme-navy .box-bottom { background: linear-gradient(180deg, #080c1c 0%, #121b3a 100%); }
+#pack-detail.theme-navy .box-lid-under { background: linear-gradient(180deg, #1b2750 0%, #080c1c 100%); }
 
 /* 内壁容器 */
 .box-interior {
@@ -1119,37 +1205,25 @@ page {
   height: 100%;
   transform-origin: center center;
   backface-visibility: hidden;
-}
-
-.box-cig-face .bcf-filter {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: calc(var(--box-h) * var(--box-cig-filter-ratio));
-  background: linear-gradient(90deg,
-    #a07840 0%, #b88850 15%, #d2a86c 35%, #e0b878 50%,
-    #d2a86c 65%, #b88850 85%, #a07840 100%);
-}
-
-.box-cig-face .bcf-paper {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: calc(var(--box-cig-total-h) - var(--box-h) * var(--box-cig-filter-ratio));
-  background: linear-gradient(90deg,
-    #b8b0a0 0%, #d8d0c0 15%, #efe9df 35%, #f5f0e8 50%,
-    #efe9df 65%, #d8d0c0 85%, #b8b0a0 100%);
-}
-
-.box-cig-face .bcf-ring {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  top: calc(var(--box-h) * var(--box-cig-filter-ratio));
-  background: linear-gradient(180deg, #b8884a 0%, #d4a86a 50%, #8a6430 100%);
+  /* 滤嘴 / 纸身 / 接缝线合成在一张面上：
+     原来这三是三个独立子节点，20 根烟就是几百个多余节点，开盖时明显卡 */
+  background-image:
+    linear-gradient(180deg, #b8884a 0%, #d4a86a 50%, #8a6430 100%),
+    linear-gradient(90deg,
+      #a07840 0%, #b88850 15%, #d2a86c 35%, #e0b878 50%,
+      #d2a86c 65%, #b88850 85%, #a07840 100%),
+    linear-gradient(90deg,
+      #b8b0a0 0%, #d8d0c0 15%, #efe9df 35%, #f5f0e8 50%,
+      #efe9df 65%, #d8d0c0 85%, #b8b0a0 100%);
+  background-repeat: no-repeat;
+  background-size:
+    100% 2px,
+    100% calc(var(--box-h) * var(--box-cig-filter-ratio)),
+    100% calc(var(--box-cig-total-h) - var(--box-h) * var(--box-cig-filter-ratio));
+  background-position:
+    0 calc(var(--box-h) * var(--box-cig-filter-ratio)),
+    0 0,
+    0 calc(var(--box-h) * var(--box-cig-filter-ratio));
 }
 
 .box-cig-cap-top {
@@ -1223,11 +1297,5 @@ page {
   50%      { transform: translate(-50%, -8px); }
 }
 
-@keyframes btnPulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--glow); }
-  50% { box-shadow: 0 0 0 16px transparent; }
-}
-#btn-have-one {
-  animation: btnPulse 2.5s ease-in-out infinite;
-}
+
 </style>

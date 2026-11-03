@@ -50,7 +50,14 @@ export const BRANDS = [
   { id: 'heiye', cn: '胖达666', en: 'PANDA666', price: 100, theme: 'black', tag: '顶配·都是心理味', quote: '国宝都戒了你还抽？', packSize: 20 },
   { id: 'jinsi', cn: '羊驼', en: 'LLAMA', price: 22, theme: 'gold', tag: '粗犷·沙漠风', quote: '沙漠来的，跟任何真品牌都没关系', packSize: 20 },
   { id: 'qingyun', cn: '冰河', en: 'ICE·RIVER', price: 35, theme: 'lightblue', tag: '薄荷冰爆·脑瓜疼', quote: '爆珠一捏，感觉良好', packSize: 20 },
-  { id: 'zimeng', cn: '紫雾', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 }
+  { id: 'zimeng', cn: '紫雾', en: 'PURPLE', price: 45, theme: 'purple', tag: '淡雅·朕的味道', quote: '烟盒比烟好看', packSize: 20 },
+  // 后续品牌按价格从低到高排，方便在列表里一眼看出「便宜的解馋，贵的装腔」
+  { id: 'qingping', cn: '青萍', en: 'QING·PING', price: 26, theme: 'green', tag: '雨后青草·纯想象', quote: '闻着像公园，抽着像后悔', packSize: 20 },
+  { id: 'naitang', cn: '奶糖', en: 'NAI·TANG', price: 30, theme: 'pink', tag: '甜腻·童年味', quote: '小时候偷抽的那根，原来是甜的', packSize: 20 },
+  { id: 'jiuxiang', cn: '旧巷', en: 'JIU·XIANG', price: 36, theme: 'brown', tag: '潮湿·回忆味', quote: '巷子口的那根烟，早熄了', packSize: 20 },
+  { id: 'nihong', cn: '霓虹', en: 'NI·HONG', price: 48, theme: 'magenta', tag: '深夜·电子味', quote: '闪一整晚，天亮就空', packSize: 20 },
+  { id: 'baige', cn: '白鸽', en: 'BAI·GE', price: 58, theme: 'silver', tag: '轻盈·广场味', quote: '放它走吧，也放自己一马', packSize: 20 },
+  { id: 'shenhai', cn: '深海', en: 'SHEN·HAI', price: 78, theme: 'navy', tag: '幽暗·压力味', quote: '越深越贵，越贵越深', packSize: 20 }
 ]
 
 // 取品牌每包支数（未命中时回落到用户设置的 packSize）
@@ -148,17 +155,51 @@ function _diffDays(a, b) {
   return Math.floor((db.getTime() - da.getTime()) / 86400000)
 }
 
+// 读缓存：只在 withReadCache() 的同步执行期间生效。
+// 一次刷新里 settings / stats / history 会被七八个函数各读一遍，
+// 每次都是一次同步 storage 调用 + JSON.parse，缓存能把这一批压成一次。
+let _readCache = null
+
 function _read(key, fallback) {
+  if (_readCache && Object.prototype.hasOwnProperty.call(_readCache, key)) {
+    const cached = _readCache[key]
+    const value = cached === undefined ? fallback : cached
+    // 复制一层容器再返回：调用方拿到的数组/对象仍是自己的，
+    // 避免某处就地修改后影响同一次刷新里的其它读取
+    if (Array.isArray(value)) return value.slice()
+    if (value && typeof value === 'object') return { ...value }
+    return value
+  }
+  let value = fallback
   try {
     const raw = uni.getStorageSync(key)
-    return raw ? JSON.parse(raw) : fallback
+    value = raw ? JSON.parse(raw) : fallback
   } catch (e) {
-    return fallback
+    value = fallback
   }
+  if (_readCache) _readCache[key] = value
+  return value
 }
 
 function _write(key, data) {
+  // 写之前先失效，避免同一次刷新里读到写之前的旧值
+  if (_readCache) delete _readCache[key]
   uni.setStorageSync(key, JSON.stringify(data))
+}
+
+/**
+ * 在给定的同步函数内复用 storage 读取结果。
+ * 只应该包「读多写少」的整段逻辑（例如首页 refreshData），
+ * 不要包住用户操作，否则写之后又读的场景容易拿到旧值。
+ */
+export function withReadCache(fn) {
+  const prev = _readCache
+  _readCache = {}
+  try {
+    return fn()
+  } finally {
+    _readCache = prev
+  }
 }
 
 // ---- 设置 ----
@@ -389,6 +430,21 @@ export function getPackRemaining(brandId) {
   const data = _read(KEYS.packRemaining, {})
   if (data[brandId] != null) return Math.max(0, data[brandId])
   return getPackSize(brandId)
+}
+
+// 一次性取出所有品牌的「每包支数 / 剩余支数」。
+// 列表页原来对每个品牌各调一次 getPackSize + getPackRemaining，
+// 12 个品牌就是 24 次同步 storage 读取，进出页面时会有可感的停顿。
+export function getAllPackStates() {
+  const settings = getSettings()
+  const remainMap = _read(KEYS.packRemaining, {})
+  const states = {}
+  BRANDS.forEach(brand => {
+    const size = brand.packSize || settings.packSize || 20
+    const left = remainMap[brand.id] != null ? Math.max(0, remainMap[brand.id]) : size
+    states[brand.id] = { packSize: size, remaining: left }
+  })
+  return states
 }
 
 export function savePackRemaining(brandId, count) {
@@ -638,12 +694,24 @@ export function buildBadgeStats() {
 // 按当前数据自动解锁符合条件的勋章，返回本次新解锁的列表
 export function syncBadges() {
   const stats = buildBadgeStats()
+  // 一次读出全部解锁状态再统一判定：
+  // 原来对每个勋章都调 unlockBadge()，而它每次都 getStorageSync + JSON.parse，
+  // 23 枚勋章就是 23 次同步存储读取，每次进成就页都要白付这笔开销
+  const unlocked = getUnlockedBadges()
   const newly = []
+  let changed = false
   BADGE_LIST.forEach(b => {
     let ok = false
     try { ok = !!b.condition(stats) } catch (e) { ok = false }
-    if (ok && unlockBadge(b.id)) newly.push(b)
+    if (ok && !unlocked[b.id]) {
+      unlocked[b.id] = true
+      unlocked[b.id + '_time'] = Date.now()
+      newly.push(b)
+      changed = true
+    }
   })
+  // 只有真的解锁了新勋章才写一次
+  if (changed) saveUnlockedBadges(unlocked)
   return newly
 }
 
@@ -1576,13 +1644,13 @@ export default {
   getBrandSmokedCount, getBrandRemaining,
   getBrandPackSize, getBrandPricePerCig, getRecordPrice, getRecordSaved,
   boostLastSmoke,
-  getPackSize, getPackRemaining, savePackRemaining, refillPack,
+  getPackSize, getPackRemaining, getAllPackStates, savePackRemaining, refillPack,
   getPacksCompleted, getTotalPacksCompleted, completePackAndRefill,
   settleDailySavings, getTodaySaved,
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   BADGE_LIST, getBadgeList, syncBadges, buildBadgeStats,
-  migrateIfNeeded, recomputeSavedFromHistory,
+  migrateIfNeeded, recomputeSavedFromHistory, withReadCache,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   getCravings, addCraving, getCravingStats,
   getResists, recordResist, getResistStats, getResistPrice, getAutoResistPrice,

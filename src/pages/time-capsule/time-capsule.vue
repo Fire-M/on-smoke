@@ -65,9 +65,6 @@ export default {
 .page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
-.back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
-.back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: var(--text); }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
 .main-scroll { flex: 1; height: 0; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }

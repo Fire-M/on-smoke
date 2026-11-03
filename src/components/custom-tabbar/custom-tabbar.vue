@@ -77,12 +77,10 @@ export default {
   user-select: none;
 }
 
-.custom-tabbar view,
-.custom-tabbar text,
-.custom-tabbar image {
-  -webkit-tap-highlight-color: transparent;
-  outline: none;
-}
+/* 说明：小程序组件 wxss 不支持标签选择器（view/text/image），
+   原来这里用 .custom-tabbar view 批量关掉点击高亮，规则会被整条忽略。
+   -webkit-tap-highlight-color 本身会继承，根节点上已经设过；
+   outline 由 .tabbar-item 自己负责，所以这里不需要再写。 */
 
 .tabbar-inner {
   display: flex;

@@ -122,10 +122,8 @@ export default {
     }
   },
 
-  onLoad() {
-    this.loadBadges()
-  },
-
+  // 首次进入时 onShow 一定会跟在 onLoad 之后，两个都调等于把
+  // 「省钱结算 + 23 枚勋章判定」跑两遍，进页面直接多花一倍时间
   onShow() {
     this.loadBadges()
   },
@@ -180,33 +178,6 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20rpx;
-}
-
-.ach-back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.ach-back-btn-placeholder {
-  width: 64rpx;
-  height: 64rpx;
-}
-
-.ach-back-btn:active {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(0.92);
-}
-
-.ach-back-icon {
-  font-size: 48rpx;
-  color: var(--text);
 }
 
 .ach-title {
@@ -363,14 +334,14 @@ export default {
   margin-bottom: 16rpx;
 }
 
+/* 未解锁只压透明度：原来叠了 filter: grayscale(100%)，
+   几十个徽章在滚动时每个都要走一遍滤镜，是这页滚动卡顿的主要来源 */
 .badge-icon {
   font-size: 64rpx;
-  filter: grayscale(100%);
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 .badge-card.unlocked .badge-icon {
-  filter: grayscale(0%);
   opacity: 1;
 }
 

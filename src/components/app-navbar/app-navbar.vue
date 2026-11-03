@@ -1,8 +1,8 @@
 <template>
   <view class="app-navbar" :style="navStyle">
     <view class="app-navbar__row" :style="rowStyle">
-      <view class="app-navbar__back" v-if="back" @click="onBack">
-        <text class="app-navbar__back-icon">‹</text>
+      <view class="app-navbar__back" v-if="back" @click="onBack" hover-class="app-navbar__back--pressed" :hover-stay-time="80">
+        <view class="app-navbar__chevron"></view>
       </view>
       <view class="app-navbar__title" :style="titleStyle">
         <text class="app-navbar__title-text">{{ title }}</text>
@@ -26,8 +26,7 @@ export default {
     return {
       statusBarHeight: 20,
       navBarHeight: 44,
-      capsuleWidth: 87,
-      capsuleLeft: 0
+      capsuleWidth: 0
     }
   },
   computed: {
@@ -68,46 +67,50 @@ export default {
         uni.switchTab({ url: '/pages/index/index' })
       }
     },
-    initMetrics() {
-      let statusBar = 20
-      let menu = null
-      try {
-        const sys = uni.getSystemInfoSync()
-        statusBar = sys.statusBarHeight || 20
-        // 仅微信小程序有胶囊按钮，可获取精确位置用于对齐
-        // #ifdef MP-WEIXIN
-        menu = uni.getMenuButtonBoundingClientRect()
-        // #endif
-      } catch (e) {}
-      if (menu && menu.height) {
-        const gap = menu.top - statusBar
-        this.statusBarHeight = statusBar
-        this.navBarHeight = gap * 2 + menu.height
-        this.capsuleWidth = menu.width
-        this.capsuleLeft = menu.left
-        this.screenRight = sysSafeRight()
-      } else {
-        // H5 / App / 非微信：无胶囊，使用默认导航高度
-        this.statusBarHeight = statusBar || 20
-        this.navBarHeight = 44
-        this.capsuleWidth = 0
-        this.capsuleLeft = 0
-      }
-    }
   },
   created() {
-    this.screenRight = 0
-    this.initMetrics()
+    const metrics = resolveMetrics()
+    this.statusBarHeight = metrics.statusBarHeight
+    this.navBarHeight = metrics.navBarHeight
+    this.capsuleWidth = metrics.capsuleWidth
   }
 }
 
-function sysSafeRight() {
+// 状态栏高度和胶囊位置在整个 App 生命周期内不会变，模块级缓存一份。
+// 原来每个页面 created 都会调两次同步的 getSystemInfoSync（initMetrics + sysSafeRight），
+// 页面转场时这些同步桥调用会直接吃掉首帧时间。
+let navbarMetrics = null
+
+function resolveMetrics() {
+  if (navbarMetrics) return navbarMetrics
+
+  let statusBar = 20
+  let menu = null
   try {
     const sys = uni.getSystemInfoSync()
-    return sys.windowWidth || 375
-  } catch (e) {
-    return 375
+    statusBar = sys.statusBarHeight || 20
+    // 仅微信小程序有胶囊按钮，可获取精确位置用于对齐
+    // #ifdef MP-WEIXIN
+    menu = uni.getMenuButtonBoundingClientRect()
+    // #endif
+  } catch (e) {}
+
+  if (menu && menu.height) {
+    const gap = menu.top - statusBar
+    navbarMetrics = {
+      statusBarHeight: statusBar,
+      navBarHeight: gap * 2 + menu.height,
+      capsuleWidth: menu.width
+    }
+  } else {
+    // H5 / App / 非微信：无胶囊，使用默认导航高度
+    navbarMetrics = {
+      statusBarHeight: statusBar || 20,
+      navBarHeight: 44,
+      capsuleWidth: 0
+    }
   }
+  return navbarMetrics
 }
 </script>
 
@@ -127,20 +130,35 @@ function sysSafeRight() {
   padding: 0 16rpx;
   box-sizing: border-box;
 }
+/* 返回：72rpx 圆形点击区（约 36px，接近平台建议的 44px 触控尺寸），
+   箭头用边框画，跨端字形一致，也不会随字体粗细变糊 */
 .app-navbar__back {
-  width: 64rpx;
-  height: 100%;
+  width: 72rpx;
+  height: 72rpx;
+  /* 抵消一部分行内边距，让箭头视觉上仍贴着内容左边距 */
+  margin-left: -6rpx;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-shrink: 0;
+  border-radius: 50%;
   position: relative;
   z-index: 2;
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
-.app-navbar__back-icon {
-  font-size: 56rpx;
-  color: #e5e7eb;
-  line-height: 1;
+.app-navbar__back:active,
+.app-navbar__back--pressed {
+  background-color: rgba(255, 255, 255, 0.06);
+  transform: scale(0.94);
+}
+.app-navbar__chevron {
+  width: 22rpx;
+  height: 22rpx;
+  margin-top: -4rpx;
+  border-right: 3rpx solid var(--text);
+  border-bottom: 3rpx solid var(--text);
+  /* 右+下边框转 135° 就是左向箭头；比单个 ‹ 字形更稳、更居中 */
+  transform: rotate(135deg);
 }
 .app-navbar__title {
   position: absolute;

@@ -151,27 +151,6 @@ export default {
   justify-content: space-between;
 }
 
-.back-btn {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.back-btn-placeholder {
-  width: 64rpx;
-  height: 64rpx;
-}
-
-.back-icon {
-  font-size: 48rpx;
-  color: var(--text);
-}
-
 .page-title {
   font-size: 44rpx;
   font-weight: bold;

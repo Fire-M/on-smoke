@@ -116,10 +116,14 @@ export default {
   height: 340px;
   overflow: hidden;
 }
+/* #ifdef H5 */
+/* three.js 生成的 canvas 是运行时插入的，只能靠标签选择器命中；
+   小程序组件 wxss 不允许标签选择器，所以只在 H5 编译这段 */
 .pet-3d-container canvas {
   display: block;
   margin: 0 auto;
 }
+/* #endif */
 .pet-2d-canvas {
   width: 100%;
   height: 320px;

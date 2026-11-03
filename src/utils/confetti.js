@@ -36,7 +36,7 @@ function randomInRange(min, max) {
   return Math.random() * (max - min) + min
 }
 
-export function createConfetti(canvas, ctx, width, height) {
+export function createConfetti(canvas, ctx, width, height, onIdle) {
   let particles = []
   let rafId = null
   let size = { width: width || 0, height: height || 0 }
@@ -125,8 +125,14 @@ export function createConfetti(canvas, ctx, width, height) {
     }
     particles = alive
 
-    if (particles.length) loop()
-    else ctx.clearRect(0, 0, size.width, size.height)
+    if (particles.length) {
+      loop()
+    } else {
+      ctx.clearRect(0, 0, size.width, size.height)
+      // 这一炮放完了：通知页面把全屏 canvas 藏起来。
+      // 常驻的全屏 canvas 会让滚动时多一层合成，隐藏后就没这块开销了。
+      if (onIdle) onIdle()
+    }
   }
 
   function draw(p) {

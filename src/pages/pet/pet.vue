@@ -221,9 +221,6 @@ export default {
 }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
-.back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
-.back-btn-placeholder { width: 64rpx; height: 64rpx; }
-.back-icon { font-size: 48rpx; color: var(--text); }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
 .pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
 /* 统一：flex 列里的 scroll-view 必须拿到确定高度，height:0 + flex:1 是跨端最稳的写法 */

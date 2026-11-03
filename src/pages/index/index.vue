@@ -219,7 +219,7 @@
          用 Canvas 2D 跑 canvas-confetti 的物理模型（粒子自带初速度 / 重力 / 寿命），
          比 CSS keyframes 自然；粒子自己消亡，不用 v-for 维护 DOM 节点。
          canvas 常驻但 pointer-events:none，空粒子时是透明的，不挡操作。 -->
-    <canvas type="2d" id="confetti-canvas" class="confetti-canvas"></canvas>
+    <canvas type="2d" id="confetti-canvas" class="confetti-canvas" :class="{ 'is-active': confettiActive }"></canvas>
 
     <!-- 改「忍住一根算省多少」：入口就是页面上那个 +¥ 金额，不占设置页的位置 -->
     <view class="modal-mask" v-if="showPriceEditor" @click="closePriceEditor">
@@ -315,6 +315,7 @@ export default {
       showGoalEditor: false,
       goalEdit: { name: '', target: '' },
       resistHit: false,        // 按下反馈
+      confettiActive: false,   // 撒花画布是否显示（无粒子时隐藏，省一层合成）
       resistFloatVisible: false,// 「+¥x」上浮动画
       resistFloatText: '',
       resistLock: false,       // 防连点（400ms）
@@ -414,10 +415,12 @@ export default {
   },
 
   methods: {
-    // 30 秒轮询：用于跨零点刷新、挑战/里程碑状态跟进
+    // 60 秒轮询：用于跨零点刷新、挑战/里程碑状态跟进。
+    // 原来是 30s，但每次 refreshData 都是整页字段重算 + setData，
+    // 滚动过程中正好撞上就是一次可感的掉帧；60s 对跨天对齐没有任何影响。
     startPolling() {
       if (this.midnightTimer) return   // 已在跑就别重复起
-      this.midnightTimer = setInterval(() => this.refreshData(), 30000)
+      this.midnightTimer = setInterval(() => this.refreshData(), 60000)
     },
 
     stopPolling() {
@@ -430,6 +433,13 @@ export default {
     },
 
     refreshData() {
+      // 一次刷新会调十几个 Store 函数，settings / stats / history 被反复读，
+      // 每次都是一次同步 storage 调用 + JSON.parse。整段包进读缓存后，
+      // 同一份数据只解析一次，回首页的 onShow 能从 60ms 降到几十毫秒以内。
+      return Store.withReadCache(() => this._refreshData())
+    },
+
+    _refreshData() {
       const settings = Store.getSettings()
       const today = Store.getToday()
 
@@ -689,7 +699,11 @@ export default {
 
             this._confettiCanvas = canvas
             this._confettiCtx = ctx
-            this._confetti = createConfetti(canvas, ctx, width, height)
+            // 一炮放完（粒子全部消亡）就把画布藏起来：全屏 canvas 常驻时，
+            // 滚动过程中会多合成一层，安卓上尤其明显
+            this._confetti = createConfetti(canvas, ctx, width, height, () => {
+              this.confettiActive = false
+            })
           })
       }
       run()
@@ -766,6 +780,7 @@ export default {
       ]
       // 只放一波：一个炮口、一帧点火。
       // spread 是总张角：55° = 左右各 27.5°，束形收窄成一股，冲得更高
+      this.confettiActive = true
       this._confetti.fire({
         colors,
         particleCount: 120,
@@ -1447,22 +1462,21 @@ export default {
   opacity: 0.5;
 }
 
-/* 闪烁动画 */
-@keyframes btnFlash {
-  0%, 100% { 
-    box-shadow: 0 12rpx 40rpx var(--glow);
-    filter: brightness(1);
-    transform: scale(1);
-  }
-  50% { 
-    box-shadow: 0 16rpx 50rpx var(--glow), 0 0 30rpx var(--glow);
-    filter: brightness(1.15);
-    transform: scale(1.02);
-  }
+/* 呼吸动画：只动 transform，走合成层，不产生重绘。
+   原来每帧都在改 box-shadow 和 filter: brightness —— 阴影是两层大范围模糊，
+   等于首页始终有一块区域在持续重绘，滚动时就会周期性掉帧 */
+@keyframes btnBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
 }
 
 .btn-have-one:not([disabled]) {
-  animation: btnFlash 1.5s ease-in-out infinite;
+  animation: btnBreath 2.4s ease-in-out infinite;
+}
+
+/* 按下时停掉呼吸动画，否则 animation 的 transform 会盖掉 :active 的缩小反馈 */
+.btn-have-one:active {
+  animation: none;
 }
 
 .btn-fire-wrap {
@@ -1626,8 +1640,15 @@ export default {
   width: 100%;
   height: 100%;
   z-index: 180;
+  /* 没有粒子时整层不参与合成（visibility 不影响布局，选择器查询仍能拿到尺寸） */
+  visibility: hidden;
   /* 纯装饰层，绝不能吃掉下面的点击/滚动 */
   pointer-events: none;
+}
+
+/* 只在放花期间显示 */
+.confetti-canvas.is-active {
+  visibility: visible;
 }
 
 /* 工具类 */
