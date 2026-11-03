@@ -29,3 +29,6 @@ npm-debug.log*
 
 # uni-app
 unpackage/
+
+# 本地素材备份（原图/原音频，只留本地，不进仓库也不进包体）
+backup/

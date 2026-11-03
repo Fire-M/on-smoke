@@ -117,27 +117,19 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "抽烟",
-        "iconPath": "static/tab-smoke.png",
-        "selectedIconPath": "static/tab-smoke-active.png"
+        "text": "抽烟"
       },
       {
         "pagePath": "pages/dashboard/dashboard",
-        "text": "看板",
-        "iconPath": "static/tab-dashboard.png",
-        "selectedIconPath": "static/tab-dashboard-active.png"
+        "text": "看板"
       },
       {
         "pagePath": "pages/history/history",
-        "text": "历史",
-        "iconPath": "static/tab-history.png",
-        "selectedIconPath": "static/tab-history-active.png"
+        "text": "历史"
       },
       {
         "pagePath": "pages/settings/settings",
-        "text": "设置",
-        "iconPath": "static/tab-settings.png",
-        "selectedIconPath": "static/tab-settings-active.png"
+        "text": "设置"
       }
     ]
   },
