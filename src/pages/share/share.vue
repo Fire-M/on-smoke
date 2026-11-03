@@ -1,43 +1,38 @@
 <template>
   <view class="page-container" :class="themeClass()">
-    <app-navbar title="分享" :show-back="false"></app-navbar>
+    <!-- 现在是从成就页推进来的普通页面，用默认的自动返回 -->
+    <app-navbar title="晒一张"></app-navbar>
+    <scroll-view scroll-y class="main-scroll">
     <view class="result-content">
-      <text class="result-title">恭喜，你抽了一根寂寞</text>
+      <text class="result-title">这些，都是忍住换来的</text>
 
-      <!-- 四宫格数据卡片 -->
+      <!-- 四宫格：全部是「攒下来」的东西，没有一项是鼓励抽烟的 -->
       <view class="result-grid">
         <view class="result-cell">
-          <text class="result-value">¥{{ resultSaved }}</text>
-          <text class="result-label">这根省下</text>
+          <text class="result-value">¥{{ savedTotal }}</text>
+          <text class="result-label">累计已省</text>
         </view>
         <view class="result-cell">
-          <text class="result-value">{{ resultTar }}</text>
-          <text class="result-label">焦油挡在门外</text>
+          <text class="result-value">{{ resistCount }}</text>
+          <text class="result-label">次忍住不抽</text>
         </view>
         <view class="result-cell">
-          <text class="result-value">{{ resultLifespan }}</text>
-          <text class="result-label">估算延寿</text>
+          <text class="result-value">{{ cleanDays }}</text>
+          <text class="result-label">天坚持下来</text>
         </view>
         <view class="result-cell">
-          <text class="result-value">第 {{ resultCount }} 次</text>
-          <text class="result-label">骗过烟瘾</text>
+          <text class="result-value">{{ badgeCount }}<text class="result-sub">/{{ badgeTotal }}</text></text>
+          <text class="result-label">枚成就徽章</text>
         </view>
       </view>
 
-      <!-- 细节行 -->
-      <text class="result-detail">{{ resultDetail }}</text>
+      <text class="result-detail">{{ detailText }}</text>
 
-      <!-- 解锁进度提示 -->
-      <button class="unlock-btn" v-if="unlockMsg" @click="onUnlockTap">
-        {{ unlockMsg }}
-      </button>
-
-      <!-- 分享按钮 -->
-      <button class="share-btn" @click="shareToFriend">💬 给朋友也递根寂寞</button>
-
-      <!-- 再抽一根 -->
-      <button class="again-btn" @click="smokeAgain">再抽一根 ›</button>
+      <button class="share-btn" @tap="shareToFriend">💬 递给朋友一张</button>
+      <button class="again-btn" @tap="backHome">回首页 ›</button>
+      <view class="scroll-bottom"></view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -50,59 +45,39 @@ export default {
   components: { AppNavbar },
   data() {
     return {
-      brandId: '',
-      remaining: 0,
-      duration: 0,
-      resultSaved: '0.0',
-      resultTar: '-',
-      resultLifespan: '+0',
-      resultCount: 0,
-      resultDetail: '',
-      unlockMsg: ''
+      savedTotal: '0.00',
+      resistCount: 0,
+      cleanDays: 1,
+      badgeCount: 0,
+      badgeTotal: 0,
+      detailText: ''
     }
   },
 
-  onLoad(options) {
-    this.brandId = options.brandId || ''
-    this.remaining = parseInt(options.remaining) || 0
-    this.duration = parseInt(options.duration) || 0
-
-    const settings = Store.getSettings()
-    // 金额口径必须和首页/历史一致：优先取「最近一根」实际入账的钱（含翻倍），
-    // 没有记录时才用设置里的单价兜底。原来固定用 cigarettePrice/packSize，
-    // 跟品牌价算出来的数对不上。
-    const last = Store.getHistory()[0]
-    const pricePerCig = last
-      ? Store.getRecordSaved(last)
-      : (Number(settings.cigarettePrice) || 30) / (Number(settings.packSize) || 20)
-
-    this.resultSaved = pricePerCig.toFixed(1)
-    this.resultTar = '8mg'
-    this.resultLifespan = '+11min'
-    this.resultCount = Store.getStats().totalSmoked
-
-    const m = Math.floor(this.duration / 60)
-    const s = this.duration % 60
-    this.resultDetail = `耗时 ${m} 分 ${s} 秒 · 这包剩 ${this.remaining} 根`
-
-    // 检查解锁
-    this.checkUnlock()
+  onShow() {
+    this.loadData()
   },
 
   methods: {
-    checkUnlock() {
-      // 与首页 / 成就页共用同一份勋章数据，不再本地另算一套
+    loadData() {
+      // 口径全部走 Store，和首页/成就页共用同一份计算
       Store.settleDailySavings()
       Store.syncBadges()
-      const list = Store.getBadgeList()
-      const badges = list.filter(b => b.unlocked).length
-      if (badges > 0) {
-        this.unlockMsg = `已解锁 ${badges}/${list.length} 枚成就徽章`
-      }
-    },
 
-    onUnlockTap() {
-      uni.switchTab({ url: '/pages/index/index' })
+      const resist = Store.getResistStats()
+      const badges = Store.getBadgeList()
+      const today = Store.getToday()
+
+      this.savedTotal = (Number(resist.totalSaved) || 0).toFixed(2)
+      this.resistCount = Number(resist.totalCount) || 0
+      this.cleanDays = Store.getCleanDays() + 1
+      this.badgeCount = badges.filter(b => b.unlocked).length
+      this.badgeTotal = badges.length
+
+      // 今天这一行给的是「今天还在继续」的证据，而不是总数
+      const smoked = Number(today.smokedCount) || 0
+      const todaySaved = (Number(resist.todaySaved) || 0).toFixed(2)
+      this.detailText = `今天：忍住 ${resist.todayCount || 0} 次 · 省下 ¥${todaySaved} · 抽了 ${smoked} 根`
     },
 
     shareToFriend() {
@@ -119,7 +94,7 @@ export default {
       if (navigator.share) {
         navigator.share({
           title: '就抽一根',
-          text: `我在「就抽一根」里模拟了一根，纯娱乐，别当真～`,
+          text: `我在「就抽一根」里忍住了 ${this.resistCount} 次，省下 ¥${this.savedTotal}，纯属娱乐～`,
           url: window.location.href
         }).catch(() => {})
       } else {
@@ -130,14 +105,14 @@ export default {
       // 之前无条件弹「分享成功」属于误导
     },
 
-    smokeAgain() {
+    backHome() {
       uni.switchTab({ url: '/pages/index/index' })
     }
   },
 
   onShareAppMessage() {
     return {
-      title: '就抽一根 - 只是一场模拟，不花钱也不真抽',
+      title: `我忍住了 ${this.resistCount} 次，省下 ¥${this.savedTotal}`,
       path: '/pages/index/index'
     }
   }
@@ -146,7 +121,7 @@ export default {
 
 <style>
 .page-container {
-  min-height: 100vh;
+  height: 100vh;
   width: 100vw;
   background-color: var(--bg);
   color: var(--text);
@@ -154,11 +129,21 @@ export default {
   flex-direction: column;
   align-items: center;
   padding: 0;
+  overflow: hidden;
+}
+
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
+.main-scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  width: 100%;
 }
 
 .result-content {
   width: 100%;
   max-width: 600rpx;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -168,19 +153,20 @@ export default {
 }
 
 .result-title {
-  font-size: 36rpx;
-  color: var(--glow);
-  letter-spacing: 4rpx;
+  font-size: 34rpx;
+  color: var(--primary);
+  letter-spacing: 2rpx;
 }
 
 .result-grid {
   width: 100%;
-  border: 1px solid rgba(55, 65, 81, 0.6);
+  border: 1px solid var(--border);
   border-radius: 24rpx;
   padding: 32rpx;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 32rpx 0;
+  background: var(--surface-1);
 }
 
 .result-cell {
@@ -195,6 +181,13 @@ export default {
   color: var(--primary);
 }
 
+/* 徽章数是「N/M」，分母降一档，别和分子抢 */
+.result-sub {
+  font-size: 26rpx;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
 .result-label {
   display: block;
   font-size: 22rpx;
@@ -206,17 +199,6 @@ export default {
   font-size: 24rpx;
   color: var(--text-dim);
   text-align: center;
-}
-
-.unlock-btn {
-  width: 100%;
-  padding: 28rpx;
-  border-radius: 24rpx;
-  border: 1px solid var(--glow);
-  background: var(--glow);
-  color: var(--glow);
-  font-size: 28rpx;
-  font-weight: 500;
 }
 
 .share-btn {

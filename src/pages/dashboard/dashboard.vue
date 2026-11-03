@@ -17,7 +17,7 @@
             </view>
             <view class="week-stat">
               <text class="week-stat-value">{{ weekSaved }}</text>
-              <text class="week-stat-label">省钱(元)</text>
+              <text class="week-stat-label">花费(元)</text>
             </view>
             <view class="week-stat">
               <text class="week-stat-value">{{ weekAvg }}</text>
@@ -49,7 +49,7 @@
             <view class="record-item">
               <text class="record-icon">💰</text>
               <text class="record-value">¥{{ totalSaved }}</text>
-              <text class="record-label">累计省钱</text>
+              <text class="record-label">累计已花</text>
             </view>
             <view class="record-item">
               <text class="record-icon">📉</text>
@@ -339,9 +339,10 @@ export default {
 }
 
 .main-scroll {
-  /* 只吃剩余空间：同时写 flex:1 和 height:100% 会让滚动区比可视区高出一个导航栏，
-     底部那段内容就永远滚不到。min-height:0 保证能正确收缩。 */
+  /* 只吃剩余空间：height:0 + flex:1 让 scroll-view 在各端都拿到确定高度，
+     同时写 height:100% 会让滚动区比可视区高出一个导航栏，底部内容永远滚不到 */
   flex: 1;
+  height: 0;
   min-height: 0;
 }
 

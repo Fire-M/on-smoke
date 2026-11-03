@@ -11,13 +11,6 @@
           <button class="history-tab" :class="{ active: tabRange === 'month' }" @click="setTab('month')">本月</button>
         </view>
 
-        <!-- 分享卡片入口（share 页之前没有任何入口，属于死页面） -->
-        <view class="share-entry" v-if="allRecords.length > 0" @click="goShare">
-          <text class="share-entry-icon">📤</text>
-          <text class="share-entry-text">生成最近一根的分享卡片</text>
-          <text class="share-entry-arrow">›</text>
-        </view>
-
         <!-- 统计摘要 -->
         <view class="summary-card" v-if="summaryCount > 0">
           <view class="summary-row">
@@ -99,17 +92,6 @@ export default {
     setTab(range) {
       this.tabRange = range
       this.filterRecords()
-    },
-
-    // 跳到分享页，把最近一根的品牌/时长/剩余带过去
-    goShare() {
-      const last = this.allRecords[0]
-      if (!last) return
-      const brandId = last.brandId || ''
-      const remaining = brandId ? Store.getBrandRemaining(brandId) : 0
-      uni.navigateTo({
-        url: `/pages/share/share?brandId=${brandId}&duration=${last.duration || 0}&remaining=${remaining}`
-      })
     },
 
     filterRecords() {
@@ -204,8 +186,10 @@ export default {
   flex-direction: column;
 }
 
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
 .main-scroll {
   flex: 1;
+  height: 0;
   min-height: 0;
 }
 
@@ -214,32 +198,6 @@ export default {
   justify-content: center;
   gap: 16rpx;
   margin-bottom: 32rpx;
-}
-
-.share-entry {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 22rpx 28rpx;
-  margin-bottom: 24rpx;
-  border-radius: 20rpx;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-}
-.share-entry:active {
-  background: var(--surface-2);
-}
-.share-entry-icon {
-  font-size: 26rpx;
-}
-.share-entry-text {
-  flex: 1;
-  font-size: 26rpx;
-  color: var(--text);
-}
-.share-entry-arrow {
-  font-size: 28rpx;
-  color: var(--text-dim);
 }
 
 .history-tab {
@@ -387,7 +345,8 @@ export default {
 }
 
 .p-20 { padding: 40rpx; }
-.pb-100 { padding-bottom: 200rpx; }
+/* 底部要留出自定义 tabBar（100rpx）+ 安全区，否则最后一条记录会被挡住 */
+.pb-100 { padding-bottom: calc(220rpx + env(safe-area-inset-bottom, 0px)); }
 .mt-8 { margin-top: 16rpx; }
 .text-xs { font-size: 24rpx; }
 .text-sm { font-size: 28rpx; }

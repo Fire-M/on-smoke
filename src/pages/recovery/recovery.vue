@@ -30,6 +30,24 @@
 
     <!-- 时间线 -->
     <scroll-view scroll-y class="timeline-scroll">
+      <!-- 戒烟收益：原来单独有一个「健康计算」页，讲的是同一套恢复里程碑。
+           并到这里，数字和下面的时间轴一起读，不用来回跳 -->
+      <view class="benefit-card">
+        <view class="benefit-item">
+          <text class="benefit-label">估算延长寿命</text>
+          <text class="benefit-value highlight">+{{ lifeGained }} 天</text>
+        </view>
+        <view class="benefit-item">
+          <text class="benefit-label">已节省金钱</text>
+          <text class="benefit-value">¥{{ savedMoney }}</text>
+        </view>
+        <view class="benefit-item">
+          <text class="benefit-label">少吸香烟</text>
+          <text class="benefit-value">{{ cigarettesAvoided }} 根</text>
+        </view>
+        <text class="benefit-note">按「每根折寿约 11 分钟」粗估，仅供自娱自乐</text>
+      </view>
+
       <view class="timeline-note">
         <text class="timeline-note-text">
           以下时间轴整理自公开资料中的常见结论，个体差异很大，仅供鼓励与参考，不构成医学建议。
@@ -93,7 +111,11 @@ export default {
       milestones: [],
       currentMilestone: { title: '加载中...', desc: '', label: '' },
       nextMilestone: null,
-      currentProgress: 0
+      currentProgress: 0,
+      // 戒烟收益（原「健康计算」页的三项）
+      lifeGained: 0,
+      savedMoney: '0.0',
+      cigarettesAvoided: 0
     }
   },
 
@@ -108,6 +130,12 @@ export default {
       // 这页还显示「已恢复 30 天」，两个页面互相打架。
       const diffSeconds = Store.getSmokeFreeDuration()
       const diffDays = Math.floor(diffSeconds / 86400)
+
+      // 戒烟收益：口径统一走 Store，页面自己再算一遍会跟成就页/首页对不上
+      Store.settleDailySavings()
+      this.cigarettesAvoided = Store.getLessSmoked()
+      this.lifeGained = Math.floor((this.cigarettesAvoided * 11) / 60 / 24)
+      this.savedMoney = Store.getSavedMoney().toFixed(1)
 
       // 「第 N 天」是坚持天数（从戒烟日开始算，与首页一致），和无烟时长不是一回事
       this.quitDays = Store.getCleanDays() + 1
@@ -323,8 +351,11 @@ export default {
 }
 
 /* 时间线 */
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
 .timeline-scroll {
   flex: 1;
+  height: 0;
+  min-height: 0;
   padding: 0 28rpx;
 }
 
@@ -461,6 +492,50 @@ export default {
   color: var(--text-dim);
   display: block;
   line-height: 1.5;
+}
+
+/* 戒烟收益（原健康计算页） */
+.benefit-card {
+  margin: 0 12rpx 24rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 24rpx;
+}
+
+.benefit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14rpx 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.benefit-item:last-of-type {
+  border-bottom: none;
+}
+
+.benefit-label {
+  font-size: 26rpx;
+  color: var(--text-dim);
+}
+
+.benefit-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.benefit-value.highlight {
+  color: var(--primary);
+}
+
+.benefit-note {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 20rpx;
+  color: var(--text-dim);
+  opacity: 0.8;
 }
 
 .timeline-note {

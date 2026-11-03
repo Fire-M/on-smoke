@@ -112,6 +112,12 @@ page {
   background-color: var(--bg) !important;
 }
 
+/* 滚动区底部统一留白：子页面滚到底时的间距，带上 iPhone 的底部安全区。
+   页面里不要再手写 style="height: 80rpx"。 */
+.scroll-bottom {
+  height: calc(80rpx + env(safe-area-inset-bottom, 0px));
+}
+
 /* 琥珀强调色类跟随主题主色 */
 .text-amber { color: var(--primary) !important; }
 .bg-amber { background-color: var(--primary) !important; }

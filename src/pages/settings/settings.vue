@@ -161,7 +161,7 @@ export default {
       this.settings.packSize = e.detail.value
     },
 
-    // 戒烟前每天抽多少。只用于健康计算器里的「少抽的根数」，
+    // 戒烟前每天抽多少。只用于恢复时间轴页里的「少吸的根数」，
     // 不参与省钱计算（省钱是「假抽一根省一根」的逐根累加）
     onOriginalInput(e) {
       this.settings.dailyOriginal = e.detail.value
@@ -225,8 +225,10 @@ export default {
   flex-direction: column;
 }
 
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
 .main-scroll {
   flex: 1;
+  height: 0;
   min-height: 0;
 }
 
@@ -356,7 +358,8 @@ export default {
 .mb-16 { margin-bottom: 32rpx; }
 
 .p-20 { padding: 40rpx; }
-.pb-100 { padding-bottom: 200rpx; }
+/* 底部要留出自定义 tabBar（100rpx）+ 安全区，否则最后一项设置会被挡住 */
+.pb-100 { padding-bottom: calc(220rpx + env(safe-area-inset-bottom, 0px)); }
 .mb-4 { margin-bottom: 32rpx; }
 .mt-4 { margin-top: 8rpx; }
 .text-xs { font-size: 24rpx; }

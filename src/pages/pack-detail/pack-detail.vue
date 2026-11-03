@@ -348,6 +348,8 @@ export default {
 .box-area {
   position: relative;
   flex: 1;
+  /* 小屏上让盒子区先收缩，别把底部广告条挤到屏幕外（这页是固定舞台，不做整页滚动） */
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;

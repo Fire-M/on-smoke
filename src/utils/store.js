@@ -23,7 +23,8 @@ const KEYS = {
   theme: 'os_theme',
   packRemaining: 'os_pack_remaining',
   packsCompleted: 'os_packs_completed',
-  savingsSettle: 'os_savings_settle'
+  savingsSettle: 'os_savings_settle',
+  resists: 'os_resists'
 }
 
 // 存储键（非 KEYS 内、由其它模块维护，resetAll 一并清理）
@@ -75,7 +76,10 @@ const DEFAULT_SETTINGS = {
   packSize: 20,
   quitDate: _todayStr(),
   dailyOriginal: 20,
-  selectedBrand: null
+  selectedBrand: null,
+  // 「忍住一根」省下的钱（元）。0 = 不自定义，跟随烟价自动算；
+  // 用户在设置页填了就固定用这个数，方便把省下的钱按自己的心理价位记
+  resistPrice: 0
 }
 
 // 默认今日状态
@@ -616,7 +620,9 @@ export function buildBadgeStats() {
   }
   return {
     totalSmoked: s.totalSmoked || 0,
-    totalSaved: getSavedMoney(),
+    // 「省下 N 元」类成就必须看「忍住不抽」省下的钱。
+    // 之前用的是抽烟累计金额，抽得越多越容易解锁，方向是反的。
+    totalSaved: getResistStats().totalSaved,
     cleanDays: getCleanDays(),
     maxStreak: Math.max(s.maxStreak || 0, getSmokeStreak()),
     nightSmoked: s.nightSmoked || 0,
@@ -710,6 +716,73 @@ function _formatTime(sec) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+// ---- 忍住不抽（省钱账本）----
+// 和「抽烟花费」(history) 完全分开记两本账：
+//   抽一根 → history +1，记「已花」
+//   忍住一次 → resists +1，记「已省」
+// 两本账互不抵消，用户能同时看到「今天烧掉多少」和「忍住省下多少」。
+
+export function getResists() {
+  return _read(KEYS.resists, [])
+}
+
+// 当前这一根如果忍住，能省多少钱。
+// 优先用设置里的自定义单价（>0 才生效），否则按已选品牌单价 / 设置里的烟价自动算
+export function getResistPrice() {
+  const settings = getSettings()
+  const custom = Number(settings.resistPrice)
+  if (isFinite(custom) && custom > 0) return custom
+  return getBrandPricePerCig(settings.selectedBrand)
+}
+
+// 自动推算的单价（忽略自定义值）：设置页拿它做占位/说明文字，
+// 让用户知道「留空」时实际会记多少钱
+export function getAutoResistPrice() {
+  const settings = getSettings()
+  return getBrandPricePerCig(settings.selectedBrand)
+}
+
+// 记一次「忍住」：价格在点击瞬间快照，后面改烟价不影响历史省下的钱
+export function recordResist(pricePerCig) {
+  const list = getResists()
+  const price = Number(pricePerCig)
+  const record = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp: Date.now(),
+    pricePerCig: isFinite(price) && price > 0 ? price : 0
+  }
+  list.unshift(record)
+  if (list.length > 2000) list.splice(2000)
+  _write(KEYS.resists, list)
+
+  const stats = getStats()
+  stats.totalResisted = (stats.totalResisted || 0) + 1
+  saveStats(stats)
+  return record
+}
+
+export function getResistStats() {
+  const list = getResists()
+  const today = _todayStr()
+  let todayCount = 0
+  let todaySaved = 0
+  let totalSaved = 0
+  list.forEach(r => {
+    const price = Number(r.pricePerCig) || 0
+    totalSaved += price
+    if (_todayStr(r.timestamp) === today) {
+      todayCount++
+      todaySaved += price
+    }
+  })
+  return {
+    todayCount,
+    todaySaved: Math.round(todaySaved * 100) / 100,
+    totalCount: list.length,
+    totalSaved: Math.round(totalSaved * 100) / 100
+  }
+}
+
 // ---- 烟瘾追踪 ----
 export function getCravings() {
   return _read(KEYS.cravings, [])
@@ -774,8 +847,10 @@ const CHALLENGE_TEMPLATES = [
   { id: 'limit_3', title: '今日不超过3根', desc: '控制吸烟量在3根以内', type: 'limit', target: 3, icon: '🎯' },
   { id: 'limit_2', title: '今日不超过2根', desc: '进一步减少吸烟量', type: 'limit', target: 2, icon: '🎯' },
   { id: 'limit_1', title: '今日只抽1根', desc: '极限挑战，只抽1根', type: 'limit', target: 1, icon: '🎯' },
-  { id: 'save_10', title: '省下10块钱', desc: '减少吸烟节省10元', type: 'save', target: 10, icon: '💰' },
-  { id: 'save_20', title: '省下20块钱', desc: '减少吸烟节省20元', type: 'save', target: 20, icon: '💰' },
+  // 「花费预算」型：抽一根是花钱，所以挑战是「别超预算」，
+  // 而不是「省下多少钱」——后者抽得越多反而越容易完成，等于奖励抽烟
+  { id: 'save_10', title: '今日花费不超过10元', desc: '把今天烧掉的钱控制在10元以内', type: 'save', target: 10, icon: '💰' },
+  { id: 'save_20', title: '今日花费不超过20元', desc: '把今天烧掉的钱控制在20元以内', type: 'save', target: 20, icon: '💰' },
   { id: 'no_smoke_morning', title: '上午不抽烟', desc: '从起床到中午12点不吸烟', type: 'time_range', target: { start: 0, end: 12 }, icon: '☀️' },
   { id: 'no_smoke_afternoon', title: '下午不抽烟', desc: '从中午12点到晚上6点不吸烟', type: 'time_range', target: { start: 12, end: 18 }, icon: '🌤️' },
   { id: 'delay_1h', title: '延迟1小时', desc: '想抽烟时等待1小时再决定', type: 'delay', target: 60, icon: '⏰' },
@@ -808,7 +883,19 @@ export function getDailyChallenge() {
     _write(KEYS.challenges, challenges)
   }
   
-  return challenges[today]
+  // 文案以模板为准：当天已生成的旧挑战（比如改版前的「省下10块钱」）
+  // 不会自动更新，这里按 challengeId 同步一次标题/描述/口径
+  const stored = challenges[today]
+  const tpl = CHALLENGE_TEMPLATES.find(t => t.id === stored.challengeId)
+  if (tpl && stored.title !== tpl.title) {
+    stored.title = tpl.title
+    stored.desc = tpl.desc
+    stored.type = tpl.type
+    stored.target = tpl.target
+    _write(KEYS.challenges, challenges)
+  }
+
+  return stored
 }
 
 /**
@@ -834,7 +921,9 @@ export function updateChallengeProgress(progress) {
     challenge.failed = progress > challenge.target
     challenge.completed = false
   } else if (challenge.type === 'save') {
-    challenge.completed = progress >= challenge.target
+    // progress = 今日已花金额。超额立刻判失败，没超额要等当天过完才能算达成
+    challenge.failed = progress > challenge.target
+    challenge.completed = false
   } else if (challenge.type === 'resist') {
     challenge.completed = progress >= challenge.target
   } else if (challenge.type === 'time_range') {
@@ -865,6 +954,10 @@ export function settlePastChallenges() {
       changed = true
     } else if (c.type === 'time_range') {
       c.completed = progress === 0
+      changed = true
+    } else if (c.type === 'save') {
+      // 花费预算：昨天没超额才算达成
+      c.completed = progress <= c.target
       changed = true
     }
   })
@@ -1492,6 +1585,7 @@ export default {
   migrateIfNeeded, recomputeSavedFromHistory,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   getCravings, addCraving, getCravingStats,
+  getResists, recordResist, getResistStats, getResistPrice, getAutoResistPrice,
   getDailyChallenge, updateChallengeProgress, getChallengeStreak, settlePastChallenges,
   getMoods, addMood, getMoodStats,
   getSavingsGoals, addSavingsGoal, updateSavingsGoal,

@@ -1,7 +1,7 @@
 <template>
   <view class="page-container" :class="themeClass()">
     <app-navbar title="我的宠物"></app-navbar>
-    <view class="main-scroll">
+    <scroll-view scroll-y class="main-scroll">
       <view class="pet-card mx-20 mb-16">
         <pet-canvas :accessories="equippedAccessories" :mood="petMood" @tap="petThePet"></pet-canvas>
         <text class="pet-name">{{ pet.name }}</text>
@@ -44,9 +44,9 @@
         </view>
       </view>
       
-      <view style="height: 80rpx;"></view>
-    </view>
-    
+      <view class="scroll-bottom"></view>
+    </scroll-view>
+
     <!-- 装扮面板 -->
     <view class="custom-mask" :class="{ show: showAccessoryPanel }" v-if="showAccessoryPanel" @click="showAccessoryPanel = false">
       <view class="custom-panel" :class="{ show: showAccessoryPanel }" @click.stop>
@@ -210,7 +210,15 @@ export default {
 </script>
 
 <style>
-.page-container { min-height: 100vh; width: 100%; background-color: var(--bg); color: var(--text); }
+.page-container {
+  height: 100vh;
+  width: 100%;
+  background-color: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .back-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border-radius: 50%; }
@@ -218,7 +226,8 @@ export default {
 .back-icon { font-size: 48rpx; color: var(--text); }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
 .pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
-.main-scroll { flex: 1; min-height: 0; padding-bottom: 40rpx; }
+/* 统一：flex 列里的 scroll-view 必须拿到确定高度，height:0 + flex:1 是跨端最稳的写法 */
+.main-scroll { flex: 1; height: 0; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
 .pet-card { padding: 40rpx; text-align: center; }

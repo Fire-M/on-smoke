@@ -72,7 +72,7 @@ export default {
   display: flex;
   flex-direction: column;
 }
-.main-scroll { flex: 1; min-height: 0; }
+.main-scroll { flex: 1; height: 0; min-height: 0; }
 .p-20 { padding: 40rpx; }
 .pb-100 { padding-bottom: 200rpx; }
 .block { display: block; }

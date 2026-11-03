@@ -13,7 +13,7 @@
           <text class="capsule-content">{{ c.content }}</text>
         </view>
       </view>
-      <view style="height: 80rpx;"></view>
+      <view class="scroll-bottom"></view>
     </scroll-view>
 
     <!-- 写信弹窗 -->
@@ -69,7 +69,7 @@ export default {
 .back-btn-placeholder { width: 64rpx; height: 64rpx; }
 .back-icon { font-size: 48rpx; color: var(--text); }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
-.main-scroll { flex: 1; min-height: 0; }
+.main-scroll { flex: 1; height: 0; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }
 .mb-16 { margin-bottom: 32rpx; }
 .write-btn { width: 100%; padding: 28rpx; border-radius: 24rpx; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%); color: var(--bg); font-size: 32rpx; font-weight: 600; border: none; }

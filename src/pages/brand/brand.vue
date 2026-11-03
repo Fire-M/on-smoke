@@ -106,8 +106,11 @@ export default {
   position: relative;
 }
 
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
 .brand-scroll {
   flex: 1;
+  height: 0;
+  min-height: 0;
   padding: 0 28rpx;
 }
 

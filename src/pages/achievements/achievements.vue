@@ -9,6 +9,13 @@
       <text class="ach-progress-text">已解锁 {{ unlockedCount }}/{{ totalBadges }}</text>
     </view>
 
+    <!-- 晒一张：把攒下的数字做成卡片分享，比晒「刚抽了一根」说得出口 -->
+    <view class="share-entry" @tap="goShare">
+      <text class="share-entry-icon">📤</text>
+      <text class="share-entry-text">把攒下的成绩晒一张</text>
+      <text class="share-entry-arrow">›</text>
+    </view>
+
     <!-- 分类标签 -->
     <scroll-view scroll-x class="category-scroll">
       <view class="category-tabs">
@@ -41,7 +48,7 @@
       </view>
 
       <!-- 底部留白 -->
-      <view style="height: 80rpx;"></view>
+      <view class="scroll-bottom"></view>
     </scroll-view>
 
     <!-- 勋章详情弹窗 -->
@@ -71,7 +78,7 @@ import { themeClass } from '@/utils/theme.js'
 const CATEGORIES = [
   { name: '全部', filter: () => true },
   { name: '戒烟里程碑', filter: (b) => b.category === 0 },
-  { name: '省钱达人', filter: (b) => b.category === 1 },
+  { name: '忍住省钱', filter: (b) => b.category === 1 },
   { name: '抽烟次数', filter: (b) => b.category === 2 },
   { name: '特殊成就', filter: (b) => b.category === 3 },
   { name: '健康成就', filter: (b) => b.category === 4 },
@@ -143,6 +150,11 @@ export default {
       const month = date.getMonth() + 1
       const day = date.getDate()
       return `${month}月${day}日`
+    },
+
+    // 分享页只读 Store 里的累计成绩，不需要带参数
+    goShare() {
+      uni.navigateTo({ url: '/pages/share/share' })
     }
   }
 }
@@ -223,6 +235,37 @@ export default {
   color: var(--text-dim);
 }
 
+/* 分享入口 */
+.share-entry {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 0 28rpx 24rpx;
+  padding: 22rpx 28rpx;
+  border-radius: 20rpx;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+}
+
+.share-entry:active {
+  background: var(--surface-2);
+}
+
+.share-entry-icon {
+  font-size: 26rpx;
+}
+
+.share-entry-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--text);
+}
+
+.share-entry-arrow {
+  font-size: 28rpx;
+  color: var(--text-dim);
+}
+
 /* 分类标签 */
 .category-scroll {
   padding: 0 28rpx;
@@ -270,9 +313,12 @@ export default {
 }
 
 /* 勋章网格 */
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度
+   （原来写 height:100%，比可视区多出一个头部，最后一排永远滚不到） */
 .badge-scroll {
   flex: 1;
-  height: 100%;
+  height: 0;
+  min-height: 0;
   padding: 0 28rpx;
 }
 

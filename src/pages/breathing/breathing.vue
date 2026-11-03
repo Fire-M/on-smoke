@@ -2,6 +2,8 @@
   <view class="page-container" :class="themeClass()">
     <app-navbar title="呼吸引导" :custom-back="true" @back="goBack"></app-navbar>
 
+    <!-- 小屏上内容会超出，统一成 scroll-view；内容不足一屏时靠 min-height 保持居中 -->
+    <scroll-view scroll-y class="main-scroll">
     <view class="main-content">
       <!-- 呼吸圆圈 -->
       <view class="breath-circle-wrap">
@@ -40,7 +42,9 @@
         </view>
         <text class="info-desc">这种方法能帮助缓解烟瘾和焦虑，建议每天练习2-3次</text>
       </view>
+      <view class="scroll-bottom"></view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -174,8 +178,17 @@ export default {
   color: var(--text);
 }
 
-.main-content {
+/* 统一滚动容器：flex 列里靠 height:0 + flex:1 拿到确定高度 */
+.main-scroll {
   flex: 1;
+  height: 0;
+  min-height: 0;
+}
+
+.main-content {
+  /* 内容不足一屏时撑满滚动区，继续垂直居中 */
+  min-height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
