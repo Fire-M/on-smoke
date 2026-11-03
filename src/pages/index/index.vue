@@ -127,7 +127,7 @@
            视觉节奏重复且占地，这里压成一个三列，信息密度更高 -->
       <view class="mx-20 mb-16 three-col">
         <view class="mini-card" @click="goToCraving">
-          <text class="mini-icon">📝</text>
+          <text class="mini-icon">🧠</text>
           <text class="mini-value text-amber">{{ todayCravings }}</text>
           <text class="mini-label">今日烟瘾</text>
         </view>

@@ -38,7 +38,7 @@
         <!-- 记录烟瘾按钮 -->
         <view class="mx-20 mb-16">
           <button class="record-btn" @tap="showCravingModal = true">
-            <text class="record-btn-icon">📝</text>
+            <text class="record-btn-icon">🧠</text>
             <text class="record-btn-text">记录烟瘾</text>
           </button>
         </view>
