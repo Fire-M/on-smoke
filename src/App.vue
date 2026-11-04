@@ -55,7 +55,11 @@ export default {
 <style>
 @import '@/static/custom.css';
 
-/* ============ 主题 CSS 变量（默认=经典琥珀） ============ */
+/* ============ 主题 CSS 变量（默认=经典琥珀） ============
+   配色原则：底色、卡片、描边、文字这些「中性层」五个主题共用同一套近黑中性色，
+   主题差异只由 primary / primary-2 / glow / accent 承担。
+   原来的做法是把 --bg / --surface / --border / --text 全都染上主题色相，
+   于是切到薄荷就是整屏绿（连白字都发绿），看起来像蒙了一层色罩。 */
 page {
   /* page 自己没设背景色时，webview 的默认白底会在首帧之前透出来，
      跳转时就先白一下。这一行让每个页面从被创建那一刻起就是深色，
@@ -85,24 +89,25 @@ page {
   --danger-1: #ff6b6b; --danger-2: #c0392b;
 }
 .theme-aurora {
-  --bg: #0a0e16; --surface-1: #121826; --surface-2: #182032; --border: #25304a;
+  /* 中性层只留一丝冷调（蓝味），不能再重 —— 原来 #0a0e16 已经明显发蓝 */
+  --bg: #0c0d11; --surface-1: #17181d; --surface-2: #1e1f25; --border: #2b2d35;
   --primary: #a78bfa; --primary-2: #22d3ee; --glow: rgba(124, 139, 250, 0.35);
   --primary-deep: #8b5cf6; --primary-2-deep: #06b6d4;
-  --accent: #22d3ee; --text: #e8ecf6; --text-dim: #93a0bd;
+  --accent: #22d3ee; --text: #e7e9ee; --text-dim: #9aa0ac;
   --danger-1: #ff6b6b; --danger-2: #c0392b;
 }
 .theme-mint {
-  --bg: #08120e; --surface-1: #0f1f18; --surface-2: #142a20; --border: #1f3a2c;
+  --bg: #0c0e0d; --surface-1: #171917; --surface-2: #1e211f; --border: #2b302d;
   --primary: #34d399; --primary-2: #10b981; --glow: rgba(52, 211, 153, 0.30);
   --primary-deep: #10b981; --primary-2-deep: #059669;
-  --accent: #f59e0b; --text: #e6f4ec; --text-dim: #8fb3a2;
+  --accent: #f59e0b; --text: #e7eae9; --text-dim: #99a29e;
   --danger-1: #ff7a7a; --danger-2: #c0392b;
 }
 .theme-sunset {
-  --bg: #140a0a; --surface-1: #211212; --surface-2: #2c1717; --border: #3a2020;
+  --bg: #100e0d; --surface-1: #1b1918; --surface-2: #23201e; --border: #322e2b;
   --primary: #ff7a18; --primary-2: #ff4d6d; --glow: rgba(255, 122, 24, 0.32);
   --primary-deep: #ea580c; --primary-2-deep: #e11d48;
-  --accent: #ffd166; --text: #f6e9e6; --text-dim: #c79b94;
+  --accent: #ffd166; --text: #eae7e4; --text-dim: #a8a09a;
   --danger-1: #ff6b6b; --danger-2: #b03030;
 }
 .theme-mono {
