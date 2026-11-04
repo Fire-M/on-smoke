@@ -1,5 +1,6 @@
 <script>
 import Store from '@/utils/store.js'
+import tracker from '@/utils/tracker.js'
 
 export default {
   onLaunch() {
@@ -19,7 +20,8 @@ export default {
     try { Store.recoverPetDaily() } catch (e) {}
   },
   onHide() {
-    console.log('App Hide')
+    // 埋点改成了内存队列 + 延迟落盘，切后台时补一次，别让那 1 秒的窗口被杀掉
+    try { tracker.flushToStorage() } catch (e) {}
   },
 
   methods: {
@@ -55,6 +57,10 @@ export default {
 
 /* ============ 主题 CSS 变量（默认=经典琥珀） ============ */
 page {
+  /* page 自己没设背景色时，webview 的默认白底会在首帧之前透出来，
+     跳转时就先白一下。这一行让每个页面从被创建那一刻起就是深色，
+     白闪直接变成"深色→深色"，观感上基本察觉不到 */
+  background-color: var(--bg, #0f0f0f);
   --bg: #0f0f0f;
   --surface-1: #1f1f1f;
   --surface-2: #252525;

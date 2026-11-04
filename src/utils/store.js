@@ -983,6 +983,11 @@ export function updateChallengeProgress(progress) {
   const challenge = challenges[today]
   if (!challenge) return null
 
+  // 首页 onShow 和 60 秒轮询都会调这里，而下面原来是无条件 _write。
+  // setStorageSync 是同步 IO，返回首页那一下正好压在转场手势上。
+  // 记下改动前的状态，真的变了才落盘
+  const before = `${challenge.progress}|${challenge.completed}|${challenge.failed}`
+
   challenge.progress = progress
 
   if (challenge.type === 'limit') {
@@ -1001,7 +1006,10 @@ export function updateChallengeProgress(progress) {
     challenge.completed = progress >= challenge.target
   }
 
-  _write(KEYS.challenges, challenges)
+  // 没变化就不写：这一条能省掉「每次返回首页 / 每 60 秒轮询」时的一次同步存储写
+  if (`${challenge.progress}|${challenge.completed}|${challenge.failed}` !== before) {
+    _write(KEYS.challenges, challenges)
+  }
   return challenge
 }
 

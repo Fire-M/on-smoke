@@ -8,6 +8,11 @@ export function createPetCanvas2D() {
   let canvas = null, ctx = null, W = 0, H = 0
   let scale = 1, baseY = 0, topCharY = 0, sx = 1, mood = 'normal'
   let animId = null, startTime = 0
+  let running = false   // 循环开关：stop() 后即使有回调在队列里也不会续上
+  // 滤嘴和纸身的渐变只跟画布尺寸有关（x、w 由 scale 决定，attach 后不再变），
+  // 每帧新建一个 gradient 对象纯属白alloc，缓存下来可以少掉一半的临时对象
+  let filterGrad = null
+  let bodyGrad = null
   let raf = null
   let acc = { head: null, eyes: null, neck: null }
   let smoke = []
@@ -63,11 +68,13 @@ export function createPetCanvas2D() {
     const w = sx * 0.64
     const yTop = PY(0.7)
     const h = PY(0.0) - PY(0.7)
-    const g = ctx.createLinearGradient(x, 0, x + w, 0)
-    g.addColorStop(0, '#b87f3e')
-    g.addColorStop(0.5, '#d4944a')
-    g.addColorStop(1, '#a9742f')
-    ctx.fillStyle = g
+    if (!filterGrad) {
+      filterGrad = ctx.createLinearGradient(x, 0, x + w, 0)
+      filterGrad.addColorStop(0, '#b87f3e')
+      filterGrad.addColorStop(0.5, '#d4944a')
+      filterGrad.addColorStop(1, '#a9742f')
+    }
+    ctx.fillStyle = filterGrad
     rr(x, yTop, w, h, scale * 0.18)
     ctx.fill()
     ctx.strokeStyle = '#BF7F30'
@@ -86,12 +93,14 @@ export function createPetCanvas2D() {
     const w = sx * 0.64
     const yTop = PY(2.76)
     const h = PY(0.73) - PY(2.76)
-    const g = ctx.createLinearGradient(x, 0, x + w, 0)
-    g.addColorStop(0, '#e7dfd0')
-    g.addColorStop(0.45, '#fdfaf3')
-    g.addColorStop(0.55, '#fdfaf3')
-    g.addColorStop(1, '#d6ccb9')
-    ctx.fillStyle = g
+    if (!bodyGrad) {
+      bodyGrad = ctx.createLinearGradient(x, 0, x + w, 0)
+      bodyGrad.addColorStop(0, '#e7dfd0')
+      bodyGrad.addColorStop(0.45, '#fdfaf3')
+      bodyGrad.addColorStop(0.55, '#fdfaf3')
+      bodyGrad.addColorStop(1, '#d6ccb9')
+    }
+    ctx.fillStyle = bodyGrad
     rr(x, yTop, w, h, scale * 0.26)
     ctx.fill()
     ctx.fillStyle = '#C8A84E'
@@ -281,7 +290,7 @@ export function createPetCanvas2D() {
     if (acc.neck && acc.neck.type) drawNeckAcc(acc.neck.type, W / 2, PY(0.73))
   }
 
-  function drawSmoke(t) {
+  function drawSmoke(t, dt) {
     if (smoke.length < 18 && Math.random() < 0.5) {
       smoke.push({
         x: W / 2 + (Math.random() - 0.5) * scale * 0.10,
@@ -294,7 +303,8 @@ export function createPetCanvas2D() {
     }
     for (let i = smoke.length - 1; i >= 0; i--) {
       const p = smoke[i]
-      p.life += 1 / 60
+      // 按真实时间推进，而不是写死 1/60：降帧后烟的速度才不会跟着变慢
+      p.life += dt
       if (p.life >= p.max) { smoke.splice(i, 1); continue }
       const k = p.life / p.max
       const yy = p.y - k * (scale * 1.6)
@@ -305,7 +315,20 @@ export function createPetCanvas2D() {
     }
   }
 
+  // 画面里没有高速运动（呼吸浮动、眨眼、升烟），60fps 只是白烧一半 CPU 和电量。
+  // 每帧仍是全画布 clearRect + 重绘，降到 30fps 后开销直接减半，观感几乎无差
+  const FRAME_MS = 33
+  let lastNow = 0
+
   function draw(now) {
+    // running 是唯一的开关：stop() 之后仍可能有一次回调已经排进队列，
+    // 没有这个判断它会把自己重新排上，循环就再也停不下来
+    if (!running) return
+    if (now - lastNow < FRAME_MS) { animId = raf(draw); return }
+    let dt = (now - lastNow) / 1000
+    lastNow = now
+    // 刚从后台回来时时间差可能是几秒，钳一下，免得烟一口气窜到顶
+    if (dt > 0.1) dt = 0.1
     const t = (now - startTime) / 1000
     ctx.clearRect(0, 0, W, H)
 
@@ -332,8 +355,9 @@ export function createPetCanvas2D() {
     ctx.restore()
 
     // 烟雾（最上层，不随身体倾斜）
-    drawSmoke(t)
+    drawSmoke(t, dt)
 
+    if (!running) return
     animId = raf(draw)
   }
 
@@ -346,6 +370,9 @@ export function createPetCanvas2D() {
     topCharY = H * 0.15
     scale = (baseY - topCharY) / 3.12
     sx = scale * 1.3
+    // 尺寸变了渐变坐标就失效，下次绘制重新建
+    filterGrad = null
+    bodyGrad = null
   }
 
   function updateAccessories(a) {
@@ -359,7 +386,10 @@ export function createPetCanvas2D() {
   function setMood(m) { mood = m || 'normal' }
 
   function start() {
-    if (animId || !canvas || !ctx) return
+    // 用 running 判断而不是 animId：setTimeout 兜底分支拿不到可取消的句柄，
+    // 只看 animId 会让 start/stop 反复起出多条循环
+    if (running || !canvas || !ctx) return
+    running = true
     startTime = Date.now()
     raf = canvas.requestAnimationFrame
       ? canvas.requestAnimationFrame.bind(canvas)
@@ -368,7 +398,10 @@ export function createPetCanvas2D() {
   }
 
   function stop() {
-    if (animId && canvas && canvas.cancelAnimationFrame) canvas.cancelAnimationFrame(animId)
+    running = false
+    if (animId != null && canvas && typeof canvas.cancelAnimationFrame === 'function') {
+      try { canvas.cancelAnimationFrame(animId) } catch (e) {}
+    }
     animId = null
   }
 

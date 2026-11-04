@@ -353,8 +353,12 @@ export default {
   },
 
   onShow() {
-    this.loadCravingData()
-    this.loadMoodData()
+    // 两个 loader 各自读一遍 cravings / moods（同步 storage + JSON.parse），
+    // 包进读缓存后同一份数据只解析一次
+    Store.withReadCache(() => {
+      this.loadCravingData()
+      this.loadMoodData()
+    })
   },
 
   methods: {

@@ -3,7 +3,12 @@
     <app-navbar title="我的宠物"></app-navbar>
     <scroll-view scroll-y class="main-scroll">
       <view class="pet-card mx-20 mb-16">
-        <pet-canvas :accessories="equippedAccessories" :mood="petMood" @tap="petThePet"></pet-canvas>
+        <!-- canvas 等首屏渲染完再挂：2D 节点创建 + 分配像素缓冲是本页最重的一步，
+             和首屏渲染挤在一起，页面就会整体白一下才出来 -->
+        <view class="pet-stage">
+          <pet-canvas v-if="petCanvasReady" :accessories="equippedAccessories" :mood="petMood"
+            :paused="petPaused" @tap="petThePet"></pet-canvas>
+        </view>
         <text class="pet-name">{{ pet.name }}</text>
         <text class="pet-level">Lv.{{ pet.level }}</text>
         <view class="stat-row">
@@ -115,6 +120,8 @@ export default {
       return { 
         pet: { name: '小烟', health: 100, happiness: 100, level: 1, exp: 0 },
         _prevLevel: null,
+        petPaused: false,   // 页面被覆盖时暂停 canvas 循环，别在后台空转 60fps
+        petCanvasReady: false, // 首屏渲染完成后再挂 canvas，避免它拖慢页面出现
         showAccessoryPanel: false,
         accessoryTab: 'head',
         accessoryList: [],
@@ -143,7 +150,13 @@ export default {
       return this.accessoryList.filter(item => item.slot === this.accessoryTab)
     }
   },
+  onReady() {
+    // onReady 表示首屏已经渲染完（标题、卡片、数值都在屏幕上了），
+    // 这时候立刻挂 canvas 不会拖慢内容出现，宠物也就跟着一块儿出来，不需要再等
+    this.petCanvasReady = true
+  },
   onShow() { 
+    this.petPaused = false
     Store.recoverPetDaily()
     this.adEnabled = isAdEnabled()
     this.pet = Store.getPet()
@@ -153,6 +166,14 @@ export default {
     this._prevLevel = this.pet.level
     this.accessoryList = Store.getPetAccessoryList()
     this.equippedAccessories = Store.getEquippedAccessories()
+  },
+  onHide() {
+    // 被别的页面盖住 / 切后台时停掉 canvas 循环：它在不可见时也要按 60fps 重绘，
+    // 跳转时最容易被感知成「卡」
+    this.petPaused = true
+  },
+  onUnload() {
+    this.petPaused = true
   },
   methods: {
     watchAdForPet() {
@@ -222,7 +243,8 @@ export default {
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
-.pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; }
+/* min-height 与 canvas 同高：canvas 延迟挂载时先把位置占住，宠物出现时页面不会往下跳 */
+.pet-stage { flex-shrink: 0; width: 100%; display: flex; justify-content: center; align-items: center; min-height: 320px; }
 /* 统一：flex 列里的 scroll-view 必须拿到确定高度，height:0 + flex:1 是跨端最稳的写法 */
 .main-scroll { flex: 1; height: 0; min-height: 0; }
 .mx-20 { margin-left: 40rpx; margin-right: 40rpx; }

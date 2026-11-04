@@ -155,10 +155,14 @@ export default {
 
   methods: {
     loadData() {
-      this.loadWeekData()
-      this.loadRecords()
-      this.loadMonthData()
-      this.loadCalendar()
+      // 这四个 loader 各自读一次 history（同步 storage + JSON.parse），
+      // 日历还要按 31 天各 filter 一遍。整段包进读缓存，history 只解析一次
+      Store.withReadCache(() => {
+        this.loadWeekData()
+        this.loadRecords()
+        this.loadMonthData()
+        this.loadCalendar()
+      })
     },
 
     loadWeekData() {

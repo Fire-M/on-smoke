@@ -5,14 +5,55 @@
 
 const TRACK_QUEUE_KEY = 'os_track_queue'
 const MAX_QUEUE_SIZE = 100
+// 埋点合并写入的间隔：期间所有埋点只进内存队列
+const PERSIST_DELAY = 1000
 
-// 生成唯一用户 ID
+// getStorageSync / setStorageSync 是同步调用，会直接占住 JS 线程。
+// 原来每埋一个点都要 JSON.parse 整个队列 + JSON.stringify + 写一遍 storage，
+// 一次跳转里连着几条埋点就排在主线程上，看起来就是「点了没反应」。
+// 现在改成内存队列 + 延迟合并写，单次埋点不碰 storage。
+let memQueue = null
+let persistTimer = null
+let cachedUid = ''
+
+function loadQueue() {
+  if (memQueue) return memQueue
+  try {
+    const raw = uni.getStorageSync(TRACK_QUEUE_KEY)
+    memQueue = raw ? JSON.parse(raw) : []
+  } catch (e) {
+    memQueue = []
+  }
+  if (!Array.isArray(memQueue)) memQueue = []
+  return memQueue
+}
+
+function persistQueue() {
+  try {
+    uni.setStorageSync(TRACK_QUEUE_KEY, JSON.stringify(loadQueue()))
+  } catch (e) {
+    console.warn('[Tracker] 保存埋点数据失败', e)
+  }
+}
+
+function schedulePersist() {
+  if (persistTimer) return
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    persistQueue()
+  }, PERSIST_DELAY)
+}
+
+// 生成唯一用户 ID（内存缓存，避免每次埋点都同步读 storage）
 function getUserId() {
-  let uid = uni.getStorageSync('os_user_id')
+  if (cachedUid) return cachedUid
+  let uid = ''
+  try { uid = uni.getStorageSync('os_user_id') } catch (e) {}
   if (!uid) {
     uid = 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-    uni.setStorageSync('os_user_id', uid)
+    try { uni.setStorageSync('os_user_id', uid) } catch (e) {}
   }
+  cachedUid = uid
   return uid
 }
 
@@ -35,15 +76,15 @@ export function track(event, data = {}) {
     ...data
   }
 
-  // 本地缓存
+  // 本地缓存：只进内存，稍后合并落盘
   try {
-    const queue = JSON.parse(uni.getStorageSync(TRACK_QUEUE_KEY) || '[]')
+    const queue = loadQueue()
     queue.push(record)
     // 限制队列大小
     if (queue.length > MAX_QUEUE_SIZE) {
       queue.splice(0, queue.length - MAX_QUEUE_SIZE)
     }
-    uni.setStorageSync(TRACK_QUEUE_KEY, JSON.stringify(queue))
+    schedulePersist()
   } catch (e) {
     console.warn('[Tracker] 保存埋点数据失败', e)
   }
@@ -58,18 +99,29 @@ export function track(event, data = {}) {
 }
 
 /**
+ * 立刻把内存队列落盘。App onHide 时调一次，
+ * 避免「延迟合并写」的那 1 秒窗口里被系统杀掉而丢埋点
+ */
+export function flushToStorage() {
+  if (persistTimer) { clearTimeout(persistTimer); persistTimer = null }
+  persistQueue()
+}
+
+/**
  * 批量上报（预留接口）
  */
 export function flush() {
   try {
-    const queue = JSON.parse(uni.getStorageSync(TRACK_QUEUE_KEY) || '[]')
+    const queue = loadQueue()
     if (queue.length === 0) return
 
     // TODO: 发送到服务端
     // await api.post('/api/tracks', { records: queue })
 
-    // 上报成功后清空
-    uni.setStorageSync(TRACK_QUEUE_KEY, '[]')
+    // 上报成功后清空（内存 + 落盘一起清）
+    memQueue = []
+    if (persistTimer) { clearTimeout(persistTimer); persistTimer = null }
+    persistQueue()
     console.log(`[Tracker] 上报 ${queue.length} 条记录`)
   } catch (e) {
     console.warn('[Tracker] 上报失败', e)
@@ -151,7 +203,7 @@ export function trackAdSkip(adType) {
 }
 
 export default {
-  track, flush,
+  track, flush, flushToStorage,
   trackAppOpen,
   trackSmokingStart, trackSmokingComplete, trackSmokingCancel,
   trackBrandSelect,

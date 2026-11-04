@@ -58,21 +58,22 @@
       </view>
       <!-- 警告提示 -->
       <view class="lung-alert" v-if="lungFill > 70">
-        <text class="lung-alert-text">{{ lungFill >= 100 ? '⚠️ 肺部已满，必须吐烟！' : '⚠️ 肺部压力过大' }}</text>
+        <view class="lung-alert-ic"></view>
+        <text class="lung-alert-text">{{ lungFill >= 100 ? '肺部已满，必须吐烟' : '肺部压力过大' }}</text>
       </view>
     </view>
 
     <!-- 功能按钮 -->
     <view class="smoke-tools" :class="{ show: sceneReady }">
       <button class="st-tool" :class="{ active: soundEnabled }" @click="toggleSound">
-        <view class="st-tool-ic"><text>🔊</text></view>
+        <view class="st-tool-ic"><view class="ic ic-sound"></view></view>
         <view class="st-tool-lbl">
           <text class="st-tool-name">音效</text>
           <text class="st-tool-val">{{ soundEnabled ? '开着呢' : '静音' }}</text>
         </view>
       </button>
       <button class="st-tool" @click="tapAsh">
-        <view class="st-tool-ic"><text>💨</text></view>
+        <view class="st-tool-ic"><view class="ic ic-ash"></view></view>
         <view class="st-tool-lbl">
           <text class="st-tool-name">灰</text>
           <text class="st-tool-val">弹烟灰</text>
@@ -81,14 +82,14 @@
       <button class="st-tool" :class="{ active: ringActive }"
         @touchstart.prevent="startRingPress" @touchend.prevent="endRingPress" @touchcancel.prevent="endRingPress"
         @mousedown="startRingPress" @mouseup="endRingPress">
-        <view class="st-tool-ic"><text>💫</text></view>
+        <view class="st-tool-ic"><view class="ic ic-ring"></view></view>
         <view class="st-tool-lbl">
           <text class="st-tool-name">吐烟</text>
           <text class="st-tool-val">{{ smokeStyleNames[ringCurrentStyle] }}</text>
         </view>
       </button>
       <button class="st-tool" @click="passCig">
-        <view class="st-tool-ic"><text>🤝</text></view>
+        <view class="st-tool-ic"><view class="ic ic-pass"></view></view>
         <view class="st-tool-lbl">
           <text class="st-tool-name">派烟</text>
           <text class="st-tool-val">递一根</text>
@@ -99,7 +100,7 @@
     <!-- 派烟弹窗 -->
     <view class="pass-modal" :class="{ show: showPassModal }" v-if="showPassModal">
       <view class="pass-card">
-        <text class="pass-emoji">🤝</text>
+        <view class="pass-mark"></view>
         <text class="pass-title">派烟成功</text>
         <text class="pass-desc">朋友微笑着接过了这根「空气烟」</text>
         <view class="pass-btns">
@@ -139,6 +140,21 @@ import { themeClass } from '@/utils/theme.js'
 const SMOKING_DURATION = 50000
 const IGNITE_DELAY = 800
 const MAX_PUFF_DURATION = 8000  // 单次吸烟最长时长（8秒）
+
+// 香烟几何尺寸。样式里的 --cig-width / --cig-total-h / --cig-filter-h 必须与这里同步：
+// 燃烧变短、纸身收缩都按这几个数算，只改一边会让烟身和烟头错位。
+// 比例参照真实卷烟（直径 8mm / 长 84mm / 滤嘴 26mm），屏幕上是 40×440（≈1:11）。
+const CIG_TOTAL_H = 440
+const CIG_FILTER_H = 144
+const CIG_PAPER_H = CIG_TOTAL_H - CIG_FILTER_H
+
+// 纸身剩余高度：进度 100% 时只留 12px 燃烧边（真烟抽到底只剩滤嘴）。
+// 烟身总高和纸身高度必须共用这一个函数算，否则会出现
+// 「容器缩到 176px、纸身却还写着 59px」的错位，视觉上就是抽完还剩一截白纸。
+function paperHeightAt(progress) {
+  const p = Math.max(0, Math.min(100, progress))
+  return Math.max(12, CIG_PAPER_H * (1 - (p / 100) * 0.96))
+}
 
 const raf = typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : (fn) => setTimeout(fn, 16)
 const caf = typeof cancelAnimationFrame !== 'undefined' ? cancelAnimationFrame : (id) => clearTimeout(id)
@@ -245,22 +261,23 @@ export default {
       // 烟灰高度：非线性增长，模拟真实烟灰的堆积感
       const normalizedGrowth = this.ashGrowth / 200  // 0 ~ 1
       const curve = Math.pow(normalizedGrowth, 0.7)  // 更明显的堆积曲线
-      const maxH = 90  // 最大烟灰高度增大
+      // 真实烟灰挂到 1~1.5 倍烟身直径就会自然断裂；90px 对 40px 的烟身是 2.25 倍，
+      // 看着像一根灰柱子，收到 54px（约 1.35 倍）才符合直觉
+      const maxH = 54
       const h = maxH * curve
       return { 
         height: Math.max(3, h) + 'px',
-        // 烟灰宽度不超过烟身宽度
-        width: `calc(var(--cig-width) * ${1.0 - normalizedGrowth * 0.05})`
+        // 烟灰比烟身收口一点：和纸同宽会变成一根竖直的灰柱子
+        width: `calc(var(--cig-width) * ${0.94 - normalizedGrowth * 0.04})`
       }
     },
 
-    // 香烟燃烧变短：减少容器高度，烟头位置不变
+    // 香烟燃烧变短：减少容器高度，烟头位置不变。
+    // 容器高 = 滤嘴 + 纸身，纸身用 paperHeightAt 算，抽到底正好只剩滤嘴那一截
     cigBurnStyle() {
       if (this.smokeProgress <= 0) return {}
-      const totalH = 520 // --cig-total-h
-      // 最多缩短 60%（保留滤嘴）
-      const deltaH = (this.smokeProgress / 100) * totalH * 0.6
-      const newH = totalH - deltaH
+      const newH = CIG_FILTER_H + paperHeightAt(this.smokeProgress)
+      const deltaH = CIG_TOTAL_H - newH
       // 补偿 translateY：容器变短后要下移，保持烟头位置不变
       const offsetY = deltaH / 2
       return {
@@ -269,14 +286,11 @@ export default {
       }
     },
 
-    // 纸身样式：随吸烟进度缩短
+    // 纸身样式：随吸烟进度缩短（与容器高同一个来源）
     paperStyle() {
       if (this.smokeProgress <= 0) return {}
-      const paperH = 360 // --cig-total-h(520) - --cig-filter-h(160)
-      // 纸身最多缩短 80%
-      const newPaperH = paperH * (1 - (this.smokeProgress / 100) * 0.8)
       return {
-        height: newPaperH + 'px',
+        height: paperHeightAt(this.smokeProgress) + 'px',
         flex: 'none'
       }
     },
@@ -298,7 +312,8 @@ export default {
       this.syncSmokeMode(newVal, oldVal)
       // 肺部容器首次显示时初始化 canvas
       if (oldVal === 'ready' && newVal !== 'ready') {
-        this.$nextTick(() => { setTimeout(() => this.initLungCanvas(), 80) })
+        // 不再固定等 80ms：nextTick 后节点就绪就画，查不到由 initLungCanvas 自己重试
+        this.$nextTick(() => { this.initLungCanvas() })
       }
     },
     lungFill() {
@@ -346,6 +361,12 @@ export default {
     // 不处理的话回来第一帧就直接 100% → 判定「抽完」并 reLaunch 首页。
     this._hiddenAt = Date.now()
     if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
+    // 长按计时、自动停止计时、吐烟长按计时以前只在 onUnload 清：
+    // 切后台后它们照样到点，会起一条 50ms 的进度 setInterval，还把循环的烟声音效放起来
+    if (this.pressTimer) { clearTimeout(this.pressTimer); this.pressTimer = null }
+    if (this.puffTimer) { clearTimeout(this.puffTimer); this.puffTimer = null }
+    if (this.ringPressTimer) { clearTimeout(this.ringPressTimer); this.ringPressTimer = null }
+    this.stopBurnSound()
     this.isPressing = false
     if (this.state === 'smoking') {
       this.state = 'lit'
@@ -360,9 +381,14 @@ export default {
       this.showHint = true
       this.hintText = '长按吸烟'
     }
+    // 页面不可见时没必要继续跑 60fps 的烟雾粒子循环。
+    // 传 false 是不清屏：回来时烟雾还在原来的位置，不会「刷」地一下空掉
+    this.stopCanvasLoop(false)
   },
 
   onShow() {
+    // 从别的页面 / 后台回来，把隐藏时停掉的循环重新拉起来（startCanvasLoop 自带去重）
+    if (this._canvasReady && !this.animFrame) this.startCanvasLoop()
     if (!this._hiddenAt) return
     const away = Date.now() - this._hiddenAt
     this._hiddenAt = 0
@@ -425,10 +451,22 @@ export default {
 
     // ---- 肺部 Canvas 绘制 ----
     initLungCanvas() {
+      // state 每次从 ready 转出都会触发，重复初始化会反复 getContext + scale，
+      // 旧 ctx 直接丢弃；已经拿到就不要再查一次
+      if (this._unmounted || this.lungCtx) return
       uni.createSelectorQuery().in(this)
         .select('#lung-canvas').fields({ node: true, size: true })
         .exec((res) => {
-          if (!res || !res[0] || !res[0].node) return
+          if (this._unmounted) return
+          if (!res || !res[0] || !res[0].node) {
+            // 肺部容器刚 v-if 出来，节点可能还没渲染：40ms 后重试，最多 5 次
+            this._lungRetry = (this._lungRetry || 0) + 1
+            if (this._lungRetry <= 5) {
+              if (this.lungTimer) clearTimeout(this.lungTimer)
+              this.lungTimer = setTimeout(() => { this.lungTimer = null; this.initLungCanvas() }, 40)
+            }
+            return
+          }
           const canvas = res[0].node
           const ctx = canvas.getContext('2d')
           let dpr = 2
@@ -569,6 +607,11 @@ export default {
 
     cleanup() {
       this._unmounted = true
+      // canvas 查询失败后的重试链、肺部画布初始化延时、toast 延时，
+      // 以前都没登记，卸载后回调还在跑（重试链甚至会长住不放）
+      if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null }
+      if (this.lungTimer) { clearTimeout(this.lungTimer); this.lungTimer = null }
+      if (this.toastTimer) { clearTimeout(this.toastTimer); this.toastTimer = null }
       if (this.finishTimerA) { clearTimeout(this.finishTimerA); this.finishTimerA = null }
       if (this.finishTimerB) { clearTimeout(this.finishTimerB); this.finishTimerB = null }
       if (this.smokeTimer) { clearInterval(this.smokeTimer); this.smokeTimer = null }
@@ -598,11 +641,31 @@ export default {
     },
 
     initCanvas() {
+      // mounted 和 onReady 都会调这里，重复进出还会各来一次；
+      // 已经有实例或查询在途就不要再发一轮
+      if (this._unmounted || this._canvasReady || this._initPending) return
+      this._initPending = true
       uni.createSelectorQuery().in(this)
         .select('#smoke-canvas').fields({ node: true, size: true })
         .select('#spriteCanvas').fields({ node: true, size: true })
         .exec((res) => {
-          if (!res || !res[0] || !res[1]) { setTimeout(() => this.initCanvas(), 120); return }
+          this._initPending = false
+          // 页面已经卸载了还回来的回调：这里如果继续往下走，
+          // startCanvasLoop 会把 _loopDead 重置回 false，起一条再没人停的 60fps 循环，
+          // 每进出一次页面就多一条 —— 这是「用越久越卡」的主因
+          if (this._unmounted) return
+          if (!res || !res[0] || !res[1]) {
+            // 重试要封顶：查不到节点时这条 120ms 的链会无限自调度，
+            // 页面卸载后也不会停，等于每次跳转都留下一个永久定时器
+            this._canvasRetry = (this._canvasRetry || 0) + 1
+            if (this._canvasRetry > 20) return
+            if (this._retryTimer) clearTimeout(this._retryTimer)
+            // 60ms 而不是 120ms：首屏刚渲染时节点通常下一两帧就能查到，
+            // 间隔太长会让烟雾晚出现小半秒
+            this._retryTimer = setTimeout(() => { this._retryTimer = null; this.initCanvas() }, 60)
+            return
+          }
+          this._canvasReady = true
           const canvas = res[0].node
           const ctx = canvas.getContext('2d')
           let dpr = 2
@@ -696,14 +759,16 @@ export default {
       this.animFrame = rafFn(loop)
     },
 
-    stopCanvasLoop() {
+    // clear 传 false 用于「页面暂时不可见」：只停循环，保留画布上的烟，
+    // 回到前台不会看到屏幕被擦空
+    stopCanvasLoop(clear) {
       this._loopDead = true
       if (this.animFrame) {
         try { (this._cancelFrame || caf)(this.animFrame) } catch (e) {}
         this.animFrame = null
       }
       this.active = []
-      if (this.canvasCtx) this.canvasCtx.clearRect(0, 0, this.canvasW, this.canvasH)
+      if (clear !== false && this.canvasCtx) this.canvasCtx.clearRect(0, 0, this.canvasW, this.canvasH)
     },
 
     setSmokeMode(m) {
@@ -982,7 +1047,7 @@ export default {
         // 肺部已满，禁止吸烟
         if (this.lungFill >= 100) {
           this.showHint = true
-          this.hintText = '⚠️ 肺部已满，请先吐烟'
+          this.hintText = '肺部已满，先吐烟'
           if (uni.vibrateShort) uni.vibrateShort({ type: 'medium' })
           this.isPressing = false
           return
@@ -1986,14 +2051,19 @@ export default {
 /* 肺部承受力可视化 */
 .lung-container {
   position: absolute;
-  top: 160rpx;
-  left: 30rpx;
-  width: 290rpx;
-  background: rgba(0, 0, 0, 0.5);
+  /* 原来贴在左上角，和烟头、火星挤在同一条水平线上，整页重心偏左上；
+     改成左侧垂直居中，正好和右侧工具栏左右配重 */
+  top: 50%;
+  left: 24rpx;
+  transform: translateY(-50%);
+  width: 248rpx;
+  /* backdrop-filter 在小程序 webview 里支持参差，而且每帧都要重新采样背景，
+     换成半透明实色 + 细描边，观感接近、开销低得多 */
+  background: linear-gradient(180deg, rgba(30, 30, 30, 0.92) 0%, rgba(17, 17, 17, 0.92) 100%);
   border-radius: 24rpx;
-  padding: 24rpx;
-  backdrop-filter: blur(10rpx);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 22rpx 20rpx 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.4);
   z-index: 10;
 }
 
@@ -2006,13 +2076,13 @@ export default {
 
 .lung-icon {
   position: relative;
-  width: 240rpx;
-  height: 200rpx;
+  width: 208rpx;
+  height: 172rpx;
 }
 
 .lung-canvas {
-  width: 240rpx;
-  height: 200rpx;
+  width: 208rpx;
+  height: 172rpx;
 }
 
 .lung-info {
@@ -2024,12 +2094,16 @@ export default {
 
 .lung-label {
   font-size: 22rpx;
+  letter-spacing: 4rpx;
   color: var(--text-dim);
+  opacity: 0.85;
 }
 
 .lung-value {
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: bold;
+  line-height: 1.05;
+  letter-spacing: 1rpx;
   color: var(--primary);
   transition: color 0.3s ease;
 }
@@ -2040,17 +2114,38 @@ export default {
 }
 
 .lung-alert {
-  margin-top: 12rpx;
-  padding: 8rpx 12rpx;
-  background: rgba(239, 68, 68, 0.2);
+  margin-top: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 10rpx 12rpx;
+  background: rgba(239, 68, 68, 0.13);
   border-radius: 12rpx;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1rpx solid rgba(239, 68, 68, 0.26);
+}
+
+/* 警示点：代替原来的 ⚠️。emoji 在各端字形/配色都不一样，圆点更稳也更克制 */
+.lung-alert-ic {
+  flex-shrink: 0;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: var(--danger-1);
+  box-shadow: 0 0 10rpx rgba(255, 107, 107, 0.85);
+  animation: alertBlink 1.1s ease-in-out infinite;
+}
+
+@keyframes alertBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
 }
 
 .lung-alert-text {
   font-size: 20rpx;
+  letter-spacing: 1rpx;
   color: var(--danger-1);
-  text-align: center;
+  white-space: nowrap;
 }
 
 @keyframes textPulse {
@@ -2066,12 +2161,14 @@ export default {
   z-index: 0;
   opacity: 0;
   transition: opacity 0.8s ease;
+  /* 光晕收紧到烟头那一层（烟头大约在 30% 高度），
+     原来铺满 80%×60% 会把整页染成一片脏橙 */
   background: radial-gradient(
-    ellipse 80% 60% at 50% 42%,
-    rgba(255, 140, 30, 0.25) 0%,
-    rgba(255, 90, 15, 0.15) 25%,
-    rgba(220, 60, 10, 0.08) 45%,
-    rgba(180, 40, 0, 0.03) 65%,
+    ellipse 64% 46% at 50% 30%,
+    rgba(255, 140, 30, 0.22) 0%,
+    rgba(255, 90, 15, 0.13) 25%,
+    rgba(220, 60, 10, 0.06) 45%,
+    rgba(180, 40, 0, 0.02) 65%,
     transparent 85%
   );
 }
@@ -2186,15 +2283,23 @@ export default {
 /* ---- 提示 ---- */
 .smoke-hint {
   position: absolute;
-  bottom: 320rpx; left: 0; right: 0;
+  /* 烟身收到 440 高后，提示再停在 300rpx 会离烟底太远 */
+  bottom: 240rpx; left: 0; right: 0;
   text-align: center;
   z-index: 30;
 }
 
+/* 装进胶囊：裸字压在烟上会跟着烟雾一起晃，包一层底色才读得清 */
 .smoke-hint text {
-  font-size: 28rpx;
+  display: inline-block;
+  padding: 14rpx 32rpx;
+  border-radius: 999rpx;
+  background: rgba(18, 18, 18, 0.6);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  font-size: 26rpx;
+  letter-spacing: 3rpx;
   color: var(--text-dim);
-  animation: pulse 2s ease-in-out infinite;
+  animation: pulse 2.6s ease-in-out infinite;
 }
 
 @keyframes pulse {
@@ -2204,40 +2309,47 @@ export default {
 
 /* ---- 顶部状态栏 ---- */
 .smoke-dashboard {
-  position: absolute;
-  top: 0; left: 0; right: 0;
+  /* 原来是 absolute + top:0，会压在 navbar（状态栏 + 标题栏）上，
+     标题「抽烟」和「剩余 x 根」直接叠字。navbar 本身在文档流里，
+     这一条跟着流走就自然落在标题下方，也不用去猜状态栏高度了 */
+  position: relative;
   z-index: 30;
-  padding: 80rpx 40rpx 24rpx;
-  background: linear-gradient(to bottom, rgba(15,15,15,0.9) 0%, transparent 100%);
+  /* 和标题拉开一点，不然「剩余 18 根」看着像标题的第二行 */
+  padding: 14rpx 40rpx 22rpx;
+  text-align: center;
 }
 
 .sd-row {
   display: flex;
-  align-items: center;
-  gap: 12rpx;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10rpx;
 }
 
 .sd-label {
-  font-size: 24rpx;
+  font-size: 21rpx;
+  letter-spacing: 4rpx;
   color: var(--text-dim);
+  opacity: 0.8;
 }
 
 .sd-val {
-  font-size: 28rpx;
+  font-size: 30rpx;
   color: var(--primary);
   font-weight: bold;
+  letter-spacing: 1rpx;
 }
 
 /* ---- 工具栏 ---- */
 .smoke-tools {
   position: absolute;
-  right: 16rpx;
+  right: 18rpx;
   top: 50%;
   transform: translateY(-50%);
   z-index: 40;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 18rpx;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
@@ -2252,51 +2364,59 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4rpx;
+  gap: 6rpx;
   background: transparent;
   border: none;
-  color: #d4d4d4;
-  padding: 8rpx 12rpx;
+  color: var(--text-dim);
+  padding: 0;
+  line-height: 1;
   cursor: pointer;
   transition: transform 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 小程序 button 自带 ::after 描边，会把圆形图标圈成方框 */
+.st-tool::after {
+  border: none;
+}
+
 .st-tool:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
 .st-tool-ic {
-  width: 96rpx;
-  height: 96rpx;
+  position: relative;
+  width: 92rpx;
+  height: 92rpx;
   border-radius: 50%;
-  background: rgba(40, 40, 40, 0.85);
-  border: 1px solid #3a3a3a;
+  /* 白 7% 的圆片压在橙色火光上会直接消失，改用深色玻璃片，任何主题下都看得出边界 */
+  background: linear-gradient(180deg, rgba(30, 26, 22, 0.64) 0%, rgba(16, 14, 12, 0.58) 100%);
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8rpx 18rpx rgba(0, 0, 0, 0.4), inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c0c0c0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: all 0.2s ease;
-  font-size: 40rpx;
+  color: #cfcfcf;
+  transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .st-tool.active .st-tool-ic {
-  background: var(--glow);
-  border-color: var(--primary);
   color: var(--primary);
-  box-shadow: 0 0 14px var(--glow);
+  border-color: var(--primary);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, var(--glow) 100%);
+  box-shadow: 0 0 0 1rpx var(--glow), 0 0 20rpx var(--glow);
 }
 
 .st-tool:active .st-tool-ic {
-  background: var(--glow);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .st-tool-lbl {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 136rpx;
+  gap: 2rpx;
+  min-width: 120rpx;
 }
 
 .st-tool-name {
@@ -2304,16 +2424,122 @@ export default {
   color: #d4d4d4;
   line-height: 1.1;
   font-weight: 500;
+  letter-spacing: 2rpx;
 }
 
 .st-tool-val {
   font-size: 20rpx;
-  color: #8a8a8a;
+  color: #858585;
   line-height: 1.1;
+  letter-spacing: 1rpx;
 }
 
 .st-tool.active .st-tool-val {
   color: var(--primary);
+}
+
+/* ---- 工具图标：纯 CSS 线稿，不用 emoji ----
+   emoji 在 iOS / Android / H5 是三套字形，还自带配色，和暗色主题打架；
+   线稿只吃 currentColor，按钮 active 时自动跟着主题变色 */
+
+.ic {
+  position: relative;
+  display: block;
+  width: 40rpx;
+  height: 40rpx;
+  color: inherit;
+}
+
+/* 音效：四根均衡器竖条，底对齐 */
+.ic-sound {
+  width: 36rpx;
+  height: 28rpx;
+  background-image:
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 5rpx 12rpx, 5rpx 24rpx, 5rpx 17rpx, 5rpx 28rpx;
+  background-position: 0 bottom, 10rpx bottom, 20rpx bottom, 30rpx bottom;
+}
+
+/* 弹灰：一根斜着的烟 + 两粒正在掉的灰 */
+.ic-ash::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3rpx;
+  width: 7rpx;
+  height: 22rpx;
+  margin-left: -3.5rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  transform: rotate(26deg);
+  transform-origin: top center;
+}
+
+.ic-ash::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 5rpx;
+  width: 5rpx;
+  height: 5rpx;
+  margin-left: 2rpx;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+  box-shadow: -14rpx -8rpx 0 -1rpx currentColor, 6rpx -16rpx 0 -1.5rpx currentColor;
+}
+
+/* 吐烟：两个错开大小的椭圆环，像刚飘出去的烟圈 */
+.ic-ring::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9rpx;
+  width: 26rpx;
+  height: 17rpx;
+  box-sizing: border-box;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+}
+
+.ic-ring::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 2rpx;
+  width: 15rpx;
+  height: 10rpx;
+  box-sizing: border-box;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+/* 派烟：两根并着递出去的烟 */
+.ic-pass::before,
+.ic-pass::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5rpx;
+  height: 26rpx;
+  margin: -13rpx 0 0 -2.5rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+}
+
+.ic-pass::before {
+  transform: translateX(-8rpx) rotate(32deg);
+}
+
+.ic-pass::after {
+  transform: translateX(7rpx) rotate(32deg);
+  opacity: 0.55;
 }
 
 /* ---- 派烟弹窗 ---- */
@@ -2337,10 +2563,38 @@ export default {
   text-align: center;
 }
 
-.pass-emoji {
-  font-size: 96rpx;
-  display: block;
-  margin-bottom: 24rpx;
+/* 弹窗顶部标记：两根交叉的烟，替换原来的 🤝 emoji */
+.pass-mark {
+  position: relative;
+  width: 96rpx;
+  height: 96rpx;
+  margin: 0 auto 26rpx;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, var(--glow) 100%);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 24rpx var(--glow);
+}
+
+.pass-mark::before,
+.pass-mark::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7rpx;
+  height: 44rpx;
+  margin: -22rpx 0 0 -3.5rpx;
+  border-radius: 4rpx;
+  background: var(--primary);
+}
+
+.pass-mark::before {
+  transform: rotate(38deg);
+}
+
+.pass-mark::after {
+  transform: rotate(-38deg);
+  opacity: 0.55;
 }
 
 .pass-title {
@@ -2386,14 +2640,17 @@ export default {
 /* ---- Toast ---- */
 .toast {
   position: fixed;
-  top: 160rpx; left: 50%;
+  /* 160rpx 会顶到标题栏，往下让开 navbar */
+  top: 220rpx; left: 50%;
   transform: translateX(-50%);
-  background-color: var(--border);
-  border: 1px solid var(--border);
+  background-color: rgba(26, 26, 26, 0.95);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.45);
   color: var(--text);
-  font-size: 28rpx;
-  padding: 16rpx 32rpx;
-  border-radius: 24rpx;
+  font-size: 26rpx;
+  letter-spacing: 1rpx;
+  padding: 16rpx 34rpx;
+  border-radius: 999rpx;
   z-index: 200;
 }
 
@@ -2417,22 +2674,24 @@ export default {
 }
 
 .style-picker {
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 24rpx;
-  padding: 32rpx;
+  background: var(--surface-1);
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 28rpx;
+  padding: 32rpx 28rpx 28rpx;
   width: 620rpx;
   max-height: 80vh;
+  box-shadow: 0 24rpx 60rpx rgba(0, 0, 0, 0.55);
   overflow-y: auto;
 }
 
 .picker-title {
   display: block;
   text-align: center;
-  font-size: 32rpx;
-  color: var(--primary);
-  font-weight: bold;
-  margin-bottom: 24rpx;
+  font-size: 30rpx;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 4rpx;
+  margin-bottom: 26rpx;
 }
 
 .picker-grid {
@@ -2443,23 +2702,23 @@ export default {
 }
 
 .picker-item {
-  width: 130rpx;
-  height: 130rpx;
+  width: 132rpx;
+  height: 132rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6rpx;
   background: var(--surface-2);
-  border: 2px solid #333;
-  border-radius: 16rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+  border-radius: 18rpx;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .picker-item.active {
   border-color: var(--primary);
   background: var(--glow);
-  box-shadow: 0 0 12rpx var(--glow);
 }
 
 .picker-item:active {
@@ -2467,14 +2726,13 @@ export default {
 }
 
 .picker-icon {
-  font-size: 40rpx;
-  line-height: 1.2;
+  font-size: 44rpx;
+  line-height: 1.1;
 }
 
 .picker-name {
   font-size: 20rpx;
   color: var(--text-dim);
-  margin-top: 4rpx;
 }
 
 .picker-item.active .picker-name {
@@ -2485,10 +2743,13 @@ export default {
 
 :root,
 page {
-  --cig-width: 46px;
-  --cig-total-h: 520px;
-  --cig-filter-h: 160px;
-  --cig-paper-h: 360px;
+  /* 与 script 顶部的 CIG_TOTAL_H / CIG_FILTER_H 保持一致：
+     46×520 在 390 宽的屏上几乎是一根柱子（占屏高 62%），
+     收到 40×440 后接近真实卷烟的细长比例（1:11），也不再顶到顶部信息区 */
+  --cig-width: 40px;
+  --cig-total-h: 440px;
+  --cig-filter-h: 144px;
+  --cig-paper-h: 296px;
 }
 
 /* 香烟容器：垂直居中，flex列排列 */
@@ -2701,26 +2962,28 @@ page {
     rgba(100, 20, 0, 0.3) 100%);
 }
 
-/* 自然火光闪烁：不规则亮度变化 */
+/* 自然火光闪烁：不规则亮度变化。
+   原来 brightness 在 0.85~1.4 之间来回摆，加上 blur 到 0.8px，
+   看起来像有人在拧灯泡；收窄到 0.92~1.18，只留轻微呼吸感 */
 @keyframes emberFlicker {
-  0% { filter: blur(0.3px) brightness(0.9); }
-  15% { filter: blur(0.5px) brightness(1.2); }
-  30% { filter: blur(0.2px) brightness(0.85); }
-  50% { filter: blur(0.8px) brightness(1.4); }
-  65% { filter: blur(0.4px) brightness(1.0); }
-  80% { filter: blur(0.6px) brightness(1.3); }
-  100% { filter: blur(0.3px) brightness(0.95); }
+  0% { filter: blur(0.3px) brightness(0.95); }
+  17% { filter: blur(0.45px) brightness(1.1); }
+  31% { filter: blur(0.25px) brightness(0.92); }
+  48% { filter: blur(0.6px) brightness(1.18); }
+  63% { filter: blur(0.35px) brightness(1.02); }
+  82% { filter: blur(0.5px) brightness(1.12); }
+  100% { filter: blur(0.3px) brightness(0.97); }
 }
 
-/* 吸烟时火光：更强烈更不规则 */
+/* 吸烟时火光：更亮，但幅度同样收敛（原来 brightness 到 2.0 会整块发白） */
 @keyframes emberFlickerIntense {
-  0% { filter: blur(0.2px) brightness(1.1); }
-  20% { filter: blur(0.8px) brightness(1.6); }
-  35% { filter: blur(0.3px) brightness(1.0); }
-  55% { filter: blur(1.2px) brightness(2.0); }
-  70% { filter: blur(0.5px) brightness(1.3); }
-  85% { filter: blur(0.9px) brightness(1.8); }
-  100% { filter: blur(0.3px) brightness(1.15); }
+  0% { filter: blur(0.25px) brightness(1.08); }
+  19% { filter: blur(0.55px) brightness(1.28); }
+  34% { filter: blur(0.3px) brightness(1.02); }
+  53% { filter: blur(0.75px) brightness(1.42); }
+  69% { filter: blur(0.4px) brightness(1.14); }
+  86% { filter: blur(0.6px) brightness(1.32); }
+  100% { filter: blur(0.3px) brightness(1.1); }
 }
 
 /* 点燃时内光晕：自然呼吸 */
@@ -2728,60 +2991,68 @@ page {
 .cigarette-3d.smoking .cig-flat-burn::after {
   content: '';
   position: absolute;
-  inset: -8px -14px -8px -14px;
+  /* 原来上下左右各外扩 8/14px、宽出烟身 28px 且上下对称，
+     渲染出来是一圈套在烟上的扁光环。现在两侧只溢 6px、往下多溢一点，
+     让光从烟灰底下透出来，而不是绕着烟头打转 */
+  inset: 1px -6px -4px -6px;
   border-radius: 50%;
-  background: radial-gradient(ellipse 60% 70% at 50% 50%,
-    rgba(255, 220, 100, 0.5) 0%,
-    rgba(255, 140, 30, 0.38) 28%,
-    rgba(255, 60, 0, 0.18) 52%,
-    transparent 72%);
+  background: radial-gradient(closest-side ellipse at 50% 62%,
+    rgba(255, 244, 196, 0.92) 0%,
+    rgba(255, 198, 78, 0.8) 20%,
+    rgba(255, 128, 24, 0.5) 42%,
+    rgba(226, 66, 4, 0.22) 62%,
+    rgba(170, 35, 0, 0.08) 78%,
+    transparent 92%);
   animation: emberPulse 0.6s ease-in-out infinite;
   pointer-events: none;
 }
 
 /* 吸烟时内光晕更强更大 */
 .cigarette-3d.smoking .cig-flat-burn::after {
-  inset: -12px -20px -12px -20px;
-  background: radial-gradient(ellipse 65% 75% at 50% 50%,
-    rgba(255, 240, 140, 0.7) 0%,
-    rgba(255, 180, 50, 0.55) 25%,
-    rgba(255, 100, 20, 0.35) 48%,
-    rgba(255, 40, 0, 0.15) 65%,
-    transparent 80%);
-  animation: emberPulseIntense 0.4s ease-in-out infinite;
+  inset: 0 -9px -6px -9px;
+  background: radial-gradient(closest-side ellipse at 50% 60%,
+    rgba(255, 250, 212, 1) 0%,
+    rgba(255, 214, 96, 0.92) 18%,
+    rgba(255, 148, 30, 0.66) 38%,
+    rgba(240, 92, 6, 0.34) 58%,
+    rgba(190, 42, 0, 0.14) 76%,
+    transparent 92%);
+  animation: emberPulseIntense 0.5s ease-in-out infinite;
 }
 
-/* 自然光晕呼吸 */
+/* 自然光晕呼吸：缩放幅度从 ±10% 收到 ±4%，亮度变化交给 emberFlicker */
 @keyframes emberPulse {
-  0% { opacity: 0.6; transform: scale(0.9); }
-  25% { opacity: 0.85; transform: scale(1.05); }
-  50% { opacity: 0.7; transform: scale(0.95); }
-  75% { opacity: 1; transform: scale(1.1); }
-  100% { opacity: 0.65; transform: scale(0.92); }
+  0% { opacity: 0.72; transform: scale(0.96); }
+  25% { opacity: 0.88; transform: scale(1.02); }
+  50% { opacity: 0.78; transform: scale(0.98); }
+  75% { opacity: 0.94; transform: scale(1.04); }
+  100% { opacity: 0.74; transform: scale(0.97); }
 }
 
 /* 吸烟时强烈光晕脉动 */
 @keyframes emberPulseIntense {
-  0% { opacity: 0.75; transform: scale(0.92); }
-  30% { opacity: 1; transform: scale(1.15); }
-  60% { opacity: 0.85; transform: scale(1.0); }
-  100% { opacity: 1; transform: scale(1.2); }
+  0% { opacity: 0.82; transform: scale(0.98); }
+  30% { opacity: 1; transform: scale(1.05); }
+  60% { opacity: 0.9; transform: scale(1.0); }
+  100% { opacity: 1; transform: scale(1.08); }
 }
 
-/* 整体火光晕（外层，扁椭圆向外扩散） */
+/* 整体火光晕（外层，扁椭圆向外扩散）。
+   原来 90×56px、top -32px：宽度是烟身的 2.2 倍还把中心抬高了 4px，
+   所以看着像一圈悬在烟头上方的光；现在贴着烟头收窄到 58×38px */
 .cigarette-3d.lit::before,
 .cigarette-3d.smoking::before {
   content: '';
   position: absolute;
-  top: -32px;
+  top: -19px;
   left: 50%;
   transform: translateX(-50%);
-  width: 90px;
-  height: 56px;
+  width: 58px;
+  height: 38px;
   background: radial-gradient(ellipse 50% 50% at 50% 50%,
-    rgba(255, 200, 60, 0.45) 0%,
-    rgba(255, 120, 20, 0.3) 32%,
-    rgba(255, 60, 0, 0.12) 55%,
+    rgba(255, 200, 60, 0.32) 0%,
+    rgba(255, 120, 20, 0.2) 32%,
+    rgba(255, 60, 0, 0.07) 55%,
     transparent 75%);
   pointer-events: none;
   animation: emberGlow 0.8s ease-in-out infinite;
@@ -2790,13 +3061,13 @@ page {
 
 /* 吸烟时外层光晕更大更亮 */
 .cigarette-3d.smoking::before {
-  width: 120px;
-  height: 72px;
-  top: -40px;
+  width: 74px;
+  height: 48px;
+  top: -24px;
   background: radial-gradient(ellipse 55% 55% at 50% 50%,
-    rgba(255, 220, 80, 0.65) 0%,
-    rgba(255, 150, 30, 0.45) 30%,
-    rgba(255, 80, 10, 0.22) 52%,
+    rgba(255, 220, 80, 0.42) 0%,
+    rgba(255, 150, 30, 0.28) 30%,
+    rgba(255, 80, 10, 0.12) 52%,
     transparent 72%);
   animation: emberGlowIntense 0.5s ease-in-out infinite;
 }
@@ -2826,67 +3097,66 @@ page {
   width: var(--cig-width);
   transform-origin: bottom center;
   background:
-    linear-gradient(88deg,
-      transparent 0%,
-      transparent 35%,
-      rgba(40, 35, 30, 0.15) 35.5%,
-      rgba(40, 35, 30, 0.15) 36%,
-      transparent 36.5%,
-      transparent 62%,
-      rgba(35, 30, 25, 0.12) 62.3%,
-      rgba(35, 30, 25, 0.12) 62.8%,
-      transparent 63.3%,
-      transparent 100%),
-    repeating-linear-gradient(to top,
-      transparent 0px,
-      transparent 4px,
-      rgba(45, 40, 35, 0.22) 4px,
-      rgba(45, 40, 35, 0.22) 5px,
-      rgba(65, 60, 55, 0.12) 5px,
-      rgba(65, 60, 55, 0.12) 6px,
-      transparent 6px,
-      transparent 11px),
-    repeating-linear-gradient(78deg,
-      transparent 0px,
-      transparent 3px,
-      rgba(40, 35, 30, 0.08) 3px,
-      rgba(40, 35, 30, 0.08) 3.5px,
-      transparent 3.5px,
-      transparent 7px),
+    /* 两条横向节缝：真实烟灰是一节一节堆的，没有缝就成了一块混凝土 */
     linear-gradient(to top,
-      #2a2520 0%,
-      #3a3530 6%,
-      #4a4540 14%,
-      #5a5550 24%,
-      #6a6560 36%,
-      #7a7570 48%,
-      #8a8580 60%,
-      #9a9590 74%,
-      #a8a3a0 86%,
-      #b5b0ab 100%);
+      transparent 0%,
+      transparent 14%,
+      rgba(12, 10, 8, 0.5) 15.5%,
+      rgba(12, 10, 8, 0.5) 17.5%,
+      transparent 19%,
+      transparent 37%,
+      rgba(12, 10, 8, 0.38) 38.5%,
+      rgba(12, 10, 8, 0.38) 40.5%,
+      transparent 42%,
+      transparent 100%),
+    /* 竖向细裂纹 */
+    linear-gradient(96deg,
+      transparent 0%,
+      transparent 41%,
+      rgba(18, 16, 14, 0.3) 41.5%,
+      rgba(18, 16, 14, 0.3) 42.6%,
+      transparent 43.1%,
+      transparent 67%,
+      rgba(18, 16, 14, 0.2) 67.5%,
+      rgba(18, 16, 14, 0.2) 68.4%,
+      transparent 69%,
+      transparent 100%),
+    /* 上下明暗：贴着燃烧线的一端最暗，顶端被烤得发灰白 */
+    linear-gradient(to top,
+      #17140f 0%,
+      #241f1a 5%,
+      #332d27 11%,
+      #423b34 17%,
+      #58514a 26%,
+      #6f6860 36%,
+      #837b73 48%,
+      #948c84 60%,
+      #a29a92 72%,
+      #aea69e 84%,
+      #b8b0a8 94%,
+      #c3bbb3 100%);
   opacity: 0;
   transition: opacity 0.35s ease, height 0.4s ease-out;
   pointer-events: none;
   z-index: 6;
-  border-radius: 2px 2px 0 0;
+  border-radius: 3px 3px 0 0;
+  /* 顶边改成一条起伏不大、带缺口的灰脊（原来单个尖顶会顶出「石头」轮廓） */
   clip-path: polygon(
     0% 100%, 100% 100%,
-    100% 96%, 98% 92%, 101% 86%, 97% 80%, 99% 74%,
-    96% 68%, 98% 62%, 95% 56%, 97% 50%, 94% 44%,
-    96% 38%, 93% 32%, 95% 26%, 91% 20%, 88% 14%,
-    84% 9%, 78% 5%, 70% 2%, 60% 0%,
-    52% 3%, 46% 1%, 40% 4%, 34% 2%, 28% 5%,
-    22% 9%, 16% 14%, 12% 20%, 8% 26%, 6% 32%,
-    4% 38%, 5% 44%, 3% 50%, 5% 56%, 2% 62%,
-    4% 68%, 1% 74%, 3% 80%, 0% 86%, 2% 92%,
-    0% 96%, 0% 100%
+    100% 95%, 98% 89%, 99% 81%, 96% 73%, 98% 65%,
+    95% 57%, 97% 49%, 94% 41%, 96% 33%, 92% 25%,
+    89% 19%, 85% 14%, 79% 11%, 71% 9%, 64% 11%,
+    57% 7%, 49% 9%, 41% 6%, 34% 9%, 27% 8%,
+    20% 11%, 15% 16%, 11% 23%, 8% 31%, 6% 39%,
+    4% 47%, 6% 55%, 3% 63%, 5% 71%, 2% 79%,
+    4% 87%, 1% 93%, 0% 97%, 0% 100%
   );
-  filter: blur(0.2px);
+  /* 0.2px 太锐，边缘像切出来的石块；0.6px 接近灰烬的松散轮廓 */
+  filter: blur(0.6px);
   box-shadow: 
-    inset 0 -3px 5px rgba(0, 0, 0, 0.35),
-    inset 0 1px 2px rgba(255, 255, 255, 0.08),
-    inset 2px 0 4px rgba(0, 0, 0, 0.12),
-    inset -2px 0 4px rgba(0, 0, 0, 0.12);
+    inset 0 -5px 7px rgba(0, 0, 0, 0.45),
+    inset 2px 0 4px rgba(0, 0, 0, 0.14),
+    inset -2px 0 4px rgba(0, 0, 0, 0.14);
 }
 
 /* 烟灰堆积层：不规则裂纹 + 颗粒感 + 微小火光 */
@@ -2895,12 +3165,12 @@ page {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 18% at 50% 96%,
-      rgba(255, 130, 35, 0.55) 0%,
-      rgba(220, 95, 18, 0.35) 25%,
-      rgba(180, 65, 12, 0.2) 45%,
-      rgba(120, 45, 8, 0.1) 65%,
-      transparent 90%),
+    /* 余烬只从灰的底缝里透一点暗红，原来 0.55 的橙会糊成一圈橘色 */
+    radial-gradient(ellipse 74% 13% at 50% 99%,
+      rgba(255, 105, 28, 0.4) 0%,
+      rgba(205, 78, 14, 0.24) 30%,
+      rgba(150, 52, 8, 0.11) 55%,
+      transparent 85%),
     linear-gradient(115deg,
       transparent 0%,
       transparent 28%,
@@ -2974,15 +3244,13 @@ page {
     opacity: 1;
     clip-path: polygon(
       0% 100%, 100% 100%,
-      100% 96%, 98% 92%, 101% 86%, 97% 80%, 99% 74%,
-      96% 68%, 98% 62%, 95% 56%, 97% 50%, 94% 44%,
-      96% 38%, 93% 32%, 95% 26%, 91% 20%, 88% 14%,
-      84% 9%, 78% 5%, 70% 2%, 60% 0%,
-      52% 3%, 46% 1%, 40% 4%, 34% 2%, 28% 5%,
-      22% 9%, 16% 14%, 12% 20%, 8% 26%, 6% 32%,
-      4% 38%, 5% 44%, 3% 50%, 5% 56%, 2% 62%,
-      4% 68%, 1% 74%, 3% 80%, 0% 86%, 2% 92%,
-      0% 96%, 0% 100%
+      100% 95%, 98% 89%, 99% 81%, 96% 73%, 98% 65%,
+      95% 57%, 97% 49%, 94% 41%, 96% 33%, 92% 25%,
+      89% 19%, 85% 14%, 79% 11%, 71% 9%, 64% 11%,
+      57% 7%, 49% 9%, 41% 6%, 34% 9%, 27% 8%,
+      20% 11%, 15% 16%, 11% 23%, 8% 31%, 6% 39%,
+      4% 47%, 6% 55%, 3% 63%, 5% 71%, 2% 79%,
+      4% 87%, 1% 93%, 0% 97%, 0% 100%
     );
   }
   30% {
@@ -3146,22 +3414,4 @@ page {
   z-index: 5;
 }
 
-/* 工具按钮角标 */
-.st-tool-ic .st-badge {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 6px var(--glow);
-}
-
-/* 吐烟圈长按指示 */
-.st-tool-ic.ring-pulse {
-  animation: ringPulse 0.5s ease-in-out infinite alternate;
-}
-@keyframes ringPulse {
-  0% { box-shadow: 0 0 6px var(--glow); }
-  100% { box-shadow: 0 0 20px var(--glow); }
-}
 </style>

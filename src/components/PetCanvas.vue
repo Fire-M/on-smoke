@@ -22,7 +22,9 @@ import { createPetCanvas2D } from '@/utils/pet-engine-2d.js'
 export default {
   props: {
     accessories: { type: Object, default: () => ({}) },
-    mood: { type: String, default: 'normal' }
+    mood: { type: String, default: 'normal' },
+    // 页面不可见时置 true：canvas 循环在后台仍按 60fps 重绘，白烧 CPU
+    paused: { type: Boolean, default: false }
   },
   data() { return { initTimer: null } },
   mounted() {
@@ -37,9 +39,9 @@ export default {
     })
     // #endif
     // #ifdef MP-WEIXIN
-    this.$nextTick(() => {
-      this.initTimer = setTimeout(() => { this.initMpCanvas() }, 200)
-    })
+    // 原来是固定等 200ms 再查节点，宠物必然晚 200ms 才出现。
+    // 改成渲染后立刻查，查不到再重试（见 initMpCanvas），正常情况一帧内就初始化完
+    this.$nextTick(() => { this.initMpCanvas() })
     // #endif
   },
   created() {
@@ -50,6 +52,10 @@ export default {
   // Vue 3 里 beforeDestroy 已经废弃（不会触发），组件销毁时引擎和定时器都不会清理，
   // 反复进出宠物页会累积动画循环。
   beforeUnmount() {
+    // 定时器清掉了，但 createSelectorQuery 的回调还在途中：
+    // 它回来后会在已销毁的组件上新建引擎并 start()，那条循环再没人停。
+    // 这里立个墓碑，回调进去先看它
+    this._unmounted = true
     // #ifdef H5
     if (this.initTimer) { clearTimeout(this.initTimer); this.initTimer = null }
     if (this._engine) { this._engine.destroy(); this._engine = null }
@@ -62,9 +68,20 @@ export default {
   methods: {
     // #ifdef MP-WEIXIN
     initMpCanvas() {
+      // 已经建好，或者组件已经销毁，都别再查
+      if (this._engine2d || this._unmounted) return
       uni.createSelectorQuery().in(this).select('#pet-canvas').fields({ node: true, size: true })
         .exec((res) => {
-          if (!res || !res[0] || !res[0].node) return
+          if (this._unmounted) return
+          if (!res || !res[0] || !res[0].node) {
+            // 节点还没渲染出来：40ms 后重试，最多 8 次。
+            // 比"一次性死等 200ms"快得多 —— 正常页面一帧内就能查到
+            this._initTries = (this._initTries || 0) + 1
+            if (this._initTries <= 8) {
+              this.initTimer = setTimeout(() => { this.initTimer = null; this.initMpCanvas() }, 40)
+            }
+            return
+          }
           const canvas = res[0].node
           const ctx = canvas.getContext('2d')
           let dpr = 2
@@ -78,7 +95,8 @@ export default {
           this._engine2d.attach(canvas, ctx, res[0].width, res[0].height)
           this._engine2d.updateAccessories(this.accessories || {})
           this._engine2d.setMood(this.mood)
-          this._engine2d.start()
+          // 初始化期间页面可能已经切走了，这时先别起循环
+          if (!this.paused) this._engine2d.start()
         })
     }
     // #endif
@@ -98,6 +116,11 @@ export default {
     // #ifdef MP-WEIXIN
     mood(val) {
       if (this._engine2d) this._engine2d.setMood(val)
+    },
+    paused(val) {
+      if (!this._engine2d) return
+      if (val) this._engine2d.stop()
+      else this._engine2d.start()
     }
     // #endif
   }

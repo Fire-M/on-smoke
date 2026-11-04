@@ -197,7 +197,10 @@
         </view>
         <!-- 金额不放进按钮里：它是独立的一条可点区域，
              否则和「记一次」的点击叠在一起，容易互相抢事件 -->
-        <view class="btn-resist-chip" @tap="openPriceEditor">+¥{{ resistPrice }}</view>
+        <view class="btn-resist-chip" @tap="openPriceEditor">
+          <text class="btn-resist-chip-val">+¥{{ resistPrice }}</text>
+          <text class="btn-resist-chip-edit">自定义</text>
+        </view>
         <text class="resist-float" v-if="resistFloatVisible">{{ resistFloatText }}</text>
       </view>
 
@@ -225,12 +228,17 @@
     <view class="modal-mask" v-if="showPriceEditor" @click="closePriceEditor">
       <view class="modal-card" @click.stop>
         <text class="modal-title">忍住一根，算省多少</text>
-        <view class="modal-input-wrap">
+        <view class="modal-input-wrap" :class="{ 'is-error': priceEditError }">
           <text class="modal-input-prefix">¥</text>
           <input class="modal-input" type="digit" v-model="priceEditValue"
-            :placeholder="autoResistPrice" :focus="showPriceEditor" />
+            :placeholder="autoResistPrice" :focus="showPriceEditor"
+            @input="priceEditError = ''" />
         </view>
-        <text class="modal-hint">留空或填 0 就按烟价自动算（现在 ¥{{ autoResistPrice }} 一根）。只影响之后记的次数，已记下的金额不变。</text>
+        <!-- 出错时就地贴在金额下面说明，不再弹 toast（toast 在弹窗后面，很容易没看见） -->
+        <view class="modal-error" v-if="priceEditError">
+          <text class="modal-error-text">{{ priceEditError }}</text>
+        </view>
+        <text class="modal-hint" v-else>留空或填 0 就按烟价自动算（现在 ¥{{ autoResistPrice }} 一根）。只影响之后记的次数，已记下的金额不变。</text>
         <view class="modal-actions">
           <button class="modal-btn cancel" @click="closePriceEditor">取消</button>
           <button class="modal-btn confirm" @click="saveResistPrice">保存</button>
@@ -307,6 +315,7 @@ export default {
       autoResistPrice: '0.00', // 不自定义时按烟价算出来的值，弹窗里当占位符
       showPriceEditor: false,  // 改金额的弹窗
       priceEditValue: '',      // 弹窗里的输入值
+      priceEditError: '',      // 金额非法时的内联提示（显示在输入框下面）
       // 省钱目标（原独立页面，现在就在账本里）
       hasGoal: false,
       goalName: '',
@@ -393,12 +402,18 @@ export default {
   },
 
   onShow() {
+    this.startPolling()
+    // onLoad 刚刷过一次，首次 onShow 不必再来一遍
+    if (!this._firstShowDone) {
+      this._firstShowDone = true
+      return
+    }
+    // 立刻刷新。之前试过延后 100ms，反而更卡 —— 那一发正好撞上用户返回后的第一次点击。
+    // 真正的开销是 updateChallengeProgress 每次无条件写 storage，那里已经改成按需写
     this.refreshData()
     this.checkCooldown()
-    this.startPolling()
-    // 首次进入 onShow 早于 onReady，query 不到节点会被 initConfetti 自己重试；
-    // 从别的 tab 切回来时引擎已在 onHide 销毁，这里重新建一个
-    this.initConfetti()
+    // 撒花引擎不在这里重建：burstConfetti 发现引擎不在时会自己初始化。
+    // 每次返回都重建一遍（同步 query + 新引擎）是纯浪费
   },
 
   // tabBar 页切走只触发 onHide，不会 unload。
@@ -656,6 +671,16 @@ export default {
     initConfetti() {
       this._confettiWanted = true
       if (this._confetti || this._confettiPending) return
+      // tabBar 切走只是隐藏页面，canvas 节点和 2D 上下文都还在。
+      // 直接拿它们重建引擎，省掉重设 canvas.width —— 那一步会重新分配整块像素缓冲，
+      // 每次从子页面返回首页都来一遍，反复切换时很伤
+      if (this._confettiCanvas && this._confettiCtx && this._confettiW && this._confettiH) {
+        this._confetti = createConfetti(
+          this._confettiCanvas, this._confettiCtx, this._confettiW, this._confettiH,
+          () => { this.confettiActive = false }
+        )
+        return
+      }
       this._confettiPending = true
       let retry = 0
       const run = () => {
@@ -699,6 +724,9 @@ export default {
 
             this._confettiCanvas = canvas
             this._confettiCtx = ctx
+            // 尺寸也记下来：下次 onShow 复用同一块画布，不用再查询、再重分配
+            this._confettiW = width
+            this._confettiH = height
             // 一炮放完（粒子全部消亡）就把画布藏起来：全屏 canvas 常驻时，
             // 滚动过程中会多合成一层，安卓上尤其明显
             this._confetti = createConfetti(canvas, ctx, width, height, () => {
@@ -745,8 +773,13 @@ export default {
         this._confetti.destroy()
         this._confetti = null
       }
-      this._confettiCanvas = null
-      this._confettiCtx = null
+      // 粒子跟着引擎一起没了，标记也要清掉。
+      // 否则它在 onHide 后一直是 true，每次都让人以为「还在撒花」而白跑一遍初始化
+      this.confettiActive = false
+      // 注意：这里故意不清 _confettiCanvas / _confettiCtx。
+      // 首页是 tabBar 页，onHide 只是隐藏，画布节点还在，
+      // 下次 onShow 直接复用（见 initConfetti），不用重新分配像素缓冲。
+      // 真页面销毁时整个实例一起回收，不会泄漏
     },
 
     // 忍住成功时放一炮：左右两侧对射 + 中间一束（原文的三连发打法）
@@ -831,27 +864,44 @@ export default {
       // 已经自定义过就预填当前值（多半只想微调）；跟随烟价时留空，让占位符显示自动价
       const custom = Number(Store.getSettings().resistPrice)
       this.priceEditValue = custom > 0 ? String(custom) : ''
+      this.priceEditError = ''
       this.showPriceEditor = true
     },
 
     closePriceEditor() {
       this.showPriceEditor = false
+      this.priceEditError = ''
     },
 
     saveResistPrice() {
       const raw = String(this.priceEditValue == null ? '' : this.priceEditValue).trim()
       let price = 0
       if (raw !== '') {
-        const n = Number(raw)
-        if (!isFinite(n) || n < 0) {
-          uni.showToast({ title: '请输入正确的金额', icon: 'none' })
+        // digit 键盘拦不住粘贴和多余的符号，这里逐条给出能看懂的说明，
+        // 提示直接显示在输入框下方，不用 toast
+        if (raw.startsWith('-')) {
+          this.priceEditError = '金额不能是负数'
           return
         }
-        price = Math.min(999, n)   // 上限防手滑多打一位
+        if (!/^\d+(\.\d{0,2})?$/.test(raw)) {
+          this.priceEditError = '只能填数字，最多两位小数'
+          return
+        }
+        const n = Number(raw)
+        if (!isFinite(n)) {
+          this.priceEditError = '这是个无效的金额'
+          return
+        }
+        if (n > 999) {
+          this.priceEditError = '单根最多 ¥999，是不是多打了一位'
+          return
+        }
+        price = n
       }
       // 用存储里的最新快照打底，只覆盖这一个字段，
       // 避免把 onLoad 时的旧 selectedBrand 写回去
       Store.saveSettings({ ...Store.getSettings(), resistPrice: price })
+      this.priceEditError = ''
       this.showPriceEditor = false
       this.refreshData()
       uni.showToast({
@@ -1247,8 +1297,9 @@ export default {
   display: flex;
   align-items: center;
   gap: 18rpx;
-  /* 右侧留出金额徽标的位置：徽标是独立浮层，不参与这行 flex */
-  padding: 20rpx 150rpx 20rpx 24rpx;
+  /* 右侧留出金额徽标的位置：徽标是独立浮层，不参与这行 flex。
+     徽标现在是「金额 + 自定义」两行，比原来宽一点，留 170rpx 免得压到副标题 */
+  padding: 20rpx 170rpx 20rpx 24rpx;
   margin-bottom: 16rpx;
   border-radius: 26rpx;
   background: linear-gradient(135deg, var(--surface-1) 0%, var(--surface-2) 100%);
@@ -1290,26 +1341,47 @@ export default {
   color: var(--text-dim);
 }
 
-/* 这个金额可以点开改：盖在按钮右侧，独立于「记一次」的点击区 */
+/* 这个金额可以点开改：盖在按钮右侧，独立于「记一次」的点击区。
+   金额下面带一行「自定义」，光看 +¥1.50 没人知道它可点、可以改 */
 .btn-resist-chip {
   position: absolute;
   right: 24rpx;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  padding: 10rpx 18rpx;
-  border-radius: 999rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+  padding: 9rpx 18rpx 8rpx;
+  border-radius: 20rpx;
   border: 1px solid var(--accent);
   background: var(--surface-2);
   color: var(--accent);
-  font-size: 22rpx;
+}
+
+.btn-resist-chip-val {
+  font-size: 24rpx;
   font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.5rpx;
+}
+
+.btn-resist-chip-edit {
+  font-size: 18rpx;
+  line-height: 1.15;
+  letter-spacing: 1rpx;
+  opacity: 0.62;
 }
 
 /* 按下给点反馈，暗示这里能点 */
 .btn-resist-chip:active {
   background: var(--accent);
   color: var(--bg);
+}
+
+.btn-resist-chip:active .btn-resist-chip-edit {
+  opacity: 0.8;
 }
 
 /* 点一下的钱数上浮，回答的是「我刚才做了什么」 */
@@ -1560,6 +1632,35 @@ export default {
 /* 两个输入框叠在同一个弹窗里时的间距 */
 .modal-input-wrap-gap {
   margin-top: 16rpx;
+}
+
+/* 金额填错：输入框描边转红，说明就贴在框下面（不再靠 toast，弹窗后面看不见） */
+.modal-input-wrap.is-error {
+  border-color: var(--danger-1);
+  box-shadow: 0 0 0 3rpx rgba(255, 107, 107, 0.12);
+}
+
+.modal-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+
+.modal-error::before {
+  content: '';
+  flex-shrink: 0;
+  width: 8rpx;
+  height: 8rpx;
+  margin-top: 12rpx;
+  border-radius: 50%;
+  background: var(--danger-1);
+}
+
+.modal-error-text {
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--danger-1);
 }
 
 /* 目标名称是文字不是数字，字号跟着降一档 */

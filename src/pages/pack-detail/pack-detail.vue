@@ -5,7 +5,7 @@
     <!-- 烟盒展示区 -->
     <view class="box-area">
       <view class="box-scene" v-if="sceneReady">
-        <view class="box-wrapper" :style="wrapperStyle"
+        <view class="box-wrapper" :class="{ dragging: isDragging }" :style="wrapperStyle"
           @touchstart="onDragStart" @touchmove.prevent="onDragMove" @touchend="onDragEnd">
           <view class="box-ground-shadow"></view>
           <view class="box-3d" :class="{ 'lid-open': lidOpen }">
@@ -84,14 +84,10 @@
             <view class="box-click-hint" v-if="!lidOpen">
               <text>拖拽旋转 · 点击开盖</text>
             </view>
-            <view class="box-dots">
-              <text class="dot active"></text>
-              <text class="dot"></text>
-            </view>
           </view>
         </view>
-        <view class="box-pull-hint" :class="{ show: showPullHint }">
-          <text>点击任意一支抽出</text>
+        <view class="box-pull-hint" :class="{ show: showPullHint && boxRemainingCigs > 0 }">
+          <text>还剩 {{ boxRemainingCigs }} 支 · 点击任意一支抽出</text>
         </view>
         <!-- 抽空后的空盒提示 + 开新包 -->
         <view class="box-empty-hint" v-if="boxRemainingCigs <= 0">
@@ -213,18 +209,22 @@ export default {
   },
 
   onReady() {
-    // 首帧画完（导航栏、底色、广告条）后再把 3D 烟盒挂上去。
-    // 页面转场时新页面要立刻出一帧，如果这一帧就在合成 3D 层，
-    // 看起来就是「点卡片 → 白屏一下 → 盒子出现」。
-    // 120ms ≈ 转场动画过半：这时页面底色和导航栏已经画出来了，
-    // 再把 3D 层的栅格化压在动画尾段，比首帧就合成整块 3D 顺很多
+    // 首帧画完（导航栏、底色、广告条）后再把 3D 烟盒挂上去：
+    // 转场那一帧如果就在合成整块 3D 层，会变成「点卡片 → 白屏 → 盒子出现」。
+    // 但也不必死等 120ms —— 让出两帧（≈32ms）就够转场起步了，
+    // 盒子能早 90ms 出现
     this.$nextTick(() => {
-      setTimeout(() => { this.sceneReady = true }, 120)
+      this._sceneTimer = setTimeout(() => {
+        this._sceneTimer = null
+        if (this._unmounted) return
+        this.sceneReady = true
+      }, 32)
     })
   },
 
   onUnload() {
     this._unmounted = true
+    if (this._sceneTimer) { clearTimeout(this._sceneTimer); this._sceneTimer = null }
     if (this.pullTimer) { clearTimeout(this.pullTimer); this.pullTimer = null }
   },
 
@@ -234,6 +234,8 @@ export default {
     this.activeIndex = null
     // 从存储重新读取包剩余（抽完会扣减，没抽完则不变）
     this.refreshPack()
+    // 从抽烟页回来时盖子还是开的：把「点击抽出」引导恢复，否则抽完一根回来就没提示了
+    this.showPullHint = this.lidOpen && this.boxRemainingCigs > 0
     // 看完广告回来后刷新剩余次数（含跨天重置）
     this.adRewardRemain = getRewardRemain()
     this.adEnabled = isAdEnabled()
@@ -250,6 +252,8 @@ export default {
       this.boxRemainingCigs = Store.refillPack(this.brand.id)
       this.isPulling = false
       this.activeIndex = null
+      // 盒里又有烟了：盖子开着就把「点击抽出」的引导还回去，否则抽空后提示再也不出现
+      this.showPullHint = this.lidOpen
       if (uni.showToast) uni.showToast({ title: '开了新的一包', icon: 'none' })
     },
 
@@ -266,6 +270,7 @@ export default {
         Store.addExtraQuota(REWARD_QUOTA_PER_AD)
         this.isPulling = false
         this.activeIndex = null
+        this.showPullHint = this.lidOpen
         if (uni.showToast) uni.showToast({ title: `已补满 · 配额 +${REWARD_QUOTA_PER_AD}`, icon: 'none' })
       }).catch(() => {
         this.adWatching = false
@@ -437,7 +442,10 @@ page {
 /* 场景容器 - 透视：绝对居中于页面 */
 .box-scene {
   position: absolute;
-  top: 50%;
+  /* .box-3d 高 435px（盒体 340 + 开盖预留 95），合盖时顶部那 95px 是空的，
+     所以几何居中会让盒子看着往下坠（盒体中心比场景中心低 47.5px）。
+     这里把场景整体上移 lid 高度的一半，让盒体自己落在视觉中心 */
+  top: calc(50% - var(--lid-h) / 2);
   left: 50%;
   transform: translate(-50%, -50%);
   perspective: 900px;
@@ -855,28 +863,6 @@ page {
   font-size: 13px;
   color: rgba(240, 230, 210, 0.5);
   letter-spacing: 2px;
-}
-
-/* 分页点 */
-.box-dots {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.box-dots .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(240, 230, 210, 0.25);
-  transition: background 0.3s;
-}
-
-.box-dots .dot.active {
-  background: rgba(240, 230, 210, 0.8);
-  width: 16px;
-  border-radius: 3px;
 }
 
 /* 地面阴影 */
