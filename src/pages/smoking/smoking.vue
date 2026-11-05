@@ -1,5 +1,5 @@
 <template>
-  <view class="page-container" :class="themeClass()">
+  <view class="page-container" :class="[themeClass(), brandMoodClass]">
     <app-navbar title="抽烟" :custom-back="true" @back="goBack"></app-navbar>
 
     <!-- 背景火光（由亮渐灭） -->
@@ -114,6 +114,11 @@
     <view class="toast" v-if="showToast">
       <text>{{ toastMsg }}</text>
     </view>
+
+    <!-- 品牌氛围层：随品牌系列/焦油/解压切换，pointer-events:none 不挡操作 -->
+    <view class="mood-veil"></view>
+    <view class="tar-stain" v-if="currentBrand && currentBrand.tar === '高'"></view>
+    <view class="relax-glow" v-if="currentBrand && currentBrand.relax >= 4"></view>
 
     <!-- 花样选择器 -->
     <view class="style-picker-mask" :class="{ show: showStylePicker }" @click="showStylePicker = false">
@@ -246,6 +251,26 @@ export default {
   },
 
   computed: {
+    // 当前抽烟的品牌对象：优先取链接带进来的 brandId，否则取用户选中的牌子。
+    // 抽烟页所有「随品牌变」的视觉（氛围/焦油/柔光/emoji/台词）都从这里拿。
+    currentBrand() {
+      if (this.brandId) {
+        const b = BRANDS.find(x => x.id === this.brandId)
+        if (b) return b
+      }
+      const sel = Store.getSettings().selectedBrand
+      return sel ? BRANDS.find(x => x.id === sel) : null
+    },
+    // 整页氛围 class：按 series 定色调，再叠加焦油/解压标记，供 CSS 渲染对应遮罩层
+    brandMoodClass() {
+      const b = this.currentBrand
+      if (!b) return ''
+      const arr = ['mood-' + (b.series || 'cold')]
+      if (b.tar === '高') arr.push('tar-high')
+      if (b.relax >= 4) arr.push('relax-high')
+      return arr.join(' ')
+    },
+
     cigClass() {
       const classes = {}
       if (this.state === 'lit') classes.lit = true
@@ -329,6 +354,11 @@ export default {
 
   onLoad(options) {
     this.brandId = options.brandId || ''
+    // 进抽烟页弹一句品牌开盒毒舌（不挡操作，2s 自消；页面已卸载则跳过）
+    const ob = this.currentBrand
+    if (ob && ob.openLine) {
+      setTimeout(() => { if (!this._unmounted) this.showToastMsg(ob.openLine) }, 1000)
+    }
     // 参数缺失或非法时不能当 0：会被记成「抽完一包」并补满整包。
     // 回退到该品牌真实的剩余支数。
     const parsedRemaining = parseInt(options.remaining, 10)
@@ -690,6 +720,12 @@ export default {
             brand = sel ? BRANDS.find(b => b.id === sel) : null
           }
           const smoke = (brand && brand.smoke) || '#dfe6f2'
+          // 进入抽烟页按品牌绑定「默认吐烟形态」+ 记录品牌 emoji（偶发飘进烟雾里）
+          this.brandEmoji = (brand && brand.emoji) || ''
+          if (brand && brand.defStyle) {
+            const di = this.smokeStyleNames.indexOf(brand.defStyle)
+            if (di >= 0) this.ringCurrentStyle = di
+          }
           const hexA = (hex, a) => {
             const h = hex.replace('#', '')
             const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h
@@ -842,6 +878,8 @@ export default {
       p.seedT = Math.random() * 50
       p.grow = this.cfg.growRate * (0.45 + Math.random() * 1.2)
       p.depth = Math.random()
+      // 偶发让一个粒子变成品牌 emoji，抽着抽着飘出一个专属符号（不是满屏 emoji 雨）
+      p.emoji = (this.brandEmoji && Math.random() < 0.014) ? this.brandEmoji : null
       this.active.push(p)
       return p
     },
@@ -910,7 +948,14 @@ export default {
         const a = Math.max(0, fade) * p.alphaMax
         const s = r * 2
         ctx.globalAlpha = a
-        ctx.drawImage(this.sprite, p.x - r, p.y - r, s, s)
+        if (p.emoji) {
+          ctx.font = Math.max(12, s * 0.9) + 'px sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(p.emoji, p.x, p.y)
+        } else {
+          ctx.drawImage(this.sprite, p.x - r, p.y - r, s, s)
+        }
       }
       ctx.globalAlpha = 1
     },
@@ -1026,39 +1071,18 @@ export default {
         this.hintText = ''
         this.showHint = true
         this.pressTimer = setTimeout(() => {
-          // 点火成功，直接进入吸烟状态（跳过无效的 lit 中间态）
+          // 点火成功：烟点着了，进入「已点着(lit)」态，但**不**直接进入吸烟。
+          // 必须让用户松手后再长按才吸烟——把「点火」和「吸烟」拆成两次手势，
+          // 否则一次长按里点火+吸烟+吐烟连着发生，松手即吐，体验很乱。
           if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
           this.playFire()  // 点火音效
-          this.state = 'smoking'
-          this.smokeStartTime = Date.now()
-          this.currentPuffStart = Date.now()
-
           // 「点火即算抽了一根」：此刻立刻落账（配额 -1、history +1、
           // 烟盒剩余 -1），之后无论抽完还是中途返回都不再重复记账。
           this.settleSmoke()
-
-          this.startSmokeProgress()
-          this.showHint = false
-          this.startBurnSound()
-          // 单次吸烟最长时长，到时自动吐烟
-          this.puffTimer = setTimeout(() => {
-            if (this.state === 'smoking') {
-              this.isPressing = false
-              const progressFactor = 0.4 + (this.smokeProgress / 100) * 0.6
-              const puffFactor = Math.min(2.0, 0.5 + MAX_PUFF_DURATION / 3000)
-              this.startExhale({
-                intensity: progressFactor * puffFactor,
-                duration: 2000,
-                onComplete: () => {
-                  if (this.state === 'exhaling') {
-                    this.state = 'lit'
-                    this.showHint = true
-                    this.hintText = '长按吸烟'
-                  }
-                }
-              })
-            }
-          }, MAX_PUFF_DURATION)
+          this.state = 'lit'
+          this.showHint = true
+          // 若用户还按着火柴没松手，先提示松开；松手后 onPointerUp 会改成「长按吸烟」
+          this.hintText = this.isPressing ? '松开后长按吸烟' : '长按吸烟'
         }, IGNITE_DELAY)
       } else if (this.state === 'lit' || this.state === 'exhaling') {
         // 肺部已满，禁止吸烟
@@ -1132,6 +1156,14 @@ export default {
         this.state = 'ready'
         this.showHint = true
         this.hintText = '长按点火'
+        return
+      }
+
+      // 点火后处于「已点着」态：松手只是结束点火手势，不触发吐烟，
+      // 明确提示进入下一次「长按吸烟」手势（见 onPointerDown 的 lit 分支）
+      if (this.state === 'lit') {
+        this.showHint = true
+        this.hintText = '长按吸烟'
         return
       }
 
@@ -1301,6 +1333,10 @@ export default {
       if (!this.cancelled && this.settled) {
         Store.updateLastSmokeDuration(duration)
       }
+
+      // 抽完一根弹一句收尾毒舌，维持「不劝你、陪你自嘲」的调性
+      const eb = this.currentBrand
+      if (eb && eb.endLine) this.showToastMsg(eb.endLine)
 
       if (uni.vibrateShort) uni.vibrateShort({ type: 'heavy' })
 
@@ -3432,4 +3468,49 @@ page {
   z-index: 5;
 }
 
+/* ===== 抽烟页品牌氛围：随品牌系列/焦油/解压切换，pointer-events:none 不挡操作 ===== */
+.mood-veil {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+}
+/* 冷系列：边缘冷蓝结霜 */
+.mood-cold .mood-veil {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(120,180,255,0.10), transparent 60%),
+    radial-gradient(140% 100% at 50% 110%, rgba(80,140,220,0.12), transparent 55%);
+}
+/* 暖系列：底部暖红压暗 */
+.mood-warm .mood-veil {
+  background:
+    radial-gradient(120% 90% at 50% 110%, rgba(220,90,60,0.16), transparent 55%),
+    radial-gradient(100% 60% at 50% -10%, rgba(220,120,60,0.08), transparent 60%);
+}
+/* 甜系列：粉雾柔光 */
+.mood-sweet .mood-veil {
+  background:
+    radial-gradient(120% 100% at 50% 50%, rgba(255,180,220,0.12), transparent 70%),
+    radial-gradient(100% 80% at 50% -10%, rgba(255,200,235,0.10), transparent 60%);
+}
+/* 暗夜系列：微紫压暗 */
+.mood-night .mood-veil {
+  background:
+    radial-gradient(120% 100% at 50% 110%, rgba(120,40,160,0.16), transparent 55%),
+    radial-gradient(100% 70% at 50% -10%, rgba(90,30,140,0.12), transparent 60%);
+}
+/* 焦油高：屏幕底部悄悄积一层焦油污渍（纯玩笑，强化「这包更伤」的戏谑叙事） */
+.tar-stain {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 220rpx;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(60,40,10,0.42), rgba(60,40,10,0.18) 40%, transparent 100%);
+}
+/* 解压高：整页极轻提亮柔光，呼吸感更舒缓 */
+.relax-glow {
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 45%, rgba(255,250,235,0.08), transparent 70%);
+}
 </style>

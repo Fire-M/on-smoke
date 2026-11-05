@@ -141,6 +141,8 @@ export default {
       adWatching: false,   // 广告播放中，防连点
       isPulling: false,
       activeIndex: null,
+      // 已抽走的烟支索引集合：点哪根记哪根，盒子的空洞长在你点的位置
+      pulledIndices: [],
       // 3D 烟盒（多层渐变 + preserve-3d）首帧很贵，等页面先画出底色再挂载
       sceneReady: false,
       // 烟支是多边形柱体，面数直接决定渲染节点量：
@@ -165,16 +167,15 @@ export default {
 
     boxCigs() {
       if (!this.lidOpen) return []
-      // 槽位固定为整包支数，已抽走的留空位（从前往后抽），
-      // 这样「哪一格空了」就等于「哪根被抽走」，不会出现抽 A 根、消失 B 根的错位
+      // 槽位固定为整包支数；哪根被抽走记在 pulledIndices 里，
+      // 「点的哪根」就「空哪根」——不会出现抽 A 根、消失 B 根的错位。
       const total = Math.max(this.brand.packSize || 0, this.boxRemainingCigs || 0, 0)
-      const emptyCount = Math.max(0, total - Math.max(this.boxRemainingCigs, 0))
       const cigs = []
       for (let i = 0; i < total; i++) {
         const colIndex = i % 10
         cigs.push({
           index: i,
-          empty: i < emptyCount,
+          empty: this.pulledIndices.includes(i),
           rot: -4 + colIndex * (8 / Math.max(9, 1))
         })
       }
@@ -247,6 +248,11 @@ export default {
     refreshPack() {
       this.brand.packSize = Store.getPackSize(this.brand.id)
       this.boxRemainingCigs = Store.getPackRemaining(this.brand.id)
+      // 兼容旧数据：之前是「前 N 个空」的连续模型，这里把已抽走的槽位还原成集合，
+      // 之后点击哪根就记哪根，空洞长在你点的位置。
+      const size = this.brand.packSize || 20
+      const rem = this.boxRemainingCigs
+      this.pulledIndices = rem < size ? Array.from({ length: size - rem }, (_, i) => i) : []
     },
 
     // 抽空后开新的一包（之前抽完 20 根就再也抽不了了）
@@ -254,6 +260,7 @@ export default {
       this.boxRemainingCigs = Store.refillPack(this.brand.id)
       this.isPulling = false
       this.activeIndex = null
+      this.pulledIndices = []
       // 盒里又有烟了：盖子开着就把「点击抽出」的引导还回去，否则抽空后提示再也不出现
       this.showPullHint = this.lidOpen
       if (uni.showToast) uni.showToast({ title: '开了新的一包', icon: 'none' })
@@ -272,6 +279,7 @@ export default {
         Store.addExtraQuota(REWARD_QUOTA_PER_AD)
         this.isPulling = false
         this.activeIndex = null
+        this.pulledIndices = []
         this.showPullHint = this.lidOpen
         if (uni.showToast) uni.showToast({ title: `已补满 · 配额 +${REWARD_QUOTA_PER_AD}`, icon: 'none' })
       }).catch(() => {
@@ -295,6 +303,11 @@ export default {
       if (this.isPulling) return
       // 空盒不能再抽
       if (this.boxRemainingCigs <= 0) return
+      // 已抽掉的那根（空位）不能重复抽，给个轻提示避免「点了没反应」的困惑
+      if (this.pulledIndices.includes(index)) {
+        if (uni.showToast) uni.showToast({ title: '这根已经抽走啦', icon: 'none' })
+        return
+      }
       // 配额用完不能再抽。canSmoke() 原本只在首页 haveOne() 里调用，
       // 从烟盒页直接抽会绕过配额限制，而点火即记账会把超额直接写进数据。
       const check = Store.canSmoke()
@@ -303,9 +316,11 @@ export default {
         return
       }
       this.showPullHint = false
-      // 抽的是「第一个还有烟的槽位」：抽完它正好变空位，视觉上连续。
-      // 若按点击的那根抽，会出现「抽的是第 5 根、消失的却是别的」，数量看着不对。
-      this.activeIndex = Math.max(0, (this.brand.packSize || 0) - this.boxRemainingCigs)
+      // 抽的就是「用户点的那根」：activeIndex 用点击的 index，而不是重算成
+      // 第一个有烟的槽位——否则会出现「点第 5 根、飞出去的却是第 1 根」。
+      // 每根的空位状态记进 pulledIndices，盒子的空洞长在哪就长在哪，视觉与点击一致。
+      this.activeIndex = index
+      this.pulledIndices.push(index)
       this.isPulling = true
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
@@ -323,7 +338,7 @@ export default {
         uni.navigateTo({
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })
-      }, 400)
+      }, 500)
     },
 
     // 拖拽旋转
@@ -349,6 +364,10 @@ export default {
 
     onDragEnd() {
       this.isDragging = false
+      // 拖拽结束必须复位 dragMoved：否则旋转过盒子后，后续点击抽烟会被
+      // pullCig 的「拖拽误触」守卫永久吞掉（H5 鼠标场景下尤为明显——鼠标按下
+      // 不会触发 onDragStart 去复位 dragMoved），表现为「点了烟支毫无反应、也没飞出」。
+      this.dragMoved = false
     }
   }
 }
@@ -1253,7 +1272,11 @@ page {
 }
 
 .box-cig-3d.pulling {
-  /* 与 pullCig 的 400ms 跳转对齐：动画播完就转场，不留空等 */
+  /* 与 pullCig 的 500ms 跳转对齐：动画播完就转场，不留空等 */
+  /* 被点的这根在 pullCig 里会立即被标成 is-empty（opacity:0），会把正在播放的
+     飞出动画一起藏掉——这里强制 opacity:1 并提到最前，保证「抽哪根、哪根飞出来」看得见 */
+  opacity: 1;
+  z-index: 50;
   animation: cigPullOut 0.38s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
 }
 
