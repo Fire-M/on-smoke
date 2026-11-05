@@ -41,7 +41,7 @@ import { guardContent } from '@/utils/content-check.js'
 export default {
   components: { AppNavbar },
   data() { return { capsules: [], showWrite: false, newContent: '' } },
-  onShow() { this.capsules = Store.getTimeCapsules() },
+  onShow() { if (!this.shouldRefresh()) return; this.capsules = Store.getTimeCapsules(); this.markRefreshed() },
   methods: {
     saveCapsule() {
       const content = (this.newContent || '').trim()
@@ -62,7 +62,7 @@ export default {
 </script>
 
 <style>
-.page-container { height: 100vh; width: 100vw; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+.page-container { height: 100vh; height: 100dvh; width: 100%; background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .header { padding: 40rpx 28rpx 24rpx; }
 .header-row { display: flex; align-items: center; justify-content: space-between; }
 .page-title { font-size: 44rpx; font-weight: bold; color: var(--text); }
@@ -79,7 +79,7 @@ export default {
 .capsule-content { font-size: 26rpx; color: var(--text); }
 
 /* 写信弹窗 */
-.modal-mask { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 40rpx; }
+.modal-mask { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: var(--z-modal, 300); padding: 40rpx; }
 .modal-card { width: 100%; background-color: var(--surface-2); border: 1px solid var(--border); border-radius: 32rpx; padding: 40rpx; }
 .modal-title { font-size: 32rpx; font-weight: 700; color: var(--text); display: block; margin-bottom: 28rpx; text-align: center; }
 .modal-textarea { width: 100%; height: 240rpx; background-color: var(--surface-1); border: 1px solid var(--border); border-radius: 16rpx; padding: 20rpx; color: var(--text); font-size: 28rpx; }

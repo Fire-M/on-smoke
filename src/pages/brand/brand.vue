@@ -68,6 +68,7 @@ export default {
   },
 
   onShow() {
+    if (!this.shouldRefresh()) return
     this.settings = Store.getSettings()
     Store.settleDailySavings()
     this.activeSkin = Store.getActiveSkin()
@@ -88,6 +89,7 @@ export default {
       this.listSignature = signature
       this.brands = list
     }
+    this.markRefreshed()
   },
 
   methods: {
@@ -119,6 +121,7 @@ export default {
 <style>
 .page-container {
   height: 100vh;
+  height: 100dvh;
   width: 100%;
   background-color: var(--bg);
   color: var(--text);

@@ -155,6 +155,22 @@ function _diffDays(a, b) {
   return Math.floor((db.getTime() - da.getTime()) / 86400000)
 }
 
+// 数据版本号：所有持久化写入都经 _write，写一次自增一次。
+// 页面 onShow 拿它做脏检查 —— 数据没变就完全跳过整页重算，
+// 转场帧里最贵的那一段同步工作（storage 桥 + setData）就消失了。
+let _rev = 0
+
+export function getRev() {
+  return _rev
+}
+
+// 给绕过 Store 直接写盘的模块用（如广告次数记录）：写完调一次，
+// 让依赖那份数据的页面知道「该刷新了」。埋点队列、音效开关这类
+// 与页面数据无关的写入不要调，否则会制造无谓的整页刷新。
+export function touch() {
+  _rev++
+}
+
 // 读缓存：只在 withReadCache() 的同步执行期间生效。
 // 一次刷新里 settings / stats / history 会被七八个函数各读一遍，
 // 每次都是一次同步 storage 调用 + JSON.parse，缓存能把这一批压成一次。
@@ -185,6 +201,7 @@ function _write(key, data) {
   // 写之前先失效，避免同一次刷新里读到写之前的旧值
   if (_readCache) delete _readCache[key]
   uni.setStorageSync(key, JSON.stringify(data))
+  _rev++
 }
 
 /**
@@ -606,7 +623,9 @@ export function getUnlockedBadges() {
 }
 
 export function saveUnlockedBadges(badges) {
-  uni.setStorageSync(KEYS.badges, JSON.stringify(badges))
+  // 走 _write：原来直接 setStorageSync 会绕过数据版本号，
+  // 解锁勋章后返回首页就可能不刷新
+  _write(KEYS.badges, badges)
 }
 
 export function unlockBadge(badgeId) {
@@ -1658,7 +1677,7 @@ export default {
   getSmokeFreeDuration, getCleanDays,
   getSavedMoney, getLessSmoked,
   BADGE_LIST, getBadgeList, syncBadges, buildBadgeStats,
-  migrateIfNeeded, recomputeSavedFromHistory, withReadCache,
+  migrateIfNeeded, recomputeSavedFromHistory, withReadCache, getRev, touch,
   getUnlockedBadges, saveUnlockedBadges, unlockBadge,
   getCravings, addCraving, getCravingStats,
   getResists, recordResist, getResistStats, getResistPrice, getAutoResistPrice,

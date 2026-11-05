@@ -55,7 +55,9 @@ export default {
   },
 
   onShow() {
+    if (!this.shouldRefresh()) return
     this.loadData()
+    this.markRefreshed()
   },
 
   methods: {
@@ -122,7 +124,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;

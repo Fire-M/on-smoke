@@ -242,7 +242,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -261,22 +262,21 @@ export default {
   margin-bottom: 44rpx;
 }
 
+/* 分组标题就是普通小标题：不加字距、不降透明度，
+   否则在深色底上会变成一条几乎看不清的「eyebrow」。 */
 .group-title {
   display: block;
   padding: 0 8rpx 14rpx;
-  font-size: 22rpx;
-  letter-spacing: 6rpx;
+  font-size: var(--fs-xs, 22rpx);
   color: var(--text-dim);
-  opacity: 0.85;
 }
 
 .group-hint {
   display: block;
   padding: 16rpx 8rpx 0;
-  font-size: 22rpx;
+  font-size: var(--fs-xs, 22rpx);
   line-height: 1.7;
   color: var(--text-dim);
-  opacity: 0.7;
 }
 
 /* ---- 卡片：一组共用一张卡，行间用细线分隔。
@@ -284,7 +284,7 @@ export default {
 .card {
   background: var(--surface-1);
   border: 1rpx solid var(--border);
-  border-radius: 26rpx;
+  border-radius: var(--r-lg, 32rpx);
   overflow: hidden;
 }
 
@@ -293,7 +293,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
-  padding: 28rpx 30rpx;
+  /* 一组四项是列表不是四张独立卡，行距收紧后才像同一张表 */
+  padding: 24rpx 30rpx;
   border-bottom: 1rpx solid var(--border);
 }
 
@@ -346,17 +347,20 @@ export default {
 /* ---- 外观：五个主题横排，选中给色点套一圈主色环 ---- */
 .theme-row {
   display: flex;
-  gap: 12rpx;
+  gap: 8rpx;
 }
 
 .theme-chip {
   flex: 1;
+  /* 不加 min-width:0 时四字主题名会撑住 flex 子项，
+     窄屏 / 大字体下第五个色卡会被挤出屏幕 */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10rpx;
-  padding: 20rpx 0 16rpx;
-  border-radius: 20rpx;
+  padding: 18rpx 0 16rpx;
+  border-radius: var(--r-md, 20rpx);
   border: 1rpx solid var(--border);
   background: var(--surface-1);
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
@@ -455,7 +459,7 @@ export default {
 .save-btn {
   width: 100%;
   padding: 30rpx;
-  border-radius: 26rpx;
+  border-radius: var(--r-lg, 32rpx);
   border: none;
   /* 纯主色打底，不做任何压暗：叠黑色或降透明度都会把琥珀变成土黄。
      立体感只靠顶部一层极淡的白色高光，主体亮度不变 */
@@ -483,10 +487,10 @@ export default {
   display: block;
   padding-top: 10rpx;
   text-align: center;
-  font-size: 22rpx;
+  font-size: var(--fs-xs, 22rpx);
   line-height: 1.8;
   color: var(--text-dim);
-  opacity: 0.45;
+  opacity: 0.75;
 }
 
 .p-20 { padding: 40rpx; }

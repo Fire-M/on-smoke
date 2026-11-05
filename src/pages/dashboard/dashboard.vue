@@ -150,23 +150,35 @@ export default {
   },
 
   onShow() {
+    if (!this.shouldRefresh()) return
     this.loadData()
   },
 
   methods: {
     loadData() {
-      // 这四个 loader 各自读一次 history（同步 storage + JSON.parse），
-      // 日历还要按 31 天各 filter 一遍。整段包进读缓存，history 只解析一次
+      // 一次遍历把 history 按天装进 Map，四个 loader 直接查表：
+      // 原来日历 31 天 + 周 7 天各 filter 一遍全表（history 上限 500 条，
+      // 最多约 2 万次迭代），现在降到 O(N) 建表 + 若干次 O(1) 查表。
       Store.withReadCache(() => {
-        this.loadWeekData()
-        this.loadRecords()
-        this.loadMonthData()
-        this.loadCalendar()
+        const history = Store.getHistory()
+        const byDay = new Map()
+        for (let i = 0; i < history.length; i++) {
+          const r = history[i]
+          if (!r || !r.timestamp) continue
+          const key = this.formatDate(new Date(r.timestamp))
+          let bucket = byDay.get(key)
+          if (!bucket) { bucket = []; byDay.set(key, bucket) }
+          bucket.push(r)
+        }
+        this.loadWeekData(byDay)
+        this.loadRecords(history)
+        this.loadMonthData(history)
+        this.loadCalendar(byDay)
       })
+      this.markRefreshed()
     },
 
-    loadWeekData() {
-      const history = Store.getHistory()
+    loadWeekData(byDay) {
       const now = new Date()
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const weekStart = new Date(today)
@@ -187,7 +199,7 @@ export default {
         const date = new Date(weekStart)
         date.setDate(weekStart.getDate() + i)
         const dateStr = this.formatDate(date)
-        const dayRecords = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr)
+        const dayRecords = byDay.get(dateStr) || []
         const count = dayRecords.length
         weekTotal += count
         // 每根按记录里的价格快照累加（含看过广告的翻倍），与「至今已花」保持同一口径
@@ -216,9 +228,8 @@ export default {
       this.weekData = weekDays
     },
 
-    loadRecords() {
+    loadRecords(history) {
       Store.settleDailySavings()
-      const history = Store.getHistory()
       const stats = Store.getStats()
 
       // 总吸烟数 & 累计省钱（统一使用 stats，与 index.vue 一致）
@@ -241,8 +252,7 @@ export default {
       this.leastDay = dayCounts.length ? Math.min.apply(null, dayCounts) : 0
     },
 
-    loadMonthData() {
-      const history = Store.getHistory()
+    loadMonthData(history) {
       const now = new Date()
       const thisMonth = now.getMonth()
       const thisYear = now.getFullYear()
@@ -281,8 +291,7 @@ export default {
       }
     },
 
-    loadCalendar() {
-      const history = Store.getHistory()
+    loadCalendar(byDay) {
       const now = new Date()
       const year = now.getFullYear()
       const month = now.getMonth()
@@ -301,11 +310,12 @@ export default {
         days.push({ day: '', count: 0, isEmpty: true })
       }
       
-      // 添加日期
+      // 添加日期：原来每天 filter 一遍全表，现在直接按天查预聚合的 Map
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month, d)
         const dateStr = this.formatDate(date)
-        const count = history.filter(r => this.formatDate(new Date(r.timestamp)) === dateStr).length
+        const bucket = byDay.get(dateStr)
+        const count = bucket ? bucket.length : 0
         const isToday = date.getTime() === new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
         const isFuture = date > now
         const isPast = date < new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -335,7 +345,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -424,7 +435,7 @@ export default {
 }
 
 .chart-bar.today {
-  background: linear-gradient(to top, var(--primary) 0%, #fbbf24 100%);
+  background: linear-gradient(to top, var(--primary) 0%, var(--primary-2) 100%);
 }
 
 .chart-bar-value {
@@ -513,7 +524,7 @@ export default {
 }
 
 .month-bar.current {
-  background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%);
 }
 
 .month-value {

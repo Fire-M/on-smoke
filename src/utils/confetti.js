@@ -23,7 +23,9 @@ const DEFAULTS = {
   ticks: 200,         // 存活帧数，越小消失越快
   scalar: 1,          // 粒子尺寸倍率
   origin: { x: 0.5, y: 0.5 },
-  colors: ['#f59e0b', '#f97316', '#34d399'],
+  // 只作兜底：默认走中性色，不偏向任何一套主题。
+  // 实际调用方（首页 burstConfetti）会把当前主题的 primary / primary-2 / accent 传进来。
+  colors: ['#f8fafc', '#cbd5e1', '#94a3b8'],
   shapes: ['square', 'circle']
 }
 

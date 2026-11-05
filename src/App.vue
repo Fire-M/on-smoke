@@ -80,6 +80,28 @@ page {
   --text-dim: #9ca3af;
   --danger-1: #ff6b6b;
   --danger-2: #c0392b;
+
+  /* 设计 token：字号 6 档、间距 5 档、圆角 3 档、层级 5 档。
+     新样式优先引用这些变量，避免各页各写一套 16/18/21/23rpx。 */
+  --fs-xs: 22rpx;
+  --fs-sm: 26rpx;
+  --fs-md: 28rpx;
+  --fs-lg: 32rpx;
+  --fs-xl: 40rpx;
+  --fs-display: 96rpx;
+  --sp-1: 8rpx;
+  --sp-2: 16rpx;
+  --sp-3: 24rpx;
+  --sp-4: 32rpx;
+  --sp-6: 48rpx;
+  --r-sm: 12rpx;
+  --r-md: 20rpx;
+  --r-lg: 32rpx;
+  --z-sticky: 30;
+  --z-navbar: 100;
+  --z-tabbar: 200;
+  --z-modal: 300;
+  --z-toast: 400;
 }
 .theme-amber {
   --bg: #0f0f0f; --surface-1: #1f1f1f; --surface-2: #252525; --border: #2a2a2a;
@@ -118,9 +140,10 @@ page {
   --danger-1: #ff6b6b; --danger-2: #c0392b;
 }
 
-/* 让页面根容器背景跟随主题（覆盖各页写死的 #0f0f0f） */
+/* 页面根容器背景兜底：各页自己写的也是 var(--bg)，值本来就一致。
+   不再用 !important 压制 —— 那只会逼页面反向加 !important（军备竞赛）。 */
 .page-container, .smoke-root {
-  background-color: var(--bg) !important;
+  background-color: var(--bg);
 }
 
 /* 滚动区底部统一留白：子页面滚到底时的间距，带上 iPhone 的底部安全区。
@@ -130,8 +153,7 @@ page {
 }
 
 /* 琥珀强调色类跟随主题主色 */
-.text-amber { color: var(--primary) !important; }
-.bg-amber { background-color: var(--primary) !important; }
+.text-amber { color: var(--primary); }
 
 /* 隐藏原生 tabBar（使用自定义 TabBar） */
 .uni-tabbar,
@@ -142,10 +164,9 @@ page {
   display: none !important;
 }
 
-/* 全局基础样式 */
+/* 全局基础样式：背景与文字色已在上面第一条 page 规则里用变量定义，
+   这里不能再写死，否则同优先级下会覆盖掉换肤结果（尤其首帧与滚动回弹区）。 */
 page {
-  background-color: #0f0f0f;
-  color: #e5e7eb;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   height: 100%;
   overflow: hidden;
@@ -169,67 +190,21 @@ button::after {
   display: none;
 }
 
-/* 卡片基础样式（!important 覆盖各页 scoped 写死的卡片背景） */
+/* 卡片基础样式：小程序端只有 app.wxss 是全局的，页面 wxss 彼此隔离，
+   没自己定义 .card 的页面全靠这里兜底；这两条 !important 是跨端兜底，
+   不是用来压页面样式的（页面渐变靠 background-image，不受 background-color 影响）。 */
 .card {
   background-color: var(--surface-2) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 16rpx;
+  border: 1rpx solid var(--border) !important;
+  border-radius: var(--r-lg);
 }
 
-/* 设置输入框 */
-.setting-input {
-  width: 100%;
-  background-color: var(--surface-1) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12rpx;
-  padding: 16rpx 20rpx;
-  color: var(--text) !important;
-  font-size: 28rpx;
-}
+/* 进度条只给一个基础色，不加 !important：
+   状态色（.progress-fill.good/.warn/.over）优先级更高，自然就能赢，
+   页面也就不必再反向加 !important 去抢回来。 */
+.progress-bar { background-color: var(--border); }
+.progress-fill { background-color: var(--primary); }
 
-/* 进度条（覆盖各页写死的轨道/填充色） */
-.progress-bar {
-  background-color: var(--border) !important;
-}
-.progress-fill {
-  background-color: var(--primary) !important;
-}
-
-/* Tab 按钮 */
-.tab-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4rpx;
-  padding: 16rpx 32rpx;
-  color: var(--text-dim) !important;
-  font-size: 20rpx;
-  background: transparent;
-  border: none;
-  line-height: 1;
-}
-
-.tab-btn.active {
-  color: var(--primary) !important;
-}
-
-.tab-btn text {
-  font-size: 20rpx;
-}
-
-/* 历史 Tab */
-.history-tab {
-  padding: 12rpx 24rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
-  color: var(--text-dim) !important;
-  background-color: var(--surface-1) !important;
-  border: none;
-}
-
-.history-tab.active {
-  background-color: var(--primary) !important;
-  color: var(--bg) !important;
-}
-
+/* history-tab 只有历史页用，页面里已有完整定义（描边 / 动效 / 选中加粗），
+   这里不再放一份带 !important 的简版去覆盖它。 */
 </style>

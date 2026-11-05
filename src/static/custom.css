@@ -12,51 +12,20 @@ button,
 
 button:focus-visible,
 .brand-card:focus-visible,
-.setting-input:focus-visible {
-  outline: 2px solid rgba(245, 158, 11, 0.8);
+input:focus-visible {
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
+/* 按压反馈：小程序端用 hover-class="tap-feedback"，H5 端也可直接绑 :active */
 .tap-feedback {
   transform: scale(0.985);
   filter: brightness(1.08);
 }
 
-.view-enter {
-  animation: viewEnter 0.22s ease-out;
-}
-
-@keyframes viewEnter {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.toast-pop {
-  animation: toastPop 0.22s ease-out;
-}
-
-@keyframes toastPop {
-  from { opacity: 0; transform: translate(-50%, -8px) scale(0.96); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
-}
-
-.save-success {
-  background: #22c55e !important;
-  color: #07130b !important;
-}
-
-/* 隐藏滚动条但保持可滚动 */
-.view::-webkit-scrollbar {
+/* 隐藏滚动条但保持可滚动（小程序里 scroll-view 自带 show-scrollbar 控制） */
+::-webkit-scrollbar {
   display: none;
-}
-.view {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* 安全区域底部 */
-#tab-bar {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* 输入框数字箭头隐藏 */

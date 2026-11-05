@@ -104,8 +104,11 @@ export default {
   },
 
   onShow() {
+    // 数据没变、也没跨天时直接跳过：返回历史页不该重读整表 + 重新过滤
+    if (!this.shouldRefresh()) return
     this.allRecords = Store.getHistory()
     this.filterRecords()
+    this.markRefreshed()
   },
 
   methods: {
@@ -207,7 +210,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -382,7 +386,7 @@ export default {
 .block { display: block; }
 .text-gray-200 { color: var(--text); }
 .text-gray-500 { color: var(--text-dim); }
-.text-gray-600 { color: #4b5563; }
+.text-gray-600 { color: var(--text-dim); }
 .text-gray-700 { color: var(--border); }
 .text-amber { color: var(--primary); }
 .card { 

@@ -125,7 +125,10 @@ export default {
   // 首次进入时 onShow 一定会跟在 onLoad 之后，两个都调等于把
   // 「省钱结算 + 23 枚勋章判定」跑两遍，进页面直接多花一倍时间
   onShow() {
+    // 23 枚勋章判定只在数据真变时重跑
+    if (!this.shouldRefresh()) return
     this.loadBadges()
+    this.markRefreshed()
   },
 
   methods: {
@@ -161,7 +164,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -392,7 +396,7 @@ export default {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.8);
-  z-index: 100;
+  z-index: var(--z-modal, 300);
   display: flex;
   align-items: center;
   justify-content: center;

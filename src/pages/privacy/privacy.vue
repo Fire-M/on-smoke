@@ -66,7 +66,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -74,7 +75,7 @@ export default {
 }
 .main-scroll { flex: 1; height: 0; min-height: 0; }
 .p-20 { padding: 40rpx; }
-.pb-100 { padding-bottom: 200rpx; }
+.pb-100 { padding-bottom: calc(220rpx + env(safe-area-inset-bottom, 0px)); }
 .block { display: block; }
 .mt { margin-top: 40rpx; }
 .section-title {

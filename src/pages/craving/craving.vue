@@ -353,12 +353,14 @@ export default {
   },
 
   onShow() {
+    if (!this.shouldRefresh()) return
     // 两个 loader 各自读一遍 cravings / moods（同步 storage + JSON.parse），
     // 包进读缓存后同一份数据只解析一次
     Store.withReadCache(() => {
       this.loadCravingData()
       this.loadMoodData()
     })
+    this.markRefreshed()
   },
 
   methods: {
@@ -535,7 +537,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -1025,7 +1028,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--z-modal, 300);
 }
 
 .modal-card {

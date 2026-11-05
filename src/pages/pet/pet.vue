@@ -156,7 +156,9 @@ export default {
     this.petCanvasReady = true
   },
   onShow() { 
+    // 恢复画布循环每次都要做，但数据没变时不必重读宠物/装扮
     this.petPaused = false
+    if (!this.shouldRefresh()) return
     Store.recoverPetDaily()
     this.adEnabled = isAdEnabled()
     this.pet = Store.getPet()
@@ -166,6 +168,7 @@ export default {
     this._prevLevel = this.pet.level
     this.accessoryList = Store.getPetAccessoryList()
     this.equippedAccessories = Store.getEquippedAccessories()
+    this.markRefreshed()
   },
   onHide() {
     // 被别的页面盖住 / 切后台时停掉 canvas 循环：它在不可见时也要按 60fps 重绘，
@@ -233,6 +236,7 @@ export default {
 <style>
 .page-container {
   height: 100vh;
+  height: 100dvh;
   width: 100%;
   background-color: var(--bg);
   color: var(--text);
@@ -257,7 +261,7 @@ export default {
 .stat-bar { flex: 1; height: 16rpx; background: rgba(255, 255, 255, 0.06); border-radius: 12rpx; overflow: hidden; }
 .stat-fill { height: 100%; border-radius: 12rpx; transition: width 0.3s ease; }
 .stat-fill.health { background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%); }
-.stat-fill.happy { background: linear-gradient(90deg, var(--primary) 0%, #fbbf24 100%); }
+.stat-fill.happy { background: linear-gradient(90deg, var(--primary) 0%, var(--primary-2) 100%); }
 .stat-fill.exp { background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); }
 .stat-value { font-size: 22rpx; color: var(--text-dim); width: 100rpx; text-align: right; }
 .tip { font-size: 24rpx; color: var(--text-dim); text-align: center; display: block; }
@@ -269,7 +273,7 @@ export default {
   align-items: center;
   gap: 12rpx;
   padding: 20rpx 40rpx;
-  background: linear-gradient(135deg, var(--glow) 0%, rgba(249, 115, 22, 0.1) 100%);
+  background: linear-gradient(135deg, var(--glow) 0%, transparent 100%);
   border: 1px solid var(--glow);
   border-radius: 40rpx;
 }
@@ -338,8 +342,8 @@ export default {
 .custom-panel {
   width: 100%;
   max-height: 70vh;
-  background: #1a1a1a;
-  border-radius: 32rpx 32rpx 0 0;
+  background: var(--surface-1);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
   transform: translateY(100%);
   transition: transform 0.3s;
   display: flex;

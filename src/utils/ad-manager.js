@@ -8,6 +8,7 @@
  */
 
 import { track } from './tracker.js'
+import { touch } from './store.js'
 
 // ============ 广告实例管理 ============
 
@@ -66,6 +67,9 @@ function _getAdRecords() {
 
 function _saveAdRecords(records) {
   uni.setStorageSync(AD_RECORDS_KEY, JSON.stringify(records))
+  // 首页「今日还可看 N 次」和额外配额直接读这份记录，
+  // 看完广告返回首页必须让首页知道数据变了
+  touch()
 }
 
 // 本地日期（与 store.js 保持一致；toISOString 是 UTC 日期，会让每日限额在

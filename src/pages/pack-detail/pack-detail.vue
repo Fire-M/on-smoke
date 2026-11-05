@@ -232,13 +232,15 @@ export default {
     // 从抽烟页 navigateBack 回来时复位，避免 isPulling 卡死导致抽不出
     this.isPulling = false
     this.activeIndex = null
-    // 从存储重新读取包剩余（抽完会扣减，没抽完则不变）
-    this.refreshPack()
+    // 数据没变时跳过 storage 读取；抽完一根/看完广告会 bump 版本号，照常刷新
+    if (this.shouldRefresh()) {
+      this.refreshPack()
+      this.adRewardRemain = getRewardRemain()
+      this.adEnabled = isAdEnabled()
+      this.markRefreshed()
+    }
     // 从抽烟页回来时盖子还是开的：把「点击抽出」引导恢复，否则抽完一根回来就没提示了
     this.showPullHint = this.lidOpen && this.boxRemainingCigs > 0
-    // 看完广告回来后刷新剩余次数（含跨天重置）
-    this.adRewardRemain = getRewardRemain()
-    this.adEnabled = isAdEnabled()
   },
 
   methods: {
@@ -308,9 +310,10 @@ export default {
       if (uni.vibrateShort) uni.vibrateShort({ type: 'light' })
       const remainingAfterPull = Math.max(0, this.boxRemainingCigs - 1)
 
-      // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）
-      // 时长需不小于抽出动画(cigPullOut 0.85s)，确保飞出动画完整播完再跳转。
-      // timer 必须存起来并在页面销毁时清掉：否则用户在这 900ms 内点返回，
+      // 延迟跳转到抽烟场景（吸烟记录在 smoking.vue 结束时记录）。
+      // 原来等 900ms + 0.85s 动画，点完像「没反应」；同步压到 400ms / 0.38s，
+      // 动画仍能看清但点击反馈立刻接上转场。
+      // timer 必须存起来并在页面销毁时清掉：否则用户在这 400ms 内点返回，
       // 定时器照样执行，会把人从别的页面强行推进抽烟页。
       this.pullTimer = setTimeout(() => {
         this.pullTimer = null
@@ -320,7 +323,7 @@ export default {
         uni.navigateTo({
           url: `/pages/smoking/smoking?brandId=${this.brand.id}&remaining=${this.boxRemainingCigs}`
         })
-      }, 900)
+      }, 400)
     },
 
     // 拖拽旋转
@@ -354,7 +357,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   display: flex;
@@ -1249,7 +1253,8 @@ page {
 }
 
 .box-cig-3d.pulling {
-  animation: cigPullOut 0.85s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
+  /* 与 pullCig 的 400ms 跳转对齐：动画播完就转场，不留空等 */
+  animation: cigPullOut 0.38s cubic-bezier(0.4, 0.1, 0.3, 1) forwards;
 }
 
 @keyframes cigPullOut {

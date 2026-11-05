@@ -428,9 +428,9 @@ export default {
           Store.updateLastSmokeDuration(duration)
         }
       }
-      // 清理资源
-      this.cleanup()
-      // 返回首页
+      // 先发出返回，让转场立刻开始。重资源清理（销毁 3 个音频 / 停 60fps
+      // 循环 / 清 11 类 timer）交给 onUnload 做：原来这里同步跑一遍、
+      // onUnload 再跑一遍，既压住返回手势那一帧，又是重复劳动。
       uni.navigateBack({
         delta: 1,
         fail: () => {
@@ -2041,7 +2041,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   color: var(--text);
   position: relative;

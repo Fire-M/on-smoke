@@ -11,7 +11,9 @@
           <text class="hero-days" :class="{ bump: heroBump }">{{ quitDays }}</text>
           <text class="hero-unit">天</text>
         </view>
-        <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天 · 已抽完 <text style="color: var(--primary); font-weight: 600;">{{ packsCompleted }}</text> 包</text>
+        <!-- 一行塞三个数字在窄屏会断在「包」字，拆成两行各自成句 -->
+        <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天</text>
+        <text class="text-sm text-gray-500 mt-4 block">已抽完 <text style="color: var(--primary); font-weight: 600;">{{ packsCompleted }}</text> 包</text>
         <text class="hero-quote mt-12 block">嘴又痒了?</text>
       </view>
 
@@ -408,8 +410,10 @@ export default {
       this._firstShowDone = true
       return
     }
-    // 立刻刷新。之前试过延后 100ms，反而更卡 —— 那一发正好撞上用户返回后的第一次点击。
-    // 真正的开销是 updateChallengeProgress 每次无条件写 storage，那里已经改成按需写
+    // 数据没变且没跨天就完全不重算：转场帧里不做 storage 桥、不做整页 setData。
+    // 之前试过延后 100ms 刷新反而更卡（正撞上返回后的第一次点击），
+    // 所以方向是「能不刷就不刷」，而不是把重活错峰。
+    if (!this.shouldRefresh()) return
     this.refreshData()
     this.checkCooldown()
     // 撒花引擎不在这里重建：burstConfetti 发现引擎不在时会自己初始化。
@@ -451,7 +455,11 @@ export default {
       // 一次刷新会调十几个 Store 函数，settings / stats / history 被反复读，
       // 每次都是一次同步 storage 调用 + JSON.parse。整段包进读缓存后，
       // 同一份数据只解析一次，回首页的 onShow 能从 60ms 降到几十毫秒以内。
-      return Store.withReadCache(() => this._refreshData())
+      const result = Store.withReadCache(() => this._refreshData())
+      // 所有刷新入口（onLoad / onShow / 60s 轮询 / 记一根）都从这里过，
+      // 在刷新完成后统一记版本号：结算函数可能刚写过盘并自增 rev
+      this.markRefreshed()
+      return result
     },
 
     _refreshData() {
@@ -1035,7 +1043,8 @@ export default {
 <style>
 .page-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   background-color: var(--bg);
   /* 原来是写死的 #e5e7eb（等于 amber 主题的 --text），
      在 mono 主题下 --text 是 #f5f5f5，会比这里亮，出现不一致 */
@@ -1162,9 +1171,9 @@ export default {
    （mint 主题的 primary 是绿、accent 是琥珀，与 amber 主题正好反过来），
    用它会导致同一套状态在不同主题下意思漂移。
    good 主色（还很宽裕）→ warn 次色（快用完）→ over 危险红（归零） */
-.quota-remain.good { color: var(--primary) !important; }
-.quota-remain.warn { color: var(--primary-2) !important; }
-.quota-remain.over { color: var(--danger-1) !important; }
+.quota-remain.good { color: var(--primary); }
+.quota-remain.warn { color: var(--primary-2); }
+.quota-remain.over { color: var(--danger-1); }
 
 .quota-unit {
   font-size: 32rpx;
@@ -1274,21 +1283,25 @@ export default {
 }
 
 /* 进度条跟上数字的颜色，保持「数字=进度」是同一件事的观感。
-   App.vue 的 .progress-fill 带 !important，这里必须同样加才能覆盖 */
-.progress-fill.good { background-color: var(--primary) !important; }
-.progress-fill.warn { background-color: var(--primary-2) !important; }
-.progress-fill.over { background-color: var(--danger-1) !important; }
+   App.vue 的 .progress-fill 已去掉 !important，双类选择器优先级更高，
+   这里不必再反向加 !important 抢回来。 */
+.progress-fill.good { background-color: var(--primary); }
+.progress-fill.warn { background-color: var(--primary-2); }
+.progress-fill.over { background-color: var(--danger-1); }
 
 /* 底部按钮 */
 .btn-container {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(140rpx + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
+  /* 底边正好贴住 tabBar 顶部（100rpx + 安全区），
+     原来留 140rpx 会空出一条缝，滚动内容会从缝里露一行字 */
+  bottom: calc(100rpx + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-sticky, 30);
   padding: 16rpx 40rpx 0;
-  /* 底部渐隐要跟着主题背景走，否则薄荷/极光主题下会露出一条灰边 */
-  background: linear-gradient(to top, var(--bg) 40%, transparent);
+  /* 底部渐隐要跟着主题背景走，否则薄荷/极光主题下会露出一条灰边。
+     实色区放大到 65%，滚动内容从下方穿出时不会半透明地糊在按钮后面 */
+  background: linear-gradient(to top, var(--bg) 65%, transparent);
 }
 
 /* 省钱这条路：亮、轻、细边框，和下面沉重的主色渐变按钮区分开 */
@@ -1599,7 +1612,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 48rpx;
-  z-index: 220;   /* 高于撒花层（180）和 Toast（200） */
+  z-index: var(--z-modal, 300);   /* 高于 tabBar（200）、撒花层（180）和 Toast（200） */
 }
 
 .modal-card {
@@ -1782,9 +1795,9 @@ export default {
 .mt-8 { margin-top: 16rpx; }
 .opacity-80 { opacity: 0.8; }
 .text-gray-100 { color: var(--text); }
-.text-gray-300 { color: #d1d5db; }
-.text-gray-500 { color: #6b7280; }
-.text-gray-600 { color: #4b5563; }
+.text-gray-300 { color: var(--text); }
+.text-gray-500 { color: var(--text-dim); }
+.text-gray-600 { color: var(--text-dim); }
 .text-amber { color: var(--primary); }
 .bg-amber { background-color: var(--primary); }
 .card { 

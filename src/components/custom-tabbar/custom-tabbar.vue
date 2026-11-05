@@ -6,6 +6,8 @@
         :key="index"
         class="tabbar-item"
         :class="{ active: current === index }"
+        hover-class="tabbar-item-hover"
+        :hover-stay-time="80"
         @click="switchTab(index)"
       >
         <!-- CSS 绘制的单色图标：颜色走 currentColor，激活时跟随主题主色 -->
@@ -70,9 +72,9 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 999;
-  background: linear-gradient(to top, #1a1a1a 85%, rgba(26, 26, 26, 0.95) 100%);
-  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+  z-index: var(--z-tabbar, 200);
+  background: var(--surface-1);
+  border-top: 1rpx solid var(--border);
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
@@ -109,13 +111,17 @@ export default {
   user-select: none;
 }
 
+.tabbar-item-hover {
+  opacity: 0.65;
+}
+
 /* ===== 单色线性图标（纯 CSS，颜色随主题） ===== */
 /* 48rpx 大容器 + 4rpx 粗线条，视觉分量足 */
 .ticon {
   position: relative;
   width: 48rpx;
   height: 48rpx;
-  color: #6b7280;                /* 与原 emoji 的灰一致 */
+  color: var(--text-dim);
   transition: color 0.25s ease, transform 0.25s ease;
 }
 
@@ -194,8 +200,8 @@ export default {
 .ticon .l3 .knob { left: 11rpx; }
 
 .tab-text {
-  font-size: 20rpx;
-  color: #6b7280;
+  font-size: var(--fs-xs, 22rpx);
+  color: var(--text-dim);
   margin-top: 4rpx;
   transition: color 0.25s ease;
 }
