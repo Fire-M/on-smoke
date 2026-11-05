@@ -18,6 +18,16 @@
         <text class="rec-go">抽一根 ›</text>
       </view>
 
+      <!-- 反套路：今日最不推荐，用最贵非选中品牌的 quote 当毒舌理由，维持自嘲调性 -->
+      <view class="anti-bar" v-if="worstBrand" @click="selectBrand(worstBrand)">
+        <text class="anti-icon">🚫</text>
+        <view class="anti-body">
+          <text class="anti-label">今日最不推荐</text>
+          <text class="anti-text">{{ worstBrand.cn }} · {{ worstBrand.quote }}</text>
+        </view>
+        <text class="anti-go">偏要抽 ›</text>
+      </view>
+
       <view class="brand-grid">
         <view v-for="brand in brands" :key="brand.id"
           class="brand-card" :class="['theme-' + brand.theme, { selected: brand.id === settings.selectedBrand }]"
@@ -55,6 +65,21 @@
         </view>
       </view>
 
+      <!-- 系列收集进度：把「试遍 12 款」拆成 4 个中段目标，集齐一套更有成就感 -->
+      <view class="series">
+        <view class="series-head">
+          <text class="series-title">系列收集</text>
+          <text class="series-sub">集齐一套解锁吹牛资格</text>
+        </view>
+        <view class="series-row">
+          <view v-for="s in seriesList" :key="s.series" class="series-item" :class="{ done: s.done }">
+            <view class="series-bar"><view class="series-fill" :style="{ width: (s.unlocked / s.total * 100) + '%' }"></view></view>
+            <text class="series-name">{{ s.name }}</text>
+            <text class="series-num">{{ s.unlocked }}/{{ s.total }}{{ s.done ? ' ✓' : '' }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 品牌图鉴：抽完一包某品牌即点亮，把「尝试各品牌」变成收集游戏 -->
       <view class="codex">
         <view class="codex-head">
@@ -64,11 +89,30 @@
         <view class="codex-grid">
           <view v-for="c in codex" :key="c.id"
             class="codex-cell" :class="{ locked: !c.unlocked }"
-            :style="c.unlocked ? { background: c.accent } : {}">
+            :style="c.unlocked ? { background: c.accent } : {}"
+            @click="c.unlocked && openBio(c)">
+            <text class="codex-emoji" v-if="c.unlocked">{{ c.emoji }}</text>
             <text class="codex-cn">{{ c.unlocked ? c.cn : '🔒' }}</text>
           </view>
         </view>
-        <text class="codex-hint">抽完一包某品牌即点亮</text>
+        <text class="codex-hint">抽完一包某品牌即点亮 · 点亮的格子可翻小传</text>
+      </view>
+
+      <!-- 品牌小传弹层：解锁后点图鉴格子翻出虚构品牌史，靠叙事驱动「试遍」 -->
+      <view class="bio-mask" v-if="showBio" @click="closeBio">
+        <view class="bio-card" :class="'theme-' + (bioBrand && bioBrand.theme)" :style="{ background: (bioBrand && bioBrand.accent) }" @click.stop>
+          <text class="bio-emoji">{{ bioBrand && bioBrand.emoji }}</text>
+          <text class="bio-cn">{{ bioBrand && bioBrand.cn }}</text>
+          <text class="bio-en">{{ bioBrand && bioBrand.en }}</text>
+          <view class="bio-divider"></view>
+          <text class="bio-text">{{ bioBrand && bioBrand.bio }}</text>
+          <view class="bio-meta">
+            <text class="bio-meta-item">解压 {{ bioBrand && bioBrand.relax }}</text>
+            <text class="bio-meta-item">焦油 {{ bioBrand && bioBrand.tar }}</text>
+            <text class="bio-meta-item">¥{{ bioBrand && bioBrand.price }}</text>
+          </view>
+          <text class="bio-close" @click="closeBio">收起</text>
+        </view>
       </view>
 
       <!-- 底部声明 -->
@@ -81,7 +125,7 @@
 </template>
 
 <script>
-import Store, { BRANDS, recommendBrand, getUnlockedBrands } from '@/utils/store.js'
+import Store, { BRANDS, recommendBrand, getUnlockedBrands, getSeriesProgress, getWorstBrand, BRAND_SERIES } from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
@@ -96,7 +140,12 @@ export default {
       listSignature: '',
       // 今日心情推荐 + 图鉴（抽完一包点亮）
       todayRec: null,
-      codex: []
+      codex: [],
+      // 系列收集进度 + 反套路最不推荐 + 图鉴小传弹层
+      seriesList: [],
+      worstBrand: null,
+      showBio: false,
+      bioBrand: null
     }
   },
 
@@ -126,6 +175,9 @@ export default {
     this.todayRec = recommendBrand()
     const unlocked = getUnlockedBrands()
     this.codex = BRANDS.map(b => ({ ...b, unlocked: unlocked.includes(b.id) }))
+    // 系列收集进度 + 反套路「今日最不推荐」（陪你自嘲，不劝你）
+    this.seriesList = getSeriesProgress()
+    this.worstBrand = getWorstBrand()
     this.markRefreshed()
   },
 
@@ -189,6 +241,16 @@ export default {
       else hue = (r - g) / d + 4
       hue *= 60
       return hue < 0 ? hue + 360 : hue
+    },
+
+    // 图鉴解锁后点格子翻出品牌小传
+    openBio(brand) {
+      this.bioBrand = brand
+      this.showBio = true
+    },
+    closeBio() {
+      this.showBio = false
+      this.bioBrand = null
     }
   }
 }
@@ -515,5 +577,160 @@ export default {
   font-size: 20rpx;
   color: var(--text-dim);
   text-align: center;
+}
+
+/* 图鉴格子的专属 emoji，解锁后显示在名字上方 */
+.codex-emoji {
+  font-size: 26rpx;
+  margin-bottom: 4rpx;
+}
+
+/* 系列收集进度：4 个中段目标，集齐一套给成就感 */
+.series {
+  margin: 8rpx 14rpx 0;
+  padding: 26rpx 24rpx 30rpx;
+  border-radius: 24rpx;
+  background: var(--surface-1);
+  border: 1rpx solid var(--border);
+}
+.series-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.series-title {
+  font-size: 26rpx;
+  font-weight:700;
+  color: var(--text);
+}
+.series-sub {
+  font-size: 20rpx;
+  color: var(--text-dim);
+}
+.series-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx 24rpx;
+}
+.series-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.series-bar {
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(240, 230, 210, 0.12);
+  overflow: hidden;
+}
+.series-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+.series-item.done .series-fill,
+.series-item.done .series-num {
+  background: #22c55e;
+  color: #22c55e;
+}
+
+/* 反套路「今日最不推荐」：和推荐条同构但冷色描边，维持自嘲调性 */
+.anti-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  /* 底部留 28rpx：下方 brand-grid 没有 margin-top，贴死会像被卡片顶住 */
+  margin: 24rpx 14rpx 28rpx;
+  padding: 18rpx 24rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid var(--border);
+  background: var(--surface-1);
+}
+.anti-icon { font-size: 28rpx; }
+.anti-body { flex: 1; display: flex; flex-direction: column; }
+.anti-label {
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  color: var(--text-dim);
+}
+.anti-text {
+  font-size: 24rpx;
+  color: var(--text);
+  margin-top: 2rpx;
+}
+.anti-go {
+  font-size: 22rpx;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* 品牌小传弹层：解锁后翻出的虚构品牌史，靠叙事驱动「试遍」 */
+.bio-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.bio-card {
+  width: 600rpx;
+  max-width: 86vw;
+  padding: 44rpx 40rpx 36rpx;
+  border-radius: 28rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.5);
+}
+.bio-emoji { font-size: 72rpx; line-height: 1; }
+.bio-cn {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #0c0d11;
+  letter-spacing: 6rpx;
+  margin-top: 10rpx;
+}
+.bio-en {
+  font-size: 20rpx;
+  letter-spacing: 4rpx;
+  color: rgba(12, 13, 17, 0.6);
+  margin-top: 6rpx;
+}
+.bio-divider {
+  width: 100%;
+  height: 1rpx;
+  background: rgba(12, 13, 17, 0.18);
+  margin: 24rpx 0;
+}
+.bio-text {
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #0c0d11;
+  text-align: center;
+}
+.bio-meta {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 24rpx;
+}
+.bio-meta-item {
+  font-size: 18rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  color: #0c0d11;
+  background: rgba(12, 13, 17, 0.12);
+}
+.bio-close {
+  margin-top: 28rpx;
+  font-size: 24rpx;
+  color: #0c0d11;
+  font-weight: 700;
+  padding: 12rpx 40rpx;
+  border-radius: 999rpx;
+  background: rgba(12, 13, 17, 0.1);
 }
 </style>

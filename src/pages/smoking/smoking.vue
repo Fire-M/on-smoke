@@ -709,6 +709,9 @@ export default {
             growRate: 34, lifeMin: 3.6, lifeMax: 5.8, rMin: 12, rMax: 24,
             startSpeed: 130, spread: 22, alphaMax: 0.06, alphaVar: 0.02
           }
+          // 烟雾「性格」：不同品牌的浮力/湍流/粒径/浓度覆盖默认参数，
+          // 蓝汐飘得轻、深海沉得重、霓虹抖得像故障——让吐的烟也认牌子。
+          if (brand && brand.smokePreset) Object.assign(this.cfg, brand.smokePreset)
           this.pool = []
           this.active = []
           this.particles = []

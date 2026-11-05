@@ -66,23 +66,32 @@ export const BRANDS = [
 // accent —— 首页「今日口粮」强调色、图鉴亮块的填充色
 // relax  —— 纯虚构的「解压指数」1~5，给「今天抽哪包」一点策略性
 // tar    —— 纯虚构的「焦油感」低/中/高
+// emoji  —— 各品牌专属符号（图鉴亮块角标 + 小传弹层）
+// series —— 所属系列（冷/暖/甜/暗夜），集齐一套给收集中段目标
+// bio    —— 图鉴解锁后的虚构小传，靠叙事而非数值驱动「试遍」
+// smokePreset —— 烟雾「性格」参数：浮力/湍流/粒径/浓度/寿命，让不同牌子吐的烟真不一样
 const BRAND_VISUAL = {
-  blue:      { smoke: '#9ecbff', accent: '#3b82f6', relax: 3, tar: '中' },
-  red:       { smoke: '#ffb4a8', accent: '#ef4444', relax: 2, tar: '高' },
-  black:     { smoke: '#cbd5e1', accent: '#6b7280', relax: 2, tar: '高' },
-  gold:      { smoke: '#f0d68a', accent: '#d4a017', relax: 4, tar: '中' },
-  lightblue: { smoke: '#bae6fd', accent: '#38bdf8', relax: 5, tar: '低' },
-  purple:    { smoke: '#e9c8ff', accent: '#a855f7', relax: 3, tar: '中' },
-  green:     { smoke: '#b6f0c8', accent: '#22c55e', relax: 4, tar: '低' },
-  pink:      { smoke: '#ffc7df', accent: '#ec4899', relax: 5, tar: '低' },
-  brown:     { smoke: '#d8bd9c', accent: '#b07b4f', relax: 3, tar: '中' },
-  magenta:   { smoke: '#ff9ed8', accent: '#e11d8f', relax: 3, tar: '中' },
-  silver:    { smoke: '#ffffff', accent: '#cbd5e1', relax: 4, tar: '低' },
-  navy:      { smoke: '#9db4e8', accent: '#1e3a8a', relax: 2, tar: '高' }
+  blue:      { smoke: '#9ecbff', accent: '#3b82f6', relax: 3, tar: '中', emoji: '❄️',  series: 'cold',  bio: '据说产自北纬40°的一阵风，喝起来像把冰箱门焊脸上。主打「假装自己很高级」。', smokePreset: { buoyancy: 96, turbStrength: 40, rMin: 10, rMax: 20, alphaMax: 0.05, growRate: 30 } },
+  red:       { smoke: '#ffb4a8', accent: '#ef4444', relax: 2, tar: '高', emoji: '🔥',  series: 'warm',  bio: '包装红得像要发红包，实际只是空气。送人倍有面，自己抽倍心虚。', smokePreset: { buoyancy: 70, turbStrength: 70, rMin: 14, rMax: 26, alphaMax: 0.08, growRate: 38 } },
+  black:     { smoke: '#cbd5e1', accent: '#6b7280', relax: 2, tar: '高', emoji: '🐼',  series: 'night', bio: '国宝同款心理价位。抽它的时候，请先确认自己不是被保护的物种。', smokePreset: { buoyancy: 52, turbStrength: 30, rMin: 16, rMax: 30, alphaMax: 0.09, growRate: 40, lifeMin: 4.2, lifeMax: 6.4 } },
+  gold:      { smoke: '#f0d68a', accent: '#d4a017', relax: 4, tar: '中', emoji: '🦙',  series: 'warm',  bio: '从沙漠一路吐口水过来的牌子。和任何真牌子没关系，和任何一种骆驼也没关系。', smokePreset: { buoyancy: 80, turbStrength: 96, rMin: 12, rMax: 22, alphaMax: 0.06 } },
+  lightblue: { smoke: '#bae6fd', accent: '#38bdf8', relax: 5, tar: '低', emoji: '🧊',  series: 'cold',  bio: '捏爆珠的瞬间，你以为自己穿越到了南极。脑瓜疼免费，凉感全靠想象。', smokePreset: { buoyancy: 110, turbStrength: 36, rMin: 8, rMax: 16, alphaMax: 0.04, growRate: 26 } },
+  purple:    { smoke: '#e9c8ff', accent: '#a855f7', relax: 3, tar: '中', emoji: '👑',  series: 'warm',  bio: '朕的味道。烟盒比烟好看，建议直接供起来别抽。', smokePreset: { buoyancy: 64, turbStrength: 50, rMin: 13, rMax: 24, alphaMax: 0.07 } },
+  green:     { smoke: '#b6f0c8', accent: '#22c55e', relax: 4, tar: '低', emoji: '🌿',  series: 'sweet', bio: '雨后公园的味道，抽着像后悔。蚊子免费送，不谢。', smokePreset: { buoyancy: 90, turbStrength: 44, rMin: 10, rMax: 18, alphaMax: 0.05 } },
+  pink:      { smoke: '#ffc7df', accent: '#ec4899', relax: 5, tar: '低', emoji: '🍬',  series: 'sweet', bio: '小时候偷抽的那根，原来真的是甜的。长大后发现甜的是糖，后悔的是你。', smokePreset: { buoyancy: 60, turbStrength: 28, rMin: 14, rMax: 28, alphaMax: 0.09, growRate: 46, lifeMax: 6.6 } },
+  brown:     { smoke: '#d8bd9c', accent: '#b07b4f', relax: 3, tar: '中', emoji: '🏚️',  series: 'warm',  bio: '巷子口那根早熄了，这包是你自己点的火。潮湿，且充满回忆的霉味。', smokePreset: { buoyancy: 56, turbStrength: 34, rMin: 14, rMax: 26, alphaMax: 0.08 } },
+  magenta:   { smoke: '#ff9ed8', accent: '#e11d8f', relax: 3, tar: '中', emoji: '💡',  series: 'night', bio: '深夜限定电子味，闪一整晚，天亮就空。适合凌晨三点还不舍得睡的你。', smokePreset: { buoyancy: 74, turbStrength: 120, rMin: 9, rMax: 20, alphaMax: 0.06, spread: 34 } },
+  silver:    { smoke: '#ffffff', accent: '#cbd5e1', relax: 4, tar: '低', emoji: '🕊️',  series: 'cold',  bio: '放它走吧，也放自己一马。轻盈得像根本没抽，主打一个心理安慰。', smokePreset: { buoyancy: 104, turbStrength: 38, rMin: 9, rMax: 17, alphaMax: 0.04 } },
+  navy:      { smoke: '#9db4e8', accent: '#1e3a8a', relax: 2, tar: '高', emoji: '🌊',  series: 'cold',  bio: '越深越贵，越贵越深。抽完感觉自己沉到了马里亚纳，钱包也沉了。', smokePreset: { buoyancy: 46, turbStrength: 26, rMin: 16, rMax: 30, alphaMax: 0.1, growRate: 36, lifeMin: 4.4, lifeMax: 6.8 } }
 }
 BRANDS.forEach(b => {
-  Object.assign(b, BRAND_VISUAL[b.theme] || { smoke: '#dfe6f2', accent: '#94a3b8', relax: 3, tar: '中' })
+  Object.assign(b, BRAND_VISUAL[b.theme] || {
+    smoke: '#dfe6f2', accent: '#94a3b8', relax: 3, tar: '中', emoji: '🚬', series: 'cold', bio: '', smokePreset: {}
+  })
 })
+
+// 系列中文名（图鉴系列进度条用）
+export const BRAND_SERIES = { cold: '冷系列', warm: '暖系列', sweet: '甜系列', night: '暗夜系列' }
 
 // 图鉴：抽完过一包的品牌会点亮。靠 _write 走数据版本号，
 // 解锁后回首页/成就页能感知到变化。
@@ -101,9 +110,24 @@ export function unlockBrand(id) {
   _write(BRAND_CODEX_KEY, list)
 }
 
-// 今日心情推荐：按当前时段挑一个最「应景」的品牌，
-// 把静态的 tag/quote 激活成「今天该抽这根」。返回品牌对象。
+// 今日心情推荐：优先按用户近期情绪挑系列（焦虑/烦躁→暗夜、低落→暖、无聊→暖、平和→冷/甜），
+// 系列内优先推「还没解锁过」的牌子给探索动机；无情绪数据时回落到按时段。
 export function recommendBrand() {
+  const moods = getMoods()
+  const recent = (moods || []).slice(-10)
+  const dist = {}
+  recent.forEach(m => { if (m && m.mood) dist[m.mood] = (dist[m.mood] || 0) + 1 })
+  const top = Object.keys(dist).sort((a, b) => dist[b] - dist[a])[0]
+  const moodSeries = { anxious: 'night', angry: 'night', sad: 'warm', bored: 'warm', happy: 'sweet', calm: 'cold' }
+  let pool = BRANDS
+  if (top && moodSeries[top]) {
+    const inSeries = BRANDS.filter(b => b.series === moodSeries[top])
+    if (inSeries.length) pool = inSeries
+  }
+  const unlocked = getUnlockedBrands()
+  const fresh = pool.filter(b => !unlocked.includes(b.id))
+  if (fresh.length) return fresh[Math.floor(Math.random() * fresh.length)]
+  // 系列已集齐则按当前时段挑一个应景的
   const hour = new Date().getHours()
   let theme
   if (hour >= 0 && hour < 5) theme = 'magenta'   // 深夜电子味
@@ -112,7 +136,33 @@ export function recommendBrand() {
   else if (hour < 18) theme = 'gold'              // 午后解馋
   else if (hour < 22) theme = 'navy'              // 傍晚深沉
   else theme = 'purple'                           // 夜晚淡雅
-  return BRANDS.find(b => b.theme === theme) || BRANDS[0]
+  return pool.find(b => b.theme === theme) || pool[0] || BRANDS[0]
+}
+
+// 系列收集进度：把「试遍 12 款」拆成 4 个中段目标，集齐一套更有成就感。
+// 返回 [{ series, name, total, unlocked, done }]
+export function getSeriesProgress() {
+  const unlocked = getUnlockedBrands()
+  const groups = {}
+  BRANDS.forEach(b => {
+    if (!groups[b.series]) groups[b.series] = { series: b.series, total: 0, unlocked: 0 }
+    groups[b.series].total++
+    if (unlocked.includes(b.id)) groups[b.series].unlocked++
+  })
+  return Object.keys(groups).map(s => ({
+    series: s, name: BRAND_SERIES[s] || s,
+    total: groups[s].total, unlocked: groups[s].unlocked,
+    done: groups[s].unlocked === groups[s].total
+  }))
+}
+
+// 反套路「今日最不推荐」：挑最贵的非选中品牌，用它的 quote 当毒舌理由，
+// 维持这个 app「不劝你、陪你自嘲」的调性。返回品牌对象。
+export function getWorstBrand() {
+  const sel = (getSettings().selectedBrand) || null
+  const candidates = BRANDS.filter(b => b.id !== sel)
+  candidates.sort((a, b) => b.price - a.price)
+  return candidates[0] || BRANDS[0]
 }
 
 // 取品牌每包支数（未命中时回落到用户设置的 packSize）
@@ -1729,6 +1779,7 @@ export default {
   getBrandSmokedCount, getBrandRemaining,
   getBrandPackSize, getBrandPricePerCig, getRecordPrice, getRecordSaved,
   getUnlockedBrands, isBrandUnlocked, unlockBrand, recommendBrand,
+  BRAND_SERIES, getSeriesProgress, getWorstBrand,
   boostLastSmoke,
   getPackSize, getPackRemaining, getAllPackStates, savePackRemaining, refillPack,
   getPacksCompleted, getTotalPacksCompleted, completePackAndRefill,

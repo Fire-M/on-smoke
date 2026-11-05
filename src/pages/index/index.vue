@@ -439,11 +439,14 @@ export default {
 
   methods: {
     // 60 秒轮询：用于跨零点刷新、挑战/里程碑状态跟进。
-    // 原来是 30s，但每次 refreshData 都是整页字段重算 + setData，
-    // 滚动过程中正好撞上就是一次可感的掉帧；60s 对跨天对齐没有任何影响。
+    // 必须用 shouldRefresh 守着——_refreshData 会遍历全部历史记录做一堆统计，
+    // 每 60s 无条件全量重算 + setData 几十字段，滚动中撞上就是一次可感掉帧。
+    // 数据没变 / 没跨天就直接跳过，只跨天（todayStr 变）或数据变化（rev 变）时才刷新。
     startPolling() {
       if (this.midnightTimer) return   // 已在跑就别重复起
-      this.midnightTimer = setInterval(() => this.refreshData(), 60000)
+      this.midnightTimer = setInterval(() => {
+        if (this.shouldRefresh()) this.refreshData()
+      }, 60000)
     },
 
     stopPolling() {
@@ -1312,11 +1315,11 @@ export default {
   position: fixed;
   left: 0;
   right: 0;
-  /* 底边正好贴住 tabBar 顶部（100rpx + 安全区），
-     原来留 140rpx 会空出一条缝，滚动内容会从缝里露一行字 */
+  /* 底边贴住 tabBar 顶部（100rpx + 安全区），但不让按钮贴死：
+     底部留 16rpx 出一条背景色缝，否则按钮副标题的底边看起来像被 tabBar 咬掉一条 */
   bottom: calc(100rpx + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-sticky, 30);
-  padding: 16rpx 40rpx 0;
+  padding: 16rpx 40rpx 16rpx;
   /* 底部渐隐要跟着主题背景走，否则薄荷/极光主题下会露出一条灰边。
      实色区放大到 65%，滚动内容从下方穿出时不会半透明地糊在按钮后面 */
   background: linear-gradient(to top, var(--bg) 65%, transparent);
