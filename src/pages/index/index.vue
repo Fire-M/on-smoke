@@ -14,6 +14,8 @@
         <!-- 一行塞三个数字在窄屏会断在「包」字，拆成两行各自成句 -->
         <text class="text-sm text-gray-500 mt-8 block">💨 已熬过 <text style="color: var(--primary); font-weight: 600;">{{ quitHours }}</text> 小时 · 连续打卡 <text style="color: var(--primary); font-weight: 600;">{{ streakDays }}</text> 天</text>
         <text class="text-sm text-gray-500 mt-4 block">已抽完 <text style="color: var(--primary); font-weight: 600;">{{ packsCompleted }}</text> 包</text>
+        <text class="text-sm hero-brand mt-8 block" :style="{ color: brandAccent }" v-if="brandCn">今日口粮 · {{ brandCn }} 💨</text>
+        <text class="text-sm text-gray-500 hero-brand-empty mt-8 block" v-else @click="goBrand">还没有口粮 · 去挑一包 ›</text>
         <text class="hero-quote mt-12 block">嘴又痒了?</text>
       </view>
 
@@ -276,7 +278,7 @@
 </template>
 
 <script>
-import Store from '@/utils/store.js'
+import Store, { BRANDS } from '@/utils/store.js'
 import AdManager from '@/utils/ad-manager.js'
 import CustomTabbar from '@/components/custom-tabbar/custom-tabbar.vue'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
@@ -363,7 +365,9 @@ export default {
       challengeProgress: 0,
       cooldownTimer: null,
       midnightTimer: null,
-      adWatching: false    // 广告播放中，防止连点重复加配额
+      adWatching: false,    // 广告播放中，防止连点重复加配额
+      brandCn: '',          // 当前选中品牌的名字（首页「今日口粮」锚点用）
+      brandAccent: '#94a3b8' // 当前选中品牌主色，用于首页强调
     }
   },
 
@@ -456,10 +460,24 @@ export default {
       // 每次都是一次同步 storage 调用 + JSON.parse。整段包进读缓存后，
       // 同一份数据只解析一次，回首页的 onShow 能从 60ms 降到几十毫秒以内。
       const result = Store.withReadCache(() => this._refreshData())
+      this._syncBrand()
       // 所有刷新入口（onLoad / onShow / 60s 轮询 / 记一根）都从这里过，
       // 在刷新完成后统一记版本号：结算函数可能刚写过盘并自增 rev
       this.markRefreshed()
       return result
+    },
+
+    // 把当前选中品牌同步到首页锚点：让「选了牌子」在首页看得见，
+    // 而不是只在品牌页和烟盒详情页生效（之前抽烟页还吐白烟，选择感更弱）
+    _syncBrand() {
+      const settings = Store.getSettings()
+      const brand = settings.selectedBrand ? BRANDS.find(b => b.id === settings.selectedBrand) : null
+      this.brandCn = brand ? brand.cn : ''
+      this.brandAccent = brand ? brand.accent : '#94a3b8'
+    },
+
+    goBrand() {
+      uni.navigateTo({ url: '/pages/brand/brand' })
     },
 
     _refreshData() {

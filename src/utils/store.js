@@ -60,6 +60,61 @@ export const BRANDS = [
   { id: 'shenhai', cn: '深海', en: 'SHEN·HAI', price: 78, theme: 'navy', tag: '幽暗·压力味', quote: '越深越贵，越贵越深', packSize: 20 }
 ]
 
+// 每个 theme 当前唯一对应一个品牌。把视觉/数值属性按 theme 映射注入，
+// 比在 12 行里各加 4 个字段好维护，也避免改到历史记录依赖的 id。
+// smoke  —— 抽烟页 canvas 烟雾粒子的基色（让「你抽的牌子决定烟啥颜色」）
+// accent —— 首页「今日口粮」强调色、图鉴亮块的填充色
+// relax  —— 纯虚构的「解压指数」1~5，给「今天抽哪包」一点策略性
+// tar    —— 纯虚构的「焦油感」低/中/高
+const BRAND_VISUAL = {
+  blue:      { smoke: '#9ecbff', accent: '#3b82f6', relax: 3, tar: '中' },
+  red:       { smoke: '#ffb4a8', accent: '#ef4444', relax: 2, tar: '高' },
+  black:     { smoke: '#cbd5e1', accent: '#6b7280', relax: 2, tar: '高' },
+  gold:      { smoke: '#f0d68a', accent: '#d4a017', relax: 4, tar: '中' },
+  lightblue: { smoke: '#bae6fd', accent: '#38bdf8', relax: 5, tar: '低' },
+  purple:    { smoke: '#e9c8ff', accent: '#a855f7', relax: 3, tar: '中' },
+  green:     { smoke: '#b6f0c8', accent: '#22c55e', relax: 4, tar: '低' },
+  pink:      { smoke: '#ffc7df', accent: '#ec4899', relax: 5, tar: '低' },
+  brown:     { smoke: '#d8bd9c', accent: '#b07b4f', relax: 3, tar: '中' },
+  magenta:   { smoke: '#ff9ed8', accent: '#e11d8f', relax: 3, tar: '中' },
+  silver:    { smoke: '#ffffff', accent: '#cbd5e1', relax: 4, tar: '低' },
+  navy:      { smoke: '#9db4e8', accent: '#1e3a8a', relax: 2, tar: '高' }
+}
+BRANDS.forEach(b => {
+  Object.assign(b, BRAND_VISUAL[b.theme] || { smoke: '#dfe6f2', accent: '#94a3b8', relax: 3, tar: '中' })
+})
+
+// 图鉴：抽完过一包的品牌会点亮。靠 _write 走数据版本号，
+// 解锁后回首页/成就页能感知到变化。
+const BRAND_CODEX_KEY = 'os_brand_codex'
+export function getUnlockedBrands() {
+  return _read(BRAND_CODEX_KEY, []) || []
+}
+export function isBrandUnlocked(id) {
+  return getUnlockedBrands().includes(id)
+}
+export function unlockBrand(id) {
+  if (!id) return
+  const list = getUnlockedBrands()
+  if (list.includes(id)) return
+  list.push(id)
+  _write(BRAND_CODEX_KEY, list)
+}
+
+// 今日心情推荐：按当前时段挑一个最「应景」的品牌，
+// 把静态的 tag/quote 激活成「今天该抽这根」。返回品牌对象。
+export function recommendBrand() {
+  const hour = new Date().getHours()
+  let theme
+  if (hour >= 0 && hour < 5) theme = 'magenta'   // 深夜电子味
+  else if (hour < 8) theme = 'lightblue'          // 清晨薄荷冰爆
+  else if (hour < 12) theme = 'blue'              // 上午清爽
+  else if (hour < 18) theme = 'gold'              // 午后解馋
+  else if (hour < 22) theme = 'navy'              // 傍晚深沉
+  else theme = 'purple'                           // 夜晚淡雅
+  return BRANDS.find(b => b.theme === theme) || BRANDS[0]
+}
+
 // 取品牌每包支数（未命中时回落到用户设置的 packSize）
 export function getBrandPackSize(brandId, fallbackPackSize) {
   const brand = BRANDS.find(b => b.id === brandId)
@@ -372,6 +427,9 @@ export function recordSmoke(duration, brandId = null) {
 
   // 抽烟会伤害宠物伙伴（掉血/掉心情，不掉经验）
   harmPet(-5, -4)
+
+  // 抽完一包某品牌即点亮图鉴：让「尝试各品牌」变成收集游戏
+  if (brandId) unlockBrand(brandId)
 }
 
 // 连续打卡天数：从今天（或昨天）往前数，历史里每天至少 1 根的连续天数
@@ -1670,6 +1728,7 @@ export default {
   getSmokeStreak,
   getBrandSmokedCount, getBrandRemaining,
   getBrandPackSize, getBrandPricePerCig, getRecordPrice, getRecordSaved,
+  getUnlockedBrands, isBrandUnlocked, unlockBrand, recommendBrand,
   boostLastSmoke,
   getPackSize, getPackRemaining, getAllPackStates, savePackRemaining, refillPack,
   getPacksCompleted, getTotalPacksCompleted, completePackAndRefill,

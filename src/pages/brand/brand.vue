@@ -8,6 +8,16 @@
         <text class="brand-header-count">{{ brands.length }} 款</text>
       </view>
 
+      <!-- 今日心情推荐：把静态的 tag/quote 激活成「今天该抽这根」，点一下直接试 -->
+      <view class="rec-bar" v-if="todayRec" :style="{ borderColor: todayRec.accent }" @click="selectBrand(todayRec)">
+        <text class="rec-icon">✨</text>
+        <view class="rec-body">
+          <text class="rec-label">今日推荐</text>
+          <text class="rec-text">{{ todayRec.cn }} · {{ todayRec.tag }}</text>
+        </view>
+        <text class="rec-go">抽一根 ›</text>
+      </view>
+
       <view class="brand-grid">
         <view v-for="brand in brands" :key="brand.id"
           class="brand-card" :class="['theme-' + brand.theme, { selected: brand.id === settings.selectedBrand }]"
@@ -37,8 +47,28 @@
           <view class="pack-warning">
             <text class="pack-tag">{{ brand.tag }}</text>
             <text class="pack-quote">{{ brand.quote }}</text>
+            <view class="pack-meta">
+              <text class="pack-meta-item">解压 {{ brand.relax }}</text>
+              <text class="pack-meta-item">焦油 {{ brand.tar }}</text>
+            </view>
           </view>
         </view>
+      </view>
+
+      <!-- 品牌图鉴：抽完一包某品牌即点亮，把「尝试各品牌」变成收集游戏 -->
+      <view class="codex">
+        <view class="codex-head">
+          <text class="codex-title">品牌图鉴</text>
+          <text class="codex-count">{{ codex.filter(c => c.unlocked).length }}/{{ codex.length }}</text>
+        </view>
+        <view class="codex-grid">
+          <view v-for="c in codex" :key="c.id"
+            class="codex-cell" :class="{ locked: !c.unlocked }"
+            :style="c.unlocked ? { background: c.accent } : {}">
+            <text class="codex-cn">{{ c.unlocked ? c.cn : '🔒' }}</text>
+          </view>
+        </view>
+        <text class="codex-hint">抽完一包某品牌即点亮</text>
       </view>
 
       <!-- 底部声明 -->
@@ -51,7 +81,7 @@
 </template>
 
 <script>
-import Store from '@/utils/store.js'
+import Store, { BRANDS, recommendBrand, getUnlockedBrands } from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
@@ -63,7 +93,10 @@ export default {
       settings: { selectedBrand: null },
       activeSkin: null,
       // 上一次列表数据的指纹，用来判断要不要重建数组
-      listSignature: ''
+      listSignature: '',
+      // 今日心情推荐 + 图鉴（抽完一包点亮）
+      todayRec: null,
+      codex: []
     }
   },
 
@@ -77,7 +110,7 @@ export default {
     // 避免分母用全局设置、分子用品牌口径，出现「剩余 15 / 总数 10」。
     // 包状态一次批量取出：逐品牌各读一次 storage 会在进出页面时明显拖慢。
     const packStates = Store.getAllPackStates()
-    const list = Store.BRANDS.map(brand => ({
+    const list = BRANDS.map(brand => ({
       ...brand,
       ...(packStates[brand.id] || {})
     }))
@@ -89,6 +122,10 @@ export default {
       this.listSignature = signature
       this.brands = list
     }
+    // 今日心情推荐 + 图鉴点亮状态：把静态的 tag/quote 激活成「今天该抽这根」
+    this.todayRec = recommendBrand()
+    const unlocked = getUnlockedBrands()
+    this.codex = BRANDS.map(b => ({ ...b, unlocked: unlocked.includes(b.id) }))
     this.markRefreshed()
   },
 
@@ -103,6 +140,8 @@ export default {
 
     selectBrand(brand) {
       const brandId = brand.id
+      // 选品牌时给一声按主色色相映射的提示音（H5 端生效；小程序无 WebAudio 自动降级静默）
+      this.playBrandChime(brand.accent)
       // 先跳转、后落存储：setStorageSync 是同步调用，放在跳转前会把转场动画推迟，
       // 手感就是「点下去先顿一下，页面才动」。详情页不依赖 selectedBrand，所以能挪。
       uni.navigateTo({
@@ -113,6 +152,43 @@ export default {
           Store.saveSettings(settings)
         }
       })
+    },
+
+    // 选品牌提示音：用主色色相映射音高，让每个牌子「听感」也不同。
+    // 纯 WebAudio 振荡器生成，不依赖音频文件；小程序无 window.AudioContext 时静默。
+    playBrandChime(hex) {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext
+        if (!AC) return
+        const ctx = new AC()
+        const freq = 200 + (this._hue(hex) / 360) * 520
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4)
+        osc.connect(gain).connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.42)
+        setTimeout(() => { try { ctx.close() } catch (e) {} }, 500)
+      } catch (e) {}
+    },
+
+    _hue(hex) {
+      const h = (hex || '#94a3b8').replace('#', '')
+      const r = parseInt(h.substr(0, 2), 16) / 255
+      const g = parseInt(h.substr(2, 2), 16) / 255
+      const b = parseInt(h.substr(4, 2), 16) / 255
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+      if (!d) return 0
+      let hue = 0
+      if (max === r) hue = ((g - b) / d) % 6
+      else if (max === g) hue = (b - r) / d + 2
+      else hue = (r - g) / d + 4
+      hue *= 60
+      return hue < 0 ? hue + 360 : hue
     }
   }
 }
@@ -338,5 +414,106 @@ export default {
 .disclaimer-text {
   font-size: 22rpx;
   color: var(--border);
+}
+
+/* 今日推荐条：一条细边框用品牌主色，不抢烟盒卡片的视觉重心 */
+.rec-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 0 14rpx 28rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid var(--border);
+  background: var(--surface-1);
+}
+.rec-icon { font-size: 30rpx; }
+.rec-body { flex: 1; display: flex; flex-direction: column; }
+.rec-label {
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  color: var(--text-dim);
+}
+.rec-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 2rpx;
+}
+.rec-go {
+  font-size: 24rpx;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* 卡片底部数值：解压指数 / 焦油感，给「选哪包」一点策略性 */
+.pack-meta {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 14rpx;
+}
+.pack-meta-item {
+  font-size: 18rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  color: rgba(240, 230, 210, 0.78);
+  background: rgba(240, 230, 210, 0.10);
+}
+
+/* 品牌图鉴：网格亮块用各品牌主色，未解锁灰 + 锁 */
+.codex {
+  margin: 8rpx 14rpx 0;
+  padding: 28rpx 24rpx 32rpx;
+  border-radius: 24rpx;
+  background: var(--surface-1);
+  border: 1rpx solid var(--border);
+}
+.codex-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.codex-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+.codex-count {
+  font-size: 22rpx;
+  color: var(--text-dim);
+}
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12rpx;
+}
+.codex-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.codex-cell.locked {
+  background: var(--surface-2);
+  border: 1rpx solid var(--border);
+}
+.codex-cn {
+  font-size: 18rpx;
+  color: #0c0d11;
+  font-weight: 700;
+  text-align: center;
+}
+.codex-cell.locked .codex-cn {
+  font-size: 24rpx;
+  color: var(--text-dim);
+}
+.codex-hint {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 20rpx;
+  color: var(--text-dim);
+  text-align: center;
 }
 </style>

@@ -133,7 +133,7 @@
 </template>
 
 <script>
-import Store from '@/utils/store.js'
+import Store, { BRANDS } from '@/utils/store.js'
 import AppNavbar from '@/components/app-navbar/app-navbar.vue'
 import { themeClass } from '@/utils/theme.js'
 
@@ -682,10 +682,24 @@ export default {
           const sc = res[1].node
           sc.width = 128; sc.height = 128
           const sx = sc.getContext('2d')
+          // 烟雾颜色跟随品牌：选「紫雾」吐淡紫烟、选「蓝汐」吐冰蓝烟。
+          // 之前写死白色，等于「选了牌子却还是白烟」，是品牌差异感知最弱的一环。
+          let brand = this.brandId ? BRANDS.find(b => b.id === this.brandId) : null
+          if (!brand) {
+            const sel = Store.getSettings().selectedBrand
+            brand = sel ? BRANDS.find(b => b.id === sel) : null
+          }
+          const smoke = (brand && brand.smoke) || '#dfe6f2'
+          const hexA = (hex, a) => {
+            const h = hex.replace('#', '')
+            const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h
+            const n = parseInt(full, 16)
+            return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+          }
           const g = sx.createRadialGradient(64, 64, 0, 64, 64, 64)
-          g.addColorStop(0.0, 'rgba(255,255,255,1)')
-          g.addColorStop(0.35, 'rgba(245,245,248,0.55)')
-          g.addColorStop(1.0, 'rgba(255,255,255,0)')
+          g.addColorStop(0.0, hexA(smoke, 1))
+          g.addColorStop(0.35, hexA(smoke, 0.55))
+          g.addColorStop(1.0, hexA(smoke, 0))
           sx.fillStyle = g
           sx.fillRect(0, 0, 128, 128)
           this.sprite = sc
